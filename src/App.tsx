@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/tauri";
 import "./App.css";
 import { DisplayInfo } from './models/display-info.model';
 import { DisplayInfoPanel } from './components/display-info-panel';
+import { ScreenView } from './components/screen-view';
 
 function App() {
   const [screenshots, setScreenshots] = createSignal<string[]>([]);
@@ -14,9 +15,9 @@ function App() {
     });
   });
 
-  createEffect(() => {
-    take_all_display_screenshot();
-  }, [displays]);
+  // createEffect(() => {
+  //   take_all_display_screenshot();
+  // }, [displays]);
 
   async function take_all_display_screenshot() {
     console.log('take_all_display_screenshot');
@@ -37,18 +38,7 @@ function App() {
           return (
             <li>
               <DisplayInfoPanel display={display} />
-            </li>
-          );
-        })}
-      </ol>
-      <ol>
-        {screenshots().map((screenshot) => {
-          return (
-            <li>
-              <img
-                style="object-fit: contain; height: 400px; width: 600px"
-                src={screenshot}
-              />
+              <ScreenView displayId={display.id} />
             </li>
           );
         })}

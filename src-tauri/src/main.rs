@@ -1,16 +1,18 @@
 // Prevents additional console window on WiOk(ndows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod take_screenshot_loop;
+pub mod screenshot;
+mod screenshot_manager;
 
 use base64::Engine;
 use core_graphics::display::{
     kCGNullWindowID, kCGWindowImageDefault, kCGWindowListOptionOnScreenOnly, CGDisplay,
 };
 use display_info::DisplayInfo;
+use paris::error;
+use screenshot_manager::ScreenshotManager;
 use serde::{Deserialize, Serialize};
 use serde_json::to_string;
-use tracing::error;
 
 #[derive(Serialize, Deserialize)]
 #[serde(remote = "DisplayInfo")]
@@ -63,7 +65,7 @@ fn take_screenshot(display_id: u32, scale_factor: f32) -> Result<String, String>
             kCGWindowImageDefault,
         )
         .ok_or_else(|| anyhow::anyhow!("Display#{}: take screenshot failed", display_id))?;
-        println!("take screenshot took {}ms", start_at.elapsed().as_millis());
+        // println!("take screenshot took {}ms", start_at.elapsed().as_millis());
 
         let buffer = cg_image.data();
         let bytes_per_row = cg_image.bytes_per_row() as f32;
@@ -74,10 +76,10 @@ fn take_screenshot(display_id: u32, scale_factor: f32) -> Result<String, String>
         let image_height = (height as f32 / scale_factor) as u32;
         let image_width = (width as f32 / scale_factor) as u32;
 
-        println!(
-            "raw image: {}x{}, output image: {}x{}",
-            width, height, image_width, image_height
-        );
+        // println!(
+        //     "raw image: {}x{}, output image: {}x{}",
+        //     width, height, image_width, image_height
+        // );
         // // from bitmap vec
         let mut image_buffer = vec![0u8; (image_width * image_height * 3) as usize];
 
@@ -88,7 +90,6 @@ fn take_screenshot(display_id: u32, scale_factor: f32) -> Result<String, String>
                 let b = buffer[offset];
                 let g = buffer[offset + 1];
                 let r = buffer[offset + 2];
-                let a = buffer[offset + 3];
                 let offset = (y * image_width + x) as usize;
                 image_buffer[offset * 3] = r;
                 image_buffer[offset * 3 + 1] = g;
@@ -136,12 +137,33 @@ fn take_screenshot(display_id: u32, scale_factor: f32) -> Result<String, String>
     })
 }
 
-fn main() {
+#[tauri::command]
+async fn subscribe_encoded_screenshot_updated(
+    window: tauri::Window,
+    display_id: u32,
+) -> Result<(), String> {
+    let screenshot_manager = ScreenshotManager::global().await;
+    screenshot_manager
+        .subscribe_encoded_screenshot_updated(window, display_id)
+        .await
+        .map_err(|err| {
+            error!("subscribe_encoded_screenshot_updated: {}", err);
+            err.to_string()
+        })
+}
+
+#[tokio::main]
+async fn main() {
+    env_logger::init();
+
+    let screenshot_manager = ScreenshotManager::global().await;
+    screenshot_manager.start().unwrap();
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             greet,
             take_screenshot,
-            list_display_info
+            list_display_info,
+            subscribe_encoded_screenshot_updated
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

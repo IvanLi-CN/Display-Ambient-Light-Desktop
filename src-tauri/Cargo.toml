@@ -22,7 +22,10 @@ core-graphics = "0.22.3"
 display-info = "0.4.1"
 png = "0.17.7"
 anyhow = "1.0.69"
-tracing = "0.1.37"
+tokio = {version = "1.26.0", features = ["full"] }
+paris = { version = "1.5", features = ["timestamps", "macros"] }
+log = "0.4.17"
+env_logger = "0.10.0"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem
