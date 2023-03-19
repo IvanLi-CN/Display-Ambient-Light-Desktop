@@ -8,8 +8,8 @@ type DisplayInfoItemProps = {
 export const DisplayInfoItem: ParentComponent<DisplayInfoItemProps> = (props) => {
   return (
     <dl class="px-3 py-1 flex hover:bg-gray-100/50 gap-2 text-black rounded">
-      <dt class="uppercase w-1/2 select-all">{props.label}</dt>
-      <dd class="select-all">{props.children}</dd>
+      <dt class="uppercase w-1/2 select-all whitespace-nowrap">{props.label}</dt>
+      <dd class="select-all w-1/2 whitespace-nowrap">{props.children}</dd>
     </dl>
   );
 };
