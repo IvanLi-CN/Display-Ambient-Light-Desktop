@@ -38,5 +38,5 @@ pub struct ScreenshotPayload {
     pub display_id: u32,
     pub height: u32,
     pub width: u32,
-    pub base64_image: String,
+    // pub base64_image: String,
 }

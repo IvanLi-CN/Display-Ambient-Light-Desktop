@@ -167,12 +167,9 @@ async fn main() {
             subscribe_encoded_screenshot_updated
         ])
         .register_uri_scheme_protocol("ambient-light", move |_app, request| {
-            info!("request: {:?}", request.uri());
-            // prepare our response
             let response = ResponseBuilder::new().header("Access-Control-Allow-Origin", "*");
-            // get the file path
-            let uri = request.uri();
 
+            let uri = request.uri();
             let uri = percent_encoding::percent_decode_str(uri)
                 .decode_utf8()
                 .unwrap()
@@ -226,7 +223,7 @@ async fn main() {
                                 .unwrap();
                             (screenshot.width as f32 / width as f32, width, height)
                         } else {
-                            info!("scale by scale_factor");
+                            log::debug!("scale by scale_factor");
                             let scale_factor = screenshot.scale_factor;
                             (
                                 scale_factor,
@@ -234,7 +231,7 @@ async fn main() {
                                 (screenshot.height as f32 / scale_factor) as u32,
                             )
                         };
-                        info!(
+                        log::debug!(
                             "scale by query. width: {}, height: {}, scale_factor: {}, len: {}",
                             width,
                             height,

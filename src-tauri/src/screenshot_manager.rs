@@ -90,7 +90,7 @@ impl ScreenshotManager {
             }
             loop {
                 Self::take_screenshot_loop(display_id, scale_factor, &tx).await;
-                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(20)).await;
             }
         });
 
@@ -150,31 +150,31 @@ impl ScreenshotManager {
                     break;
                 }
                 let screenshot = rx.borrow().clone();
-                let base64_image = Self::encode_screenshot_to_base64(&screenshot).await;
+                // let base64_image = Self::encode_screenshot_to_base64(&screenshot).await;
                 let height = screenshot.height;
                 let width = screenshot.width;
 
-                if base64_image.is_err() {
-                    error!(
-                        "subscribe_encoded_screenshot_updated: encode_screenshot_to_base64 error {}",
-                        base64_image.err().unwrap()
-                    );
-                    continue;
-                }
+                // if base64_image.is_err() {
+                //     error!(
+                //         "subscribe_encoded_screenshot_updated: encode_screenshot_to_base64 error {}",
+                //         base64_image.err().unwrap()
+                //     );
+                //     continue;
+                // }
 
-                let base64_image = base64_image.unwrap();
+                // let base64_image = base64_image.unwrap();
                 for window in windows.unwrap().into_iter() {
-                let base64_image = base64_image.clone();
+                    // let base64_image = base64_image.clone();
                     let payload = ScreenshotPayload {
                         display_id,
-                        base64_image,
+                        // base64_image,
                         height,
                         width,
                     };
                     if let Err(err) = window.emit("encoded-screenshot-updated", payload) {
                         error!("subscribe_encoded_screenshot_updated: emit error {}", err)
                     } else {
-                        info!(
+                        log::debug!(
                             "subscribe_encoded_screenshot_updated: emit success. display#{}",
                             display_id
                         )
