@@ -44,7 +44,7 @@ pub fn take_screenshot(display_id: u32, scale_factor: f32) -> anyhow::Result<Scr
 }
 
 pub struct ScreenshotManager {
-    channels: Arc<RwLock<HashMap<u32, watch::Receiver<Screenshot>>>>,
+    pub channels: Arc<RwLock<HashMap<u32, watch::Receiver<Screenshot>>>>,
     encode_listeners: Arc<RwLock<HashMap<u32, Vec<Window>>>>,
 }
 

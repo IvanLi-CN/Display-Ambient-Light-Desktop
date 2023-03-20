@@ -1,8 +1,9 @@
 import { createEffect } from 'solid-js';
-import { invoke } from '@tauri-apps/api/tauri';
-import { DisplayView } from './components/\u0016display-view';
+import { convertFileSrc, invoke } from '@tauri-apps/api/tauri';
+import { DisplayView } from './components/display-view';
 import { DisplayListContainer } from './components/display-list-container';
 import { displayStore, setDisplayStore } from './stores/display.store';
+import { path } from '@tauri-apps/api';
 
 function App() {
   createEffect(() => {

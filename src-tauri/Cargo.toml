@@ -26,6 +26,8 @@ tokio = {version = "1.26.0", features = ["full"] }
 paris = { version = "1.5", features = ["timestamps", "macros"] }
 log = "0.4.17"
 env_logger = "0.10.0"
+percent-encoding = "2.2.0"
+url-build-parse = "9.0.0"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem

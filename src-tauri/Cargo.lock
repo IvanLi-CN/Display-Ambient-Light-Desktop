@@ -2653,12 +2653,14 @@ dependencies = [
  "env_logger",
  "log",
  "paris",
+ "percent-encoding",
  "png",
  "serde",
  "serde_json",
  "tauri",
  "tauri-build",
  "tokio",
+ "url-build-parse",
  "webp",
 ]
 
@@ -2912,6 +2914,21 @@ dependencies = [
  "percent-encoding",
  "serde",
 ]
+
+[[package]]
+name = "url-build-parse"
+version = "9.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "434debbcbb26557225df912efe7949c6d1237defa81ae14d05a9cd8b7ffa2776"
+dependencies = [
+ "url-search-params",
+]
+
+[[package]]
+name = "url-search-params"
+version = "9.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e84890540c25e90ae611bfbab7d8bfcd138f29af6495027478945c1427abf532"
 
 [[package]]
 name = "utf-8"
