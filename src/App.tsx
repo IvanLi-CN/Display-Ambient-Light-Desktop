@@ -15,7 +15,7 @@ function App() {
   });
 
   return (
-    <div class="container">
+    <div>
       <DisplayListContainer>
         {displayStore.displays.map((display) => {
           return <DisplayView display={display} />;

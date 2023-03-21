@@ -13,9 +13,7 @@ import {
 
 type ScreenViewProps = {
   displayId: number;
-  height: number;
-  width: number;
-} & Omit<JSX.HTMLAttributes<HTMLCanvasElement>, 'height' | 'width'>;
+} & JSX.HTMLAttributes<HTMLDivElement>;
 
 async function subscribeScreenshotUpdate(displayId: number) {
   await invoke('subscribe_encoded_screenshot_updated', {
@@ -26,7 +24,63 @@ async function subscribeScreenshotUpdate(displayId: number) {
 export const ScreenView: Component<ScreenViewProps> = (props) => {
   const [localProps, rootProps] = splitProps(props, ['displayId']);
   let canvas: HTMLCanvasElement;
+  let root: HTMLDivElement;
   const [ctx, setCtx] = createSignal<CanvasRenderingContext2D | null>(null);
+  const [drawInfo, setDrawInfo] = createSignal({
+    drawX: 0,
+    drawY: 0,
+    drawWidth: 0,
+    drawHeight: 0,
+  });
+  const [imageData, setImageData] = createSignal<{
+    buffer: Uint8ClampedArray;
+    width: number;
+    height: number;
+  } | null>(null);
+
+  const resetSize = () => {
+    const aspectRatio = canvas.width / canvas.height;
+
+    const drawWidth = Math.round(
+      Math.min(root.clientWidth, root.clientHeight * aspectRatio),
+    );
+    const drawHeight = Math.round(
+      Math.min(root.clientHeight, root.clientWidth / aspectRatio),
+    );
+
+    const drawX = Math.round((root.clientWidth - drawWidth) / 2);
+    const drawY = Math.round((root.clientHeight - drawHeight) / 2);
+
+    setDrawInfo({
+      drawX,
+      drawY,
+      drawWidth,
+      drawHeight,
+    });
+
+    canvas.width = root.clientWidth;
+    canvas.height = root.clientHeight;
+
+    draw(true);
+  };
+
+  const draw = (cached: boolean = false) => {
+    const { drawX, drawY, drawWidth, drawHeight } = drawInfo();
+
+    let _ctx = ctx();
+    let raw = imageData();
+    if (_ctx && raw) {
+      _ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (cached) {
+        for (let i = 3; i < raw.buffer.length; i += 8) {
+          raw.buffer[i] = Math.floor(raw.buffer[i] * 0.7);
+        }
+      }
+      const img = new ImageData(raw.buffer, raw.width, raw.height);
+      _ctx.putImageData(img, drawX, drawY);
+    }
+  };
+
   createEffect(() => {
     const unlisten = listen<{
       base64_image: string;
@@ -34,9 +88,10 @@ export const ScreenView: Component<ScreenViewProps> = (props) => {
       height: number;
       width: number;
     }>('encoded-screenshot-updated', (event) => {
+      const { drawWidth, drawHeight } = drawInfo();
       if (event.payload.display_id === localProps.displayId) {
         const url = convertFileSrc(
-          `displays/${localProps.displayId}?width=${canvas.width}&height=${canvas.height}`,
+          `displays/${localProps.displayId}?width=${drawWidth}&height=${drawHeight}`,
           'ambient-light',
         );
         fetch(url, {
@@ -44,28 +99,23 @@ export const ScreenView: Component<ScreenViewProps> = (props) => {
         })
           .then((res) => res.body?.getReader().read())
           .then((buffer) => {
-            console.log(buffer?.value?.length);
-
-            let _ctx = ctx();
-            if (_ctx && buffer?.value) {
-              _ctx.clearRect(0, 0, canvas.width, canvas.height);
-              const img = new ImageData(
-                new Uint8ClampedArray(buffer.value),
-                canvas.width,
-                canvas.height,
-              );
-              _ctx.putImageData(img, 0, 0);
+            // console.log(buffer?.value?.length);
+            if (buffer?.value) {
+              setImageData({
+                buffer: new Uint8ClampedArray(buffer?.value),
+                width: drawWidth,
+                height: drawHeight,
+              });
+            } else {
+              setImageData(null);
             }
+            draw();
           });
       }
 
       // console.log(event.payload.display_id, localProps.displayId);
     });
     subscribeScreenshotUpdate(localProps.displayId);
-
-    onMount(() => {
-      setCtx(canvas.getContext('2d'));
-    });
 
     onCleanup(() => {
       unlisten.then((unlisten) => {
@@ -74,5 +124,28 @@ export const ScreenView: Component<ScreenViewProps> = (props) => {
     });
   });
 
-  return <canvas ref={canvas!} class="object-contain" {...rootProps} />;
+  createEffect(() => {
+    let resizeObserver: ResizeObserver;
+
+    onMount(() => {
+      setCtx(canvas.getContext('2d'));
+      new ResizeObserver(() => {
+        resetSize();
+      }).observe(root);
+    });
+
+    onCleanup(() => {
+      resizeObserver?.unobserve(root);
+    });
+  });
+
+  return (
+    <div
+      ref={root!}
+      {...rootProps}
+      class={'overflow-hidden h-full w-full ' + rootProps.class}
+    >
+      <canvas ref={canvas!} />
+    </div>
+  );
 };
