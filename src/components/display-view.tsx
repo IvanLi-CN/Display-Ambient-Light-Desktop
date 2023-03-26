@@ -45,19 +45,19 @@ export const DisplayView: Component<DisplayViewProps> = (props) => {
         class="absolute bg-slate-50/10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded backdrop-blur w-1/3 min-w-[300px] text-black"
       />
       <LedStripPart
-        class="row-start-1 col-start-2 flex-row"
+        class="row-start-1 col-start-2 flex-row overflow-hidden"
         config={ledStripConfigs().find((c) => c.border === 'Top')}
       />
       <LedStripPart
-        class="row-start-2 col-start-1 flex-col"
+        class="row-start-2 col-start-1 flex-col overflow-hidden"
         config={ledStripConfigs().find((c) => c.border === 'Left')}
       />
       <LedStripPart
-        class="row-start-2 col-start-3 flex-col"
+        class="row-start-2 col-start-3 flex-col overflow-hidden"
         config={ledStripConfigs().find((c) => c.border === 'Right')}
       />
       <LedStripPart
-        class="row-start-3 col-start-2 flex-row"
+        class="row-start-3 col-start-2 flex-row overflow-hidden"
         config={ledStripConfigs().find((c) => c.border === 'Bottom')}
       />
     </section>

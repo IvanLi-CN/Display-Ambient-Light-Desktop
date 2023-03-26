@@ -34,10 +34,14 @@ export const Pixel: Component<PixelProps> = (props) => {
   }));
   return (
     <div
-      class="inline-block flex-shrink w-2 h-2 aspect-square rounded-full border border-black"
-      style={style()}
+      class="flex-auto flex h-full w-full justify-center items-center relative"
       title={props.color}
-    />
+    >
+      <div
+        class="absolute top-px h-2 w-2 rounded-full shadow-2xl shadow-black"
+        style={style()}
+      />
+    </div>
   );
 };
 
@@ -52,6 +56,7 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
     if (!localProps.config || !samplePoints) {
       return;
     }
+
     let pendingCount = 0;
     const unlisten = listen<{
       base64_image: string;
@@ -66,12 +71,6 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
         return;
       }
       pendingCount++;
-
-      console.log({
-        samplePoints,
-        displayId: event.payload.display_id,
-        border: localProps.config!.border,
-      });
 
       invoke<string[]>('get_one_edge_colors', {
         samplePoints,
@@ -107,7 +106,6 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
     if (_colors) {
       return <For each={_colors}>{(item) => <Pixel color={item} />}</For>;
     } else if (localProps.config) {
-      return null;
       return (
         <For each={new Array(localProps.config.len).fill(undefined)}>
           {() => <Pixel color="transparent" />}

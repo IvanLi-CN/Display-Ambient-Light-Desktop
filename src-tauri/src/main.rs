@@ -98,24 +98,19 @@ async fn write_led_strip_configs(
 async fn get_led_strips_sample_points(
     config: LedStripConfig,
 ) -> Result<Vec<screenshot::LedSamplePoints>, String> {
-    let displays = DisplayInfo::all().map_err(|e| {
-        error!("can not read led strip config: {}", e);
-        e.to_string()
-    });
-    let display = displays?.into_iter().find(|d| d.id == config.display_id);
-
-    if let None = display {
+    let screenshot_manager = ScreenshotManager::global().await;
+    let channels = screenshot_manager.channels.read().await;
+    if let Some(rx) = channels.get(&config.display_id) {
+        let rx = rx.clone();
+        let screenshot = rx.borrow().clone();
+        let width = screenshot.width;
+        let height = screenshot.height;
+        let sample_points =
+            Screenshot::get_sample_point(&config, width as usize, height as usize);
+        Ok(sample_points)
+    } else {
         return Err(format!("display not found: {}", config.display_id));
     }
-
-    let display = display.unwrap();
-
-    let config = screenshot::Screenshot::get_sample_point(
-        config,
-        display.width as usize,
-        display.height as usize,
-    );
-    Ok(config)
 }
 
 #[tauri::command]

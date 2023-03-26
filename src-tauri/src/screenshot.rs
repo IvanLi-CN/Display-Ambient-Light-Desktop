@@ -42,7 +42,7 @@ impl Screenshot {
     }
 
     pub fn get_sample_point(
-        config: LedStripConfig,
+        config: &LedStripConfig,
         width: usize,
         height: usize,
     ) -> Vec<LedSamplePoints> {
