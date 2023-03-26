@@ -1,11 +1,11 @@
-import { createEffect } from 'solid-js';
-import { convertFileSrc, invoke } from '@tauri-apps/api/tauri';
+import { createEffect, onCleanup } from 'solid-js';
+import { invoke } from '@tauri-apps/api/tauri';
 import { DisplayView } from './components/display-view';
 import { DisplayListContainer } from './components/display-list-container';
 import { displayStore, setDisplayStore } from './stores/display.store';
-import { path } from '@tauri-apps/api';
 import { LedStripConfig } from './models/led-strip-config';
 import { setLedStripStore } from './stores/led-strip.store';
+import { listen } from '@tauri-apps/api/event';
 
 function App() {
   createEffect(() => {
@@ -15,11 +15,23 @@ function App() {
       });
     });
     invoke<LedStripConfig[]>('read_led_strip_configs').then((strips) => {
-      console.log(strips);
-
       setLedStripStore({
         strips,
       });
+    });
+  });
+
+  // register tauri event listeners
+  createEffect(() => {
+    const unlisten = listen('config_changed', (event) => {
+      const strips = event.payload as LedStripConfig[];
+      setLedStripStore({
+        strips,
+      });
+    });
+
+    onCleanup(() => {
+      unlisten.then((unlisten) => unlisten());
     });
   });
 

@@ -3,8 +3,9 @@ use std::env::current_dir;
 use paris::{error, info};
 use serde::{Deserialize, Serialize};
 use tauri::api::path::config_dir;
+use tokio::sync::OnceCell;
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq)]
 pub enum Border {
     Top,
     Bottom,
@@ -29,7 +30,20 @@ pub struct LedStripConfig {
     pub len: usize,
 }
 
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct LedStripConfigGroup {
+    pub items: Vec<LedStripConfig>,
+}
+
+
 impl LedStripConfig {
+    pub async fn global() -> &'static Vec<LedStripConfig> {
+        static LED_STRIP_CONFIGS_GLOBAL: OnceCell<Vec<LedStripConfig>> = OnceCell::const_new();
+        LED_STRIP_CONFIGS_GLOBAL
+            .get_or_init(|| async { Self::read_config().await.unwrap() })
+            .await
+    }
+
     pub async fn read_config() -> anyhow::Result<Vec<Self>> {
         // config path
         let path = config_dir()
@@ -43,10 +57,10 @@ impl LedStripConfig {
         if exists {
             let config = tokio::fs::read_to_string(path).await?;
 
-            let config: Vec<Self> = toml::from_str(&config)
+            let config: LedStripConfigGroup = toml::from_str(&config)
                 .map_err(|e| anyhow::anyhow!("Failed to parse config file: {}", e))?;
 
-            Ok(config)
+            Ok(config.items)
         } else {
             info!("config file not exist, fallback to default config");
             Ok(Self::get_default_config().await?)
@@ -58,12 +72,15 @@ impl LedStripConfig {
             .unwrap_or(current_dir().unwrap())
             .join("led_strip_config.toml");
 
-        let config = toml::to_string(configs)
-            .map_err(|e| anyhow::anyhow!("Failed to parse config file: {}", e))?;
+        let configs = LedStripConfigGroup { items: configs.clone() };
 
-        tokio::fs::write(path, config)
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to write config file: {}", e))?;
+        let config = toml::to_string(&configs).map_err(|e| {
+            anyhow::anyhow!("Failed to parse config file: {}. configs: {:?}", e, configs)
+        })?;
+
+        tokio::fs::write(&path, config).await.map_err(|e| {
+            anyhow::anyhow!("Failed to write config file: {}. path: {:?}", e, &path)
+        })?;
 
         Ok(())
     }
@@ -99,13 +116,10 @@ impl LedStripConfig {
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug)]
-pub struct DisplayConfig {
+pub struct LedStripConfigOfDisplays {
     pub id: u32,
     pub index_of_display: usize,
-    pub display_width: usize,
-    pub display_height: usize,
     pub led_strip_of_borders: LedStripConfigOfBorders,
-    pub scale_factor: f32,
 }
 
 impl LedStripConfigOfBorders {
@@ -119,21 +133,98 @@ impl LedStripConfigOfBorders {
     }
 }
 
-impl DisplayConfig {
-    pub fn default(
-        id: u32,
-        index_of_display: usize,
-        display_width: usize,
-        display_height: usize,
-        scale_factor: f32,
-    ) -> Self {
+impl LedStripConfigOfDisplays {
+    pub fn default(id: u32, index_of_display: usize) -> Self {
         Self {
             id,
             index_of_display,
-            display_width,
-            display_height,
             led_strip_of_borders: LedStripConfigOfBorders::default(),
-            scale_factor,
         }
+    }
+
+    pub async fn read_from_disk() -> anyhow::Result<Self> {
+        let path = config_dir()
+            .unwrap_or(current_dir().unwrap())
+            .join("led_strip_config_of_displays.toml");
+
+        let exists = tokio::fs::try_exists(path.clone())
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to check config file exists: {}", e))?;
+
+        if exists {
+            let config = tokio::fs::read_to_string(path).await?;
+
+            let config: Self = toml::from_str(&config)
+                .map_err(|e| anyhow::anyhow!("Failed to parse config file: {}", e))?;
+
+            Ok(config)
+        } else {
+            info!("config file not exist, fallback to default config");
+            Ok(Self::get_default_config().await?)
+        }
+    }
+
+    pub async fn write_to_disk(&self) -> anyhow::Result<()> {
+        let path = config_dir()
+            .unwrap_or(current_dir().unwrap())
+            .join("led_strip_config_of_displays.toml");
+
+        let config = toml::to_string(self).map_err(|e| {
+            anyhow::anyhow!("Failed to parse config file: {}. config: {:?}", e, self)
+        })?;
+
+        tokio::fs::write(&path, config).await.map_err(|e| {
+            anyhow::anyhow!("Failed to write config file: {}. path: {:?}", e, &path)
+        })?;
+
+        Ok(())
+    }
+
+    pub async fn get_default_config() -> anyhow::Result<Self> {
+        let displays = display_info::DisplayInfo::all().map_err(|e| {
+            error!("can not list display info: {}", e);
+            anyhow::anyhow!("can not list display info: {}", e)
+        })?;
+
+        let mut configs = Vec::new();
+        for (i, display) in displays.iter().enumerate() {
+            let config = Self {
+                id: display.id,
+                index_of_display: i,
+                led_strip_of_borders: LedStripConfigOfBorders {
+                    top: Some(LedStripConfig {
+                        index: i * 4 * 30,
+                        display_id: display.id,
+                        border: Border::Top,
+                        start_pos: i * 4 * 30,
+                        len: 30,
+                    }),
+                    bottom: Some(LedStripConfig {
+                        index: i * 4 * 30 + 30,
+                        display_id: display.id,
+                        border: Border::Bottom,
+                        start_pos: i * 4 * 30 + 30,
+                        len: 30,
+                    }),
+                    left: Some(LedStripConfig {
+                        index: i * 4 * 30 + 60,
+                        display_id: display.id,
+                        border: Border::Left,
+                        start_pos: i * 4 * 30 + 60,
+                        len: 30,
+                    }),
+                    right: Some(LedStripConfig {
+                        index: i * 4 * 30 + 90,
+                        display_id: display.id,
+                        border: Border::Right,
+                        start_pos: i * 4 * 30 + 90,
+                        len: 30,
+                    }),
+                }
+            };
+            configs.push(config);
+        }
+
+        Ok(configs[0])
     }
 }

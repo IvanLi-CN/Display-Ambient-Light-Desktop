@@ -7,11 +7,9 @@ import {
   createSignal,
   For,
   JSX,
-  on,
   onCleanup,
   splitProps,
 } from 'solid-js';
-import { borders } from '../constants/border';
 import { LedStripConfig } from '../models/led-strip-config';
 
 type LedStripPartProps = {
@@ -38,7 +36,7 @@ export const Pixel: Component<PixelProps> = (props) => {
       title={props.color}
     >
       <div
-        class="absolute top-px h-2 w-2 rounded-full shadow-2xl shadow-black"
+        class="absolute top-1/2 -translate-y-1/2 h-2.5 w-2.5 rounded-full ring-1 ring-stone-300"
         style={style()}
       />
     </div>
@@ -101,6 +99,20 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
     }
   });
 
+  const onWheel = (e: WheelEvent) => {
+    if (localProps.config) {
+      invoke('patch_led_strip_len', {
+        displayId: localProps.config.display_id,
+        border: localProps.config.border,
+        deltaLen: e.deltaY > 0 ? 1 : -1,
+      })
+        .then(() => {})
+        .catch((e) => {
+          console.error(e);
+        });
+    }
+  };
+
   const pixels = createMemo(() => {
     const _colors = colors();
     if (_colors) {
@@ -118,9 +130,9 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
     <section
       {...rootProps}
       class={
-        'bg-yellow-50 flex flex-nowrap justify-around items-center overflow-hidden' +
-        rootProps.class
+        'flex flex-nowrap justify-around items-center overflow-hidden ' + rootProps.class
       }
+      onWheel={onWheel}
     >
       {pixels()}
     </section>

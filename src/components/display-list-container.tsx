@@ -1,11 +1,13 @@
 import {
   createEffect,
   createSignal,
+  JSX,
   onCleanup,
   onMount,
   ParentComponent,
 } from 'solid-js';
 import { displayStore, setDisplayStore } from '../stores/display.store';
+import background from '../assets/transparent-grid-background.svg?url';
 
 export const DisplayListContainer: ParentComponent = (props) => {
   let root: HTMLElement;
@@ -13,8 +15,7 @@ export const DisplayListContainer: ParentComponent = (props) => {
     top: '0px',
     left: '0px',
   });
-  const [rootStyle, setRootStyle] = createSignal({
-    // width: '100%',
+  const [rootStyle, setRootStyle] = createSignal<JSX.CSSProperties>({
     height: '100%',
   });
   const [bound, setBound] = createSignal({
@@ -38,6 +39,7 @@ export const DisplayListContainer: ParentComponent = (props) => {
 
     setRootStyle({
       height: `${(_bound.bottom - _bound.top) * displayStore.viewScale}px`,
+      background: `url(${background})`,
     });
   };
 
@@ -74,7 +76,7 @@ export const DisplayListContainer: ParentComponent = (props) => {
 
   return (
     <section ref={root!} class="relative bg-gray-400/30" style={rootStyle()}>
-      <ol class="absolute bg-gray-700" style={olStyle()}>
+      <ol class="absolute" style={olStyle()}>
         {props.children}
       </ol>
     </section>

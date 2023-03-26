@@ -30,7 +30,7 @@ export const DisplayView: Component<DisplayViewProps> = (props) => {
 
   return (
     <section
-      class="absolute bg-gray-300 grid grid-cols-[16px,auto,16px] grid-rows-[16px,auto,16px] overflow-hidden"
+      class="absolute grid grid-cols-[16px,auto,16px] grid-rows-[16px,auto,16px] overflow-hidden group"
       style={style()}
     >
       <ScreenView
@@ -42,7 +42,7 @@ export const DisplayView: Component<DisplayViewProps> = (props) => {
       />
       <DisplayInfoPanel
         display={props.display}
-        class="absolute bg-slate-50/10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded backdrop-blur w-1/3 min-w-[300px] text-black"
+        class="absolute bg-slate-700/20 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded backdrop-blur w-1/3 min-w-[300px] text-black group-hover:opacity-100 opacity-0 transition-opacity"
       />
       <LedStripPart
         class="row-start-1 col-start-2 flex-row overflow-hidden"

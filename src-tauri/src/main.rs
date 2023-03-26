@@ -7,7 +7,7 @@ mod led_color;
 pub mod screenshot;
 mod screenshot_manager;
 
-use ambient_light::LedStripConfig;
+use ambient_light::{Border, LedStripConfig};
 use core_graphics::display::{
     kCGNullWindowID, kCGWindowImageDefault, kCGWindowListOptionOnScreenOnly, CGDisplay,
 };
@@ -17,7 +17,7 @@ use screenshot::Screenshot;
 use screenshot_manager::ScreenshotManager;
 use serde::{Deserialize, Serialize};
 use serde_json::to_string;
-use tauri::{http::ResponseBuilder, regex};
+use tauri::{http::ResponseBuilder, regex, Manager};
 
 #[derive(Serialize, Deserialize)]
 #[serde(remote = "DisplayInfo")]
@@ -105,8 +105,7 @@ async fn get_led_strips_sample_points(
         let screenshot = rx.borrow().clone();
         let width = screenshot.width;
         let height = screenshot.height;
-        let sample_points =
-            Screenshot::get_sample_point(&config, width as usize, height as usize);
+        let sample_points = Screenshot::get_sample_point(&config, width as usize, height as usize);
         Ok(sample_points)
     } else {
         return Err(format!("display not found: {}", config.display_id));
@@ -132,6 +131,22 @@ async fn get_one_edge_colors(
     }
 }
 
+#[tauri::command]
+async fn patch_led_strip_len(display_id: u32, border: Border, delta_len: i8) -> Result<(), String> {
+    info!("patch_led_strip_len: {} {:?} {}", display_id, border, delta_len);
+    let config_manager = ambient_light::ConfigManager::global().await;
+    config_manager
+        .patch_led_strip_len(display_id, border, delta_len)
+        .await
+        .map_err(|e| {
+            error!("can not patch led strip len: {}", e);
+            e.to_string()
+        })?;
+
+    info!("patch_led_strip_len: ok");
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() {
     env_logger::init();
@@ -146,7 +161,8 @@ async fn main() {
             read_led_strip_configs,
             write_led_strip_configs,
             get_led_strips_sample_points,
-            get_one_edge_colors
+            get_one_edge_colors,
+            patch_led_strip_len
         ])
         .register_uri_scheme_protocol("ambient-light", move |_app, request| {
             let response = ResponseBuilder::new().header("Access-Control-Allow-Origin", "*");
@@ -274,6 +290,28 @@ async fn main() {
                 .mimetype("text/plain")
                 .status(500)
                 .body(err.to_string().into_bytes());
+        })
+        .setup(move |app| {
+            let app_handle = app.handle().clone();
+            tokio::spawn(async move {
+                let config_manager = ambient_light::ConfigManager::global().await;
+                let config_update_receiver = config_manager.clone_config_update_receiver();
+                let mut config_update_receiver = config_update_receiver;
+                loop {
+                    if let Err(err) = config_update_receiver.changed().await {
+                        error!("config update receiver changed error: {}", err);
+                        return;
+                    }
+
+                    log::info!("config changed. emit config_changed event.");
+
+                    let config = config_update_receiver.borrow().clone();
+
+                    app_handle.emit_all("config_changed", config).unwrap();
+                }
+            });
+
+            Ok(())
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

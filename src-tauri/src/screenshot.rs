@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use tauri::async_runtime::RwLock;
 
 use crate::{
-    ambient_light::{DisplayConfig, LedStripConfig},
+    ambient_light::{LedStripConfigOfDisplays, LedStripConfig},
     led_color::LedColor,
 };
 
@@ -80,92 +80,92 @@ impl Screenshot {
         }
     }
 
-    fn get_sample_points(config: DisplayConfig) -> ScreenSamplePoints {
-        let top = match config.led_strip_of_borders.top {
-            Some(led_strip_config) => Self::get_one_edge_sample_points(
-                config.display_height / 8,
-                config.display_width,
-                led_strip_config.len,
-                1,
-            ),
-            None => {
-                vec![]
-            }
-        };
+    // fn get_sample_points(config: DisplayConfig) -> ScreenSamplePoints {
+    //     let top = match config.led_strip_of_borders.top {
+    //         Some(led_strip_config) => Self::get_one_edge_sample_points(
+    //             config.display_height / 8,
+    //             config.display_width,
+    //             led_strip_config.len,
+    //             1,
+    //         ),
+    //         None => {
+    //             vec![]
+    //         }
+    //     };
 
-        let bottom: Vec<LedSamplePoints> = match config.led_strip_of_borders.bottom {
-            Some(led_strip_config) => {
-                let points = Self::get_one_edge_sample_points(
-                    config.display_height / 9,
-                    config.display_width,
-                    led_strip_config.len,
-                    5,
-                );
-                points
-                    .into_iter()
-                    .map(|groups| -> Vec<Point> {
-                        groups
-                            .into_iter()
-                            .map(|(x, y)| (x, config.display_height - y))
-                            .collect()
-                    })
-                    .collect()
-            }
-            None => {
-                vec![]
-            }
-        };
+    //     let bottom: Vec<LedSamplePoints> = match config.led_strip_of_borders.bottom {
+    //         Some(led_strip_config) => {
+    //             let points = Self::get_one_edge_sample_points(
+    //                 config.display_height / 9,
+    //                 config.display_width,
+    //                 led_strip_config.len,
+    //                 5,
+    //             );
+    //             points
+    //                 .into_iter()
+    //                 .map(|groups| -> Vec<Point> {
+    //                     groups
+    //                         .into_iter()
+    //                         .map(|(x, y)| (x, config.display_height - y))
+    //                         .collect()
+    //                 })
+    //                 .collect()
+    //         }
+    //         None => {
+    //             vec![]
+    //         }
+    //     };
 
-        let left: Vec<LedSamplePoints> = match config.led_strip_of_borders.left {
-            Some(led_strip_config) => {
-                let points = Self::get_one_edge_sample_points(
-                    config.display_width / 16,
-                    config.display_height,
-                    led_strip_config.len,
-                    5,
-                );
-                points
-                    .into_iter()
-                    .map(|groups| -> Vec<Point> {
-                        groups.into_iter().map(|(x, y)| (y, x)).collect()
-                    })
-                    .collect()
-            }
-            None => {
-                vec![]
-            }
-        };
+    //     let left: Vec<LedSamplePoints> = match config.led_strip_of_borders.left {
+    //         Some(led_strip_config) => {
+    //             let points = Self::get_one_edge_sample_points(
+    //                 config.display_width / 16,
+    //                 config.display_height,
+    //                 led_strip_config.len,
+    //                 5,
+    //             );
+    //             points
+    //                 .into_iter()
+    //                 .map(|groups| -> Vec<Point> {
+    //                     groups.into_iter().map(|(x, y)| (y, x)).collect()
+    //                 })
+    //                 .collect()
+    //         }
+    //         None => {
+    //             vec![]
+    //         }
+    //     };
 
-        let right: Vec<LedSamplePoints> = match config.led_strip_of_borders.right {
-            Some(led_strip_config) => {
-                let points = Self::get_one_edge_sample_points(
-                    config.display_width / 16,
-                    config.display_height,
-                    led_strip_config.len,
-                    5,
-                );
-                points
-                    .into_iter()
-                    .map(|groups| -> Vec<Point> {
-                        groups
-                            .into_iter()
-                            .map(|(x, y)| (config.display_width - y, x))
-                            .collect()
-                    })
-                    .collect()
-            }
-            None => {
-                vec![]
-            }
-        };
+    //     let right: Vec<LedSamplePoints> = match config.led_strip_of_borders.right {
+    //         Some(led_strip_config) => {
+    //             let points = Self::get_one_edge_sample_points(
+    //                 config.display_width / 16,
+    //                 config.display_height,
+    //                 led_strip_config.len,
+    //                 5,
+    //             );
+    //             points
+    //                 .into_iter()
+    //                 .map(|groups| -> Vec<Point> {
+    //                     groups
+    //                         .into_iter()
+    //                         .map(|(x, y)| (config.display_width - y, x))
+    //                         .collect()
+    //                 })
+    //                 .collect()
+    //         }
+    //         None => {
+    //             vec![]
+    //         }
+    //     };
 
-        ScreenSamplePoints {
-            top,
-            bottom,
-            left,
-            right,
-        }
-    }
+    //     ScreenSamplePoints {
+    //         top,
+    //         bottom,
+    //         left,
+    //         right,
+    //     }
+    // }
 
     fn get_one_edge_sample_points(
         width: usize,
