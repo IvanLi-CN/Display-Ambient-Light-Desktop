@@ -12,7 +12,9 @@
   "license": "MIT",
   "dependencies": {
     "@tauri-apps/api": "^1.2.0",
-    "solid-js": "^1.4.7"
+    "solid-js": "^1.4.7",
+    "solid-tippy": "^0.2.1",
+    "tippy.js": "^6.3.7"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^1.2.2",

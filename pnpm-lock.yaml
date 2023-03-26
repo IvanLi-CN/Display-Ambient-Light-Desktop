@@ -7,7 +7,9 @@ specifiers:
   autoprefixer: ^10.4.14
   postcss: ^8.4.21
   solid-js: ^1.4.7
+  solid-tippy: ^0.2.1
   tailwindcss: ^3.2.7
+  tippy.js: ^6.3.7
   typescript: ^4.7.4
   vite: ^4.0.0
   vite-plugin-solid: ^2.3.0
@@ -15,6 +17,8 @@ specifiers:
 dependencies:
   '@tauri-apps/api': 1.2.0
   solid-js: 1.6.14
+  solid-tippy: 0.2.1_rick4tq22pxy45qudhdfrizose
+  tippy.js: 6.3.7
 
 devDependencies:
   '@tauri-apps/cli': 1.2.3
@@ -602,6 +606,10 @@ packages:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.15.0
     dev: true
+
+  /@popperjs/core/2.11.7:
+    resolution: {integrity: sha512-Cr4OjIkipTtcXKjAsm8agyleBuDHvxzeBoa1v543lbv1YaIwQjESsVcmjiWiPEbC1FIeHOG/Op9kdCmAmiS3Kw==}
+    dev: false
 
   /@tauri-apps/api/1.2.0:
     resolution: {integrity: sha512-lsI54KI6HGf7VImuf/T9pnoejfgkNoXveP14pVV7XarrQ46rOejIVJLFqHI9sRReJMGdh2YuCoI3cc/yCWCsrw==}
@@ -1329,6 +1337,17 @@ packages:
       solid-js: 1.6.14
     dev: true
 
+  /solid-tippy/0.2.1_rick4tq22pxy45qudhdfrizose:
+    resolution: {integrity: sha512-8qB6X1iMn7nBd5BX+x7tS+5mDVragw5vCaXLOxEQFWUsyRRGKAY8JmbmmyVFIMIvF+pgkIIVIArhNfAGGtYVLA==}
+    engines: {node: '>=10'}
+    peerDependencies:
+      solid-js: ^1.2
+      tippy.js: ^6.3
+    dependencies:
+      solid-js: 1.6.14
+      tippy.js: 6.3.7
+    dev: false
+
   /source-map-js/1.0.2:
     resolution: {integrity: sha512-R0XvVJ9WusLiqTCEiGCmICCMplcCkIwwR11mOSD9CR5u+IXYdiseeEuXCVAjS54zqwkLcPNnmU4OeJ6tUrWhDw==}
     engines: {node: '>=0.10.0'}
@@ -1379,6 +1398,12 @@ packages:
     transitivePeerDependencies:
       - ts-node
     dev: true
+
+  /tippy.js/6.3.7:
+    resolution: {integrity: sha512-E1d3oP2emgJ9dRQZdf3Kkn0qJgI6ZLpyS5z6ZkY1DF3kaQaBsGZsndEpHwx+eC+tYM41HaSNvNtLx8tU57FzTQ==}
+    dependencies:
+      '@popperjs/core': 2.11.7
+    dev: false
 
   /to-fast-properties/2.0.0:
     resolution: {integrity: sha512-/OaKK0xYrs3DmxRYqL/yDc+FxFUVYhDlXMhRmv3z915w2HF1tnN1omB354j8VUGO/hbRzyD6Y3sA7v7GS/ceog==}

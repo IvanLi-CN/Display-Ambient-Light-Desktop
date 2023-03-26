@@ -153,6 +153,7 @@ export const ScreenView: Component<ScreenViewProps> = (props) => {
       class={'overflow-hidden h-full w-full ' + rootProps.class}
     >
       <canvas ref={canvas!} />
+      {rootProps.children}
     </div>
   );
 };

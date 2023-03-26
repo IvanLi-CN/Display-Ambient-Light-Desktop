@@ -1,4 +1,4 @@
-import { Component, createMemo } from 'solid-js';
+import { Component, createMemo, ParentComponent } from 'solid-js';
 import { LedStripConfigOfBorders } from '../models/display-config';
 import { DisplayInfo } from '../models/display-info.model';
 import { displayStore } from '../stores/display.store';
@@ -30,20 +30,21 @@ export const DisplayView: Component<DisplayViewProps> = (props) => {
 
   return (
     <section
-      class="absolute grid grid-cols-[16px,auto,16px] grid-rows-[16px,auto,16px] overflow-hidden group"
+      class="absolute grid grid-cols-[16px,auto,16px] grid-rows-[16px,auto,16px] overflow-hidden"
       style={style()}
     >
       <ScreenView
-        class="row-start-2 col-start-2"
+        class="row-start-2 col-start-2 group"
         displayId={props.display.id}
         style={{
           'object-fit': 'contain',
         }}
-      />
-      <DisplayInfoPanel
-        display={props.display}
-        class="absolute bg-slate-700/20 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded backdrop-blur w-1/3 min-w-[300px] text-black group-hover:opacity-100 opacity-0 transition-opacity"
-      />
+      >
+        <DisplayInfoPanel
+          display={props.display}
+          class="absolute bg-slate-700/20 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded backdrop-blur w-1/3 min-w-[300px] text-black group-hover:opacity-100 opacity-0 transition-opacity"
+        />
+      </ScreenView>
       <LedStripPart
         class="row-start-1 col-start-2 flex-row overflow-hidden"
         config={ledStripConfigs().find((c) => c.border === 'Top')}

@@ -4,12 +4,15 @@ import {
   Component,
   createEffect,
   createMemo,
+  createRoot,
   createSignal,
   For,
   JSX,
   onCleanup,
   splitProps,
 } from 'solid-js';
+import { useTippy } from 'solid-tippy';
+import { followCursor } from 'tippy.js';
 import { LedStripConfig } from '../models/led-strip-config';
 
 type LedStripPartProps = {
@@ -49,6 +52,7 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
   const [ledSamplePoints, setLedSamplePoints] = createSignal();
   const [colors, setColors] = createSignal<string[]>([]);
 
+  // get led strip colors when screenshot updated
   createEffect(() => {
     const samplePoints = ledSamplePoints();
     if (!localProps.config || !samplePoints) {
@@ -88,15 +92,36 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
     });
   });
 
+  // get led strip sample points
   createEffect(() => {
     if (localProps.config) {
       invoke('get_led_strips_sample_points', {
         config: localProps.config,
       }).then((points) => {
-        console.log({ points });
         setLedSamplePoints(points);
       });
     }
+  });
+
+  const [anchor, setAnchor] = createSignal<HTMLElement>();
+
+  useTippy(anchor, {
+    hidden: true,
+    props: {
+      trigger: 'mouseenter focus',
+      followCursor: true,
+
+      plugins: [followCursor],
+
+      content: () =>
+        createRoot(() => {
+          return (
+            <span class="rounded-lg bg-slate-400/50 backdrop-blur text-white p-2 drop-shadow">
+              Count: {localProps.config?.len ?? '--'}
+            </span>
+          );
+        }) as Element,
+    },
   });
 
   const onWheel = (e: WheelEvent) => {
@@ -129,6 +154,7 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
   return (
     <section
       {...rootProps}
+      ref={setAnchor}
       class={
         'flex flex-nowrap justify-around items-center overflow-hidden ' + rootProps.class
       }
