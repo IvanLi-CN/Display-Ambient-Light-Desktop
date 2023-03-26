@@ -1,6 +1,5 @@
 use std::{collections::HashMap, sync::Arc};
 
-use base64::Engine;
 use core_graphics::display::{
     kCGNullWindowID, kCGWindowImageDefault, kCGWindowListOptionOnScreenOnly, CGDisplay,
 };
@@ -8,7 +7,7 @@ use paris::{error, info, warn};
 use tauri::{async_runtime::RwLock, Window};
 use tokio::sync::{watch, OnceCell};
 
-use crate::screenshot::{Screenshot, ScreenshotPayload};
+use crate::screenshot::{Screenshot, ScreenshotPayload, ScreenSamplePoints};
 
 pub fn take_screenshot(display_id: u32, scale_factor: f32) -> anyhow::Result<Screenshot> {
     log::debug!("take_screenshot");
@@ -40,6 +39,7 @@ pub fn take_screenshot(display_id: u32, scale_factor: f32) -> anyhow::Result<Scr
         bytes_per_row,
         bytes,
         scale_factor,
+        ScreenSamplePoints { top: vec![], bottom: vec![], left: vec![], right: vec![] }
     ))
 }
 
@@ -205,48 +205,4 @@ impl ScreenshotManager {
         }
     }
 
-    async fn encode_screenshot_to_base64(screenshot: &Screenshot) -> anyhow::Result<String> {
-        let bytes = screenshot.bytes.read().await;
-
-        let scale_factor = screenshot.scale_factor;
-
-        let image_height = (screenshot.height as f32 / scale_factor) as u32;
-        let image_width = (screenshot.width as f32 / scale_factor) as u32;
-        let mut image_buffer = vec![0u8; (image_width * image_height * 3) as usize];
-
-        for y in 0..image_height {
-            for x in 0..image_width {
-                let offset = (((y as f32) * screenshot.bytes_per_row as f32 + (x as f32) * 4.0)
-                    * scale_factor) as usize;
-                let b = bytes[offset];
-                let g = bytes[offset + 1];
-                let r = bytes[offset + 2];
-                let offset = (y * image_width + x) as usize;
-                image_buffer[offset * 3] = r;
-                image_buffer[offset * 3 + 1] = g;
-                image_buffer[offset * 3 + 2] = b;
-            }
-        }
-
-        let mut image_png = Vec::new();
-        let mut encoder = png::Encoder::new(&mut image_png, image_width, image_height);
-        encoder.set_color(png::ColorType::Rgb);
-        encoder.set_depth(png::BitDepth::Eight);
-
-        let mut writer = encoder
-            .write_header()
-            .map_err(|e| anyhow::anyhow!("png: {}", anyhow::anyhow!(e.to_string())))?;
-        writer
-            .write_image_data(&image_buffer)
-            .map_err(|e| anyhow::anyhow!("png: {}", anyhow::anyhow!(e.to_string())))?;
-        writer
-            .finish()
-            .map_err(|e| anyhow::anyhow!("png: {}", anyhow::anyhow!(e.to_string())))?;
-
-        let mut base64_image = String::new();
-        base64_image.push_str("data:image/webp;base64,");
-        let encoded = base64::engine::general_purpose::STANDARD_NO_PAD.encode(&*image_png);
-        base64_image.push_str(encoded.as_str());
-        Ok(base64_image)
-    }
 }

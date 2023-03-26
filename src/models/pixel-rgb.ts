@@ -1,0 +1,1 @@
+export type PixelRgb = [number, number, number];

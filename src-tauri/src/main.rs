@@ -1,15 +1,19 @@
 // Prevents additional console window on WiOk(ndows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod ambient_light;
+mod display;
+mod led_color;
 pub mod screenshot;
 mod screenshot_manager;
 
-use base64::Engine;
+use ambient_light::LedStripConfig;
 use core_graphics::display::{
     kCGNullWindowID, kCGWindowImageDefault, kCGWindowListOptionOnScreenOnly, CGDisplay,
 };
 use display_info::DisplayInfo;
-use paris::{error, info};
+use paris::{error, info, warn};
+use screenshot::Screenshot;
 use screenshot_manager::ScreenshotManager;
 use serde::{Deserialize, Serialize};
 use serde_json::to_string;
@@ -53,92 +57,6 @@ fn list_display_info() -> Result<String, String> {
 }
 
 #[tauri::command]
-fn take_screenshot(display_id: u32, scale_factor: f32) -> Result<String, String> {
-    let exec = || {
-        println!("take_screenshot");
-        let start_at = std::time::Instant::now();
-
-        let cg_display = CGDisplay::new(display_id);
-        let cg_image = CGDisplay::screenshot(
-            cg_display.bounds(),
-            kCGWindowListOptionOnScreenOnly,
-            kCGNullWindowID,
-            kCGWindowImageDefault,
-        )
-        .ok_or_else(|| anyhow::anyhow!("Display#{}: take screenshot failed", display_id))?;
-        // println!("take screenshot took {}ms", start_at.elapsed().as_millis());
-
-        let buffer = cg_image.data();
-        let bytes_per_row = cg_image.bytes_per_row() as f32;
-
-        let height = cg_image.height();
-        let width = cg_image.width();
-
-        let image_height = (height as f32 / scale_factor) as u32;
-        let image_width = (width as f32 / scale_factor) as u32;
-
-        // println!(
-        //     "raw image: {}x{}, output image: {}x{}",
-        //     width, height, image_width, image_height
-        // );
-        // // from bitmap vec
-        let mut image_buffer = vec![0u8; (image_width * image_height * 3) as usize];
-
-        for y in 0..image_height {
-            for x in 0..image_width {
-                let offset =
-                    (((y as f32) * bytes_per_row + (x as f32) * 4.0) * scale_factor) as usize;
-                let b = buffer[offset];
-                let g = buffer[offset + 1];
-                let r = buffer[offset + 2];
-                let offset = (y * image_width + x) as usize;
-                image_buffer[offset * 3] = r;
-                image_buffer[offset * 3 + 1] = g;
-                image_buffer[offset * 3 + 2] = b;
-            }
-        }
-        println!(
-            "convert to image buffer took {}ms",
-            start_at.elapsed().as_millis()
-        );
-
-        // to png image
-        // let mut image_png = Vec::new();
-        // let mut encoder = png::Encoder::new(&mut image_png, image_width, image_height);
-        // encoder.set_color(png::ColorType::Rgb);
-        // encoder.set_depth(png::BitDepth::Eight);
-
-        // let mut writer = encoder
-        //     .write_header()
-        //     .map_err(|e| anyhow::anyhow!("png: {}", anyhow::anyhow!(e.to_string())))?;
-        // writer
-        //     .write_image_data(&image_buffer)
-        //     .map_err(|e| anyhow::anyhow!("png: {}", anyhow::anyhow!(e.to_string())))?;
-        // writer
-        //     .finish()
-        //     .map_err(|e| anyhow::anyhow!("png: {}", anyhow::anyhow!(e.to_string())))?;
-        // println!("encode to png took {}ms", start_at.elapsed().as_millis());
-        let image_webp =
-            webp::Encoder::from_rgb(&image_buffer, image_width, image_height).encode(90f32);
-        // // base64 image
-        let mut image_base64 = String::new();
-        image_base64.push_str("data:image/webp;base64,");
-        let encoded = base64::engine::general_purpose::STANDARD_NO_PAD.encode(&*image_webp);
-        image_base64.push_str(encoded.as_str());
-
-        println!("took {}ms", start_at.elapsed().as_millis());
-        println!("image_base64: {}", image_base64.len());
-
-        Ok(image_base64)
-    };
-
-    exec().map_err(|e: anyhow::Error| {
-        println!("error: {}", e);
-        e.to_string()
-    })
-}
-
-#[tauri::command]
 async fn subscribe_encoded_screenshot_updated(
     window: tauri::Window,
     display_id: u32,
@@ -153,6 +71,72 @@ async fn subscribe_encoded_screenshot_updated(
         })
 }
 
+#[tauri::command]
+async fn read_led_strip_configs() -> Result<Vec<ambient_light::LedStripConfig>, String> {
+    let configs = ambient_light::LedStripConfig::read_config()
+        .await
+        .map_err(|e| {
+            error!("can not read led strip configs: {}", e);
+            e.to_string()
+        })?;
+    Ok(configs)
+}
+
+#[tauri::command]
+async fn write_led_strip_configs(
+    configs: Vec<ambient_light::LedStripConfig>,
+) -> Result<(), String> {
+    ambient_light::LedStripConfig::write_config(&configs)
+        .await
+        .map_err(|e| {
+            error!("can not write led strip configs: {}", e);
+            e.to_string()
+        })
+}
+
+#[tauri::command]
+async fn get_led_strips_sample_points(
+    config: LedStripConfig,
+) -> Result<Vec<screenshot::LedSamplePoints>, String> {
+    let displays = DisplayInfo::all().map_err(|e| {
+        error!("can not read led strip config: {}", e);
+        e.to_string()
+    });
+    let display = displays?.into_iter().find(|d| d.id == config.display_id);
+
+    if let None = display {
+        return Err(format!("display not found: {}", config.display_id));
+    }
+
+    let display = display.unwrap();
+
+    let config = screenshot::Screenshot::get_sample_point(
+        config,
+        display.width as usize,
+        display.height as usize,
+    );
+    Ok(config)
+}
+
+#[tauri::command]
+async fn get_one_edge_colors(
+    display_id: u32,
+    sample_points: Vec<screenshot::LedSamplePoints>,
+) -> Result<Vec<led_color::LedColor>, String> {
+    let screenshot_manager = ScreenshotManager::global().await;
+    let channels = screenshot_manager.channels.read().await;
+    if let Some(rx) = channels.get(&display_id) {
+        let rx = rx.clone();
+        let screenshot = rx.borrow().clone();
+        let bytes = screenshot.bytes.read().await;
+        let colors =
+            Screenshot::get_one_edge_colors(&sample_points, &bytes, screenshot.bytes_per_row);
+        Ok(colors)
+    } else {
+        Err(format!("display not found: {}", display_id))
+    }
+}
+
 #[tokio::main]
 async fn main() {
     env_logger::init();
@@ -162,9 +146,12 @@ async fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             greet,
-            take_screenshot,
             list_display_info,
-            subscribe_encoded_screenshot_updated
+            subscribe_encoded_screenshot_updated,
+            read_led_strip_configs,
+            write_led_strip_configs,
+            get_led_strips_sample_points,
+            get_one_edge_colors
         ])
         .register_uri_scheme_protocol("ambient-light", move |_app, request| {
             let response = ResponseBuilder::new().header("Access-Control-Allow-Origin", "*");
@@ -212,20 +199,33 @@ async fn main() {
                         let screenshot = rx.borrow().clone();
                         let bytes = screenshot.bytes.read().await;
 
-                        let (scale_factor, width, height) = if url.query.is_some()
+                        let (scale_factor_x, scale_factor_y, width, height) = if url.query.is_some()
                             && url.query.as_ref().unwrap().contains_key("height")
                             && url.query.as_ref().unwrap().contains_key("width")
                         {
-                            let width =
-                                url.query.as_ref().unwrap()["width"].parse::<u32>().unwrap();
+                            let width = url.query.as_ref().unwrap()["width"]
+                                .parse::<u32>()
+                                .map_err(|err| {
+                                    warn!("width parse error: {}", err);
+                                    err
+                                })?;
                             let height = url.query.as_ref().unwrap()["height"]
                                 .parse::<u32>()
-                                .unwrap();
-                            (screenshot.width as f32 / width as f32, width, height)
+                                .map_err(|err| {
+                                    warn!("height parse error: {}", err);
+                                    err
+                                })?;
+                            (
+                                screenshot.width as f32 / width as f32,
+                                screenshot.height as f32 / height as f32,
+                                width,
+                                height,
+                            )
                         } else {
                             log::debug!("scale by scale_factor");
                             let scale_factor = screenshot.scale_factor;
                             (
+                                scale_factor,
                                 scale_factor,
                                 (screenshot.width as f32 / scale_factor) as u32,
                                 (screenshot.height as f32 / scale_factor) as u32,
@@ -245,8 +245,9 @@ async fn main() {
 
                         for y in 0..height {
                             for x in 0..width {
-                                let offset = ((y as f32) * scale_factor) as usize * bytes_per_row as usize
-                                    + ((x as f32) * scale_factor) as usize * 4;
+                                let offset = ((y as f32) * scale_factor_y).floor() as usize
+                                    * bytes_per_row as usize
+                                    + ((x as f32) * scale_factor_x).floor() as usize * 4;
                                 let b = bytes[offset];
                                 let g = bytes[offset + 1];
                                 let r = bytes[offset + 2];

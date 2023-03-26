@@ -65,7 +65,7 @@ export const ScreenView: Component<ScreenViewProps> = (props) => {
   };
 
   const draw = (cached: boolean = false) => {
-    const { drawX, drawY, drawWidth, drawHeight } = drawInfo();
+    const { drawX, drawY } = drawInfo();
 
     let _ctx = ctx();
     let raw = imageData();
@@ -82,6 +82,7 @@ export const ScreenView: Component<ScreenViewProps> = (props) => {
   };
 
   createEffect(() => {
+    let pendingCount = 0;
     const unlisten = listen<{
       base64_image: string;
       display_id: number;
@@ -94,12 +95,15 @@ export const ScreenView: Component<ScreenViewProps> = (props) => {
           `displays/${localProps.displayId}?width=${drawWidth}&height=${drawHeight}`,
           'ambient-light',
         );
+        if (pendingCount >= 1) {
+          return;
+        }
+        pendingCount++;
         fetch(url, {
           mode: 'cors',
         })
           .then((res) => res.body?.getReader().read())
           .then((buffer) => {
-            // console.log(buffer?.value?.length);
             if (buffer?.value) {
               setImageData({
                 buffer: new Uint8ClampedArray(buffer?.value),
@@ -110,6 +114,9 @@ export const ScreenView: Component<ScreenViewProps> = (props) => {
               setImageData(null);
             }
             draw();
+          })
+          .finally(() => {
+            pendingCount--;
           });
       }
 
