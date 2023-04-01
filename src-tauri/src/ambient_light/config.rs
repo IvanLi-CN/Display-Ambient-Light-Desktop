@@ -3,7 +3,10 @@ use std::env::current_dir;
 use paris::{error, info};
 use serde::{Deserialize, Serialize};
 use tauri::api::path::config_dir;
-use tokio::sync::OnceCell;
+
+use crate::screenshot::{self, LedSamplePoints};
+
+const CONFIG_FILE_NAME: &str = "cc.ivanli.ambient_light/led_strip_config.toml";
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq)]
 pub enum Border {
@@ -32,23 +35,16 @@ pub struct LedStripConfig {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct LedStripConfigGroup {
-    pub items: Vec<LedStripConfig>,
+    pub strips: Vec<LedStripConfig>,
+    pub mappers: Vec<SamplePointMapper>,
 }
 
-
-impl LedStripConfig {
-    pub async fn global() -> &'static Vec<LedStripConfig> {
-        static LED_STRIP_CONFIGS_GLOBAL: OnceCell<Vec<LedStripConfig>> = OnceCell::const_new();
-        LED_STRIP_CONFIGS_GLOBAL
-            .get_or_init(|| async { Self::read_config().await.unwrap() })
-            .await
-    }
-
-    pub async fn read_config() -> anyhow::Result<Vec<Self>> {
+impl LedStripConfigGroup {
+    pub async fn read_config() -> anyhow::Result<Self> {
         // config path
         let path = config_dir()
             .unwrap_or(current_dir().unwrap())
-            .join("led_strip_config.toml");
+            .join(CONFIG_FILE_NAME);
 
         let exists = tokio::fs::try_exists(path.clone())
             .await
@@ -60,42 +56,44 @@ impl LedStripConfig {
             let config: LedStripConfigGroup = toml::from_str(&config)
                 .map_err(|e| anyhow::anyhow!("Failed to parse config file: {}", e))?;
 
-            Ok(config.items)
+            Ok(config)
         } else {
             info!("config file not exist, fallback to default config");
             Ok(Self::get_default_config().await?)
         }
     }
 
-    pub async fn write_config(configs: &Vec<Self>) -> anyhow::Result<()> {
+    pub async fn write_config(configs: &Self) -> anyhow::Result<()> {
         let path = config_dir()
             .unwrap_or(current_dir().unwrap())
-            .join("led_strip_config.toml");
+            .join(CONFIG_FILE_NAME);
 
-        let configs = LedStripConfigGroup { items: configs.clone() };
+        tokio::fs::create_dir_all(path.parent().unwrap()).await?;
 
-        let config = toml::to_string(&configs).map_err(|e| {
+        let config_text = toml::to_string(&configs).map_err(|e| {
             anyhow::anyhow!("Failed to parse config file: {}. configs: {:?}", e, configs)
         })?;
 
-        tokio::fs::write(&path, config).await.map_err(|e| {
+        tokio::fs::write  (&path, config_text).await.map_err(|e| {
             anyhow::anyhow!("Failed to write config file: {}. path: {:?}", e, &path)
         })?;
 
         Ok(())
     }
 
-    pub async fn get_default_config() -> anyhow::Result<Vec<Self>> {
+    pub async fn get_default_config() -> anyhow::Result<Self> {
         let displays = display_info::DisplayInfo::all().map_err(|e| {
             error!("can not list display info: {}", e);
             anyhow::anyhow!("can not list display info: {}", e)
         })?;
 
-        let mut configs = Vec::new();
+        let mut strips = Vec::new();
+        let mut mappers = Vec::new();
         for (i, display) in displays.iter().enumerate() {
+            let mut configs = Vec::new();
             for j in 0..4 {
-                let config = Self {
-                    index: j + i * 4 * 30,
+                let item = LedStripConfig {
+                    index: j + i * 4,
                     display_id: display.id,
                     border: match j {
                         0 => Border::Top,
@@ -104,14 +102,18 @@ impl LedStripConfig {
                         3 => Border::Right,
                         _ => unreachable!(),
                     },
-                    start_pos: 0,
+                    start_pos: j + i * 4 * 30,
                     len: 30,
                 };
-                configs.push(config);
+                configs.push(item);
+                strips.push(item);
+                mappers.push(SamplePointMapper {
+                    start: (j + i * 4) * 30,
+                    end: (j + i * 4 + 1) * 30,
+                })
             }
         }
-
-        Ok(configs)
+        Ok(Self { strips, mappers })
     }
 }
 
@@ -220,11 +222,23 @@ impl LedStripConfigOfDisplays {
                         start_pos: i * 4 * 30 + 90,
                         len: 30,
                     }),
-                }
+                },
             };
             configs.push(config);
         }
 
         Ok(configs[0])
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SamplePointMapper {
+    pub start: usize,
+    pub end: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SamplePointConfig {
+    pub display_id: u32,
+    pub points: Vec<LedSamplePoints>,
 }

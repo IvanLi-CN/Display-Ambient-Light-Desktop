@@ -3,9 +3,10 @@ import { invoke } from '@tauri-apps/api/tauri';
 import { DisplayView } from './components/display-view';
 import { DisplayListContainer } from './components/display-list-container';
 import { displayStore, setDisplayStore } from './stores/display.store';
-import { LedStripConfig } from './models/led-strip-config';
+import { LedStripConfigContainer } from './models/led-strip-config';
 import { setLedStripStore } from './stores/led-strip.store';
 import { listen } from '@tauri-apps/api/event';
+import { LedStripPartsSorter } from './components/led-strip-parts-sorter';
 
 function App() {
   createEffect(() => {
@@ -14,19 +15,35 @@ function App() {
         displays: JSON.parse(displays),
       });
     });
-    invoke<LedStripConfig[]>('read_led_strip_configs').then((strips) => {
-      setLedStripStore({
-        strips,
-      });
+    invoke<LedStripConfigContainer>('read_led_strip_configs').then((configs) => {
+      console.log(configs);
+      setLedStripStore(configs);
     });
   });
 
-  // register tauri event listeners
+  // listen to config_changed event
   createEffect(() => {
     const unlisten = listen('config_changed', (event) => {
-      const strips = event.payload as LedStripConfig[];
+      const { strips, mappers } = event.payload as LedStripConfigContainer;
+      console.log(event.payload);
       setLedStripStore({
         strips,
+        mappers,
+      });
+    });
+
+    onCleanup(() => {
+      unlisten.then((unlisten) => unlisten());
+    });
+  });
+
+  // listen to led_colors_changed event
+  createEffect(() => {
+    const unlisten = listen<Uint8ClampedArray>('led_colors_changed', (event) => {
+      const colors = event.payload;
+
+      setLedStripStore({
+        colors,
       });
     });
 
@@ -37,6 +54,7 @@ function App() {
 
   return (
     <div>
+      <LedStripPartsSorter />
       <DisplayListContainer>
         {displayStore.displays.map((display) => {
           return <DisplayView display={display} />;

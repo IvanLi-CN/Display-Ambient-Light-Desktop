@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use tauri::async_runtime::RwLock;
 
 use crate::{
-    ambient_light::{LedStripConfigOfDisplays, LedStripConfig},
+    ambient_light::{LedStripConfig, LedStripConfigOfDisplays},
     led_color::LedColor,
 };
 
@@ -41,17 +41,19 @@ impl Screenshot {
         }
     }
 
-    pub fn get_sample_point(
+    pub fn get_sample_points(
+        &self,
         config: &LedStripConfig,
-        width: usize,
-        height: usize,
     ) -> Vec<LedSamplePoints> {
+        let height = self.height as usize;
+        let width = self.width as usize;
+
         match config.border {
             crate::ambient_light::Border::Top => {
                 Self::get_one_edge_sample_points(height / 8, width, config.len, 5)
             }
             crate::ambient_light::Border::Bottom => {
-                let points = Self::get_one_edge_sample_points(height / 9, width, config.len, 1);
+                let points = Self::get_one_edge_sample_points(height / 9, width, config.len, 5);
                 points
                     .into_iter()
                     .map(|groups| -> Vec<Point> {
@@ -60,7 +62,7 @@ impl Screenshot {
                     .collect()
             }
             crate::ambient_light::Border::Left => {
-                let points = Self::get_one_edge_sample_points(width / 16, height, config.len, 1);
+                let points = Self::get_one_edge_sample_points(width / 16, height, config.len, 5);
                 points
                     .into_iter()
                     .map(|groups| -> Vec<Point> {
@@ -69,7 +71,7 @@ impl Screenshot {
                     .collect()
             }
             crate::ambient_light::Border::Right => {
-                let points = Self::get_one_edge_sample_points(width / 16, height, config.len, 1);
+                let points = Self::get_one_edge_sample_points(width / 16, height, config.len, 5);
                 points
                     .into_iter()
                     .map(|groups| -> Vec<Point> {
@@ -260,6 +262,12 @@ impl Screenshot {
             colors.push(color);
         }
         colors
+    }
+
+    pub async fn get_colors_by_sample_points(&self, points: &Vec<LedSamplePoints>) -> Vec<LedColor>  {
+        let bytes = self.bytes.read().await;
+
+        Self::get_one_edge_colors(points, &bytes, self.bytes_per_row)
     }
 }
 type Point = (usize, usize);

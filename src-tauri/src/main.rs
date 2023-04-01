@@ -4,10 +4,11 @@
 mod ambient_light;
 mod display;
 mod led_color;
+mod rpc;
 pub mod screenshot;
 mod screenshot_manager;
 
-use ambient_light::{Border, LedStripConfig};
+use ambient_light::{Border, LedColorsPublisher, LedStripConfig, LedStripConfigGroup};
 use core_graphics::display::{
     kCGNullWindowID, kCGWindowImageDefault, kCGWindowListOptionOnScreenOnly, CGDisplay,
 };
@@ -72,26 +73,26 @@ async fn subscribe_encoded_screenshot_updated(
 }
 
 #[tauri::command]
-async fn read_led_strip_configs() -> Result<Vec<ambient_light::LedStripConfig>, String> {
-    let configs = ambient_light::LedStripConfig::read_config()
+async fn read_led_strip_configs() -> Result<LedStripConfigGroup, String> {
+    let config = ambient_light::LedStripConfigGroup::read_config()
         .await
         .map_err(|e| {
             error!("can not read led strip configs: {}", e);
             e.to_string()
         })?;
-    Ok(configs)
+    Ok(config)
 }
 
 #[tauri::command]
 async fn write_led_strip_configs(
     configs: Vec<ambient_light::LedStripConfig>,
 ) -> Result<(), String> {
-    ambient_light::LedStripConfig::write_config(&configs)
-        .await
-        .map_err(|e| {
-            error!("can not write led strip configs: {}", e);
-            e.to_string()
-        })
+    let config_manager = ambient_light::ConfigManager::global().await;
+
+    config_manager.set_items(configs).await.map_err(|e| {
+        error!("can not write led strip configs: {}", e);
+        e.to_string()
+    })
 }
 
 #[tauri::command]
@@ -103,9 +104,7 @@ async fn get_led_strips_sample_points(
     if let Some(rx) = channels.get(&config.display_id) {
         let rx = rx.clone();
         let screenshot = rx.borrow().clone();
-        let width = screenshot.width;
-        let height = screenshot.height;
-        let sample_points = Screenshot::get_sample_point(&config, width as usize, height as usize);
+        let sample_points = screenshot.get_sample_points(&config);
         Ok(sample_points)
     } else {
         return Err(format!("display not found: {}", config.display_id));
@@ -132,8 +131,26 @@ async fn get_one_edge_colors(
 }
 
 #[tauri::command]
+async fn get_all_colors(
+    configs: Vec<ambient_light::SamplePointConfig>,
+    mappers: Vec<ambient_light::SamplePointMapper>,
+) -> Result<Vec<u8>, String> {
+    let screenshot_manager = ScreenshotManager::global().await;
+
+    let channels = screenshot_manager.channels.to_owned();
+    let channels = channels.read().await;
+
+    Ok(screenshot_manager
+        .get_all_colors(&configs, &mappers, &channels)
+        .await)
+}
+
+#[tauri::command]
 async fn patch_led_strip_len(display_id: u32, border: Border, delta_len: i8) -> Result<(), String> {
-    info!("patch_led_strip_len: {} {:?} {}", display_id, border, delta_len);
+    info!(
+        "patch_led_strip_len: {} {:?} {}",
+        display_id, border, delta_len
+    );
     let config_manager = ambient_light::ConfigManager::global().await;
     config_manager
         .patch_led_strip_len(display_id, border, delta_len)
@@ -147,12 +164,26 @@ async fn patch_led_strip_len(display_id: u32, border: Border, delta_len: i8) -> 
     Ok(())
 }
 
+#[tauri::command]
+async fn send_colors(buffer: Vec<u8>) -> Result<(), String> {
+    ambient_light::LedColorsPublisher::send_colors(buffer)
+        .await
+        .map_err(|e| {
+            error!("can not send colors: {}", e);
+            e.to_string()
+        })
+}
+
 #[tokio::main]
 async fn main() {
     env_logger::init();
 
     let screenshot_manager = ScreenshotManager::global().await;
     screenshot_manager.start().unwrap();
+
+    let led_color_publisher = ambient_light::LedColorsPublisher::global().await;
+    led_color_publisher.start().unwrap();
+
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             greet,
@@ -162,7 +193,9 @@ async fn main() {
             write_led_strip_configs,
             get_led_strips_sample_points,
             get_one_edge_colors,
-            patch_led_strip_len
+            patch_led_strip_len,
+            send_colors,
+            get_all_colors
         ])
         .register_uri_scheme_protocol("ambient-light", move |_app, request| {
             let response = ResponseBuilder::new().header("Access-Control-Allow-Origin", "*");
@@ -308,6 +341,22 @@ async fn main() {
                     let config = config_update_receiver.borrow().clone();
 
                     app_handle.emit_all("config_changed", config).unwrap();
+                }
+            });
+
+            let app_handle = app.handle().clone();
+            tokio::spawn(async move {
+                let publisher = ambient_light::LedColorsPublisher::global().await;
+                let mut publisher_update_receiver = publisher.clone_receiver().await;
+                loop {
+                    if let Err(err) = publisher_update_receiver.changed().await {
+                        error!("publisher update receiver changed error: {}", err);
+                        return;
+                    }
+
+                    let publisher = publisher_update_receiver.borrow().clone();
+
+                    app_handle.emit_all("led_colors_changed", publisher).unwrap();
                 }
             });
 

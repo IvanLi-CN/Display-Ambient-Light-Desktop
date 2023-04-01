@@ -28,6 +28,8 @@ url-build-parse = "9.0.0"
 color_space = "0.5.3"
 hex = "0.4.3"
 toml = "0.7.3"
+paho-mqtt = "0.12.1"
+time = {version="0.3.20", features= ["formatting"] }
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem

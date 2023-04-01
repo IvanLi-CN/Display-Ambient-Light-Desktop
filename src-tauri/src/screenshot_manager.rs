@@ -4,10 +4,14 @@ use core_graphics::display::{
     kCGNullWindowID, kCGWindowImageDefault, kCGWindowListOptionOnScreenOnly, CGDisplay,
 };
 use paris::{error, info, warn};
+use serde::{Deserialize, Serialize};
 use tauri::{async_runtime::RwLock, Window};
 use tokio::sync::{watch, OnceCell};
 
-use crate::screenshot::{Screenshot, ScreenshotPayload, ScreenSamplePoints};
+use crate::{
+    ambient_light::{SamplePointConfig, SamplePointMapper},
+    screenshot::{LedSamplePoints, ScreenSamplePoints, Screenshot, ScreenshotPayload},
+};
 
 pub fn take_screenshot(display_id: u32, scale_factor: f32) -> anyhow::Result<Screenshot> {
     log::debug!("take_screenshot");
@@ -39,7 +43,12 @@ pub fn take_screenshot(display_id: u32, scale_factor: f32) -> anyhow::Result<Scr
         bytes_per_row,
         bytes,
         scale_factor,
-        ScreenSamplePoints { top: vec![], bottom: vec![], left: vec![], right: vec![] }
+        ScreenSamplePoints {
+            top: vec![],
+            bottom: vec![],
+            left: vec![],
+            right: vec![],
+        },
     ))
 }
 
@@ -205,4 +214,59 @@ impl ScreenshotManager {
         }
     }
 
+    pub async fn get_all_colors(
+        &self,
+        configs: &Vec<SamplePointConfig>,
+        mappers: &Vec<SamplePointMapper>,
+        channels: &HashMap<u32, watch::Receiver<Screenshot>>,
+    ) -> Vec<u8> {
+        let total_leds = configs
+            .iter()
+            .fold(0, |acc, config| acc + config.points.len());
+
+        let mut global_colors = vec![0u8; total_leds * 3];
+        let mut all_colors = vec![];
+        for config in configs {
+            let rx = channels.get(&config.display_id);
+            if rx.is_none() {
+                error!(
+                    "get_all_colors: can not find display_id {}",
+                    config.display_id
+                );
+                continue;
+            }
+            let rx = rx.unwrap();
+            let screenshot = rx.borrow().clone();
+            let mut colors = screenshot.get_colors_by_sample_points(&config.points).await;
+
+            all_colors.append(&mut colors);
+        }
+
+        let mut color_index = 0;
+        mappers.iter().for_each(|group| {
+            if group.end >= all_colors.len() || group.start >= all_colors.len() {
+                return;
+            } 
+            if group.end > group.start {
+                for i in group.start..group.end - 1 {
+                    let rgb = all_colors[color_index].get_rgb();
+                    color_index += 1;
+
+                    global_colors[i * 3] = rgb[0];
+                    global_colors[i * 3 + 1] = rgb[1];
+                    global_colors[i * 3 + 2] = rgb[2];
+                }
+            } else {
+                for i in (group.end..group.start - 1).rev() {
+                    let rgb = all_colors[color_index].get_rgb();
+                    color_index += 1;
+
+                    global_colors[i * 3] = rgb[0];
+                    global_colors[i * 3 + 1] = rgb[1];
+                    global_colors[i * 3 + 2] = rgb[2];
+                }
+            }
+        });
+        global_colors
+    }
 }

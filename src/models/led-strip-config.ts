@@ -1,10 +1,19 @@
 import { Borders } from '../constants/border';
 
+export type LedStripPixelMapper = {
+  start: number;
+  end: number;
+};
+
+export type LedStripConfigContainer = {
+  strips: LedStripConfig[];
+  mappers: LedStripPixelMapper[];
+};
+
 export class LedStripConfig {
   constructor(
     public readonly display_id: number,
     public readonly border: Borders,
-    public start_pos: number,
     public len: number,
   ) {}
 }
