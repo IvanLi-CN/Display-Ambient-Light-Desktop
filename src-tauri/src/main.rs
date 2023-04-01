@@ -159,6 +159,22 @@ async fn send_colors(buffer: Vec<u8>) -> Result<(), String> {
         })
 }
 
+#[tauri::command]
+async fn move_strip_part(display_id: u32, border: Border, target_start: usize) -> Result<(), String> {
+    let config_manager = ambient_light::ConfigManager::global().await;
+    config_manager
+        .move_strip_part(
+            display_id,
+            border,
+            target_start,
+        )
+        .await
+        .map_err(|e| {
+            error!("can not move strip part: {}", e);
+            e.to_string()
+        })
+}
+
 #[tokio::main]
 async fn main() {
     env_logger::init();
@@ -180,6 +196,7 @@ async fn main() {
             get_one_edge_colors,
             patch_led_strip_len,
             send_colors,
+            move_strip_part,
         ])
         .register_uri_scheme_protocol("ambient-light", move |_app, request| {
             let response = ResponseBuilder::new().header("Access-Control-Allow-Origin", "*");

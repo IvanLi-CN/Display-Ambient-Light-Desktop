@@ -1,8 +1,8 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use paris::warn;
 use tauri::async_runtime::{Mutex, RwLock};
-use tokio::sync::watch;
+use tokio::{sync::watch, time::sleep};
 
 use crate::{
     ambient_light::{config, ConfigManager},
@@ -71,7 +71,7 @@ impl LedColorsPublisher {
                             warn!("rx changed error: {}", err);
                             continue;
                         }
-                        log::info!("screenshot updated");
+                        // log::info!("screenshot updated");
 
                         let screenshot = rx.borrow().clone();
 
@@ -97,28 +97,10 @@ impl LedColorsPublisher {
                     if some_screenshot_receiver_is_none
                         || config_receiver.has_changed().unwrap_or(true)
                     {
+                        sleep(Duration::from_millis(1000)).await;
                         break;
                     }
                 }
-            }
-        });
-
-        tokio::spawn(async move {
-            let config_manager = ConfigManager::global().await;
-
-            let mut config_receiver = config_manager.clone_config_update_receiver();
-
-            loop {
-                if let Err(err) = config_receiver.changed().await {
-                    warn!("config receiver changed error: {}", err);
-                    continue;
-                }
-
-                let configs = config_receiver.borrow().clone();
-                let configs = Self::get_colors_configs(&configs).await;
-
-                handler.abort();
-                break;
             }
         });
         Ok(())

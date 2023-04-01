@@ -1,5 +1,6 @@
-use std::{env::current_dir, fmt::format};
+use std::env::current_dir;
 
+use display_info::DisplayInfo;
 use paris::{error, info};
 use serde::{Deserialize, Serialize};
 use tauri::api::path::config_dir;
@@ -41,6 +42,8 @@ pub struct LedStripConfigGroup {
 
 impl LedStripConfigGroup {
     pub async fn read_config() -> anyhow::Result<Self> {
+        let displays = DisplayInfo::all()?;
+
         // config path
         let path = config_dir()
             .unwrap_or(current_dir().unwrap())
@@ -53,10 +56,14 @@ impl LedStripConfigGroup {
         if exists {
             let config = tokio::fs::read_to_string(path).await?;
 
-            let config: LedStripConfigGroup = toml::from_str(&config)
+            let mut config: LedStripConfigGroup = toml::from_str(&config)
                 .map_err(|e| anyhow::anyhow!("Failed to parse config file: {}", e))?;
 
-            log::info!("config loaded: {:?}", config.strips.iter().map(|c| format!("{}#{}", c.index, c.display_id)).collect::<Vec<_>>());
+            for strip in config.strips.iter_mut() {
+                strip.display_id = displays[strip.index / 4].id;
+            }
+
+            // log::info!("config loaded: {:?}", config);
 
             Ok(config)
         } else {
@@ -76,7 +83,7 @@ impl LedStripConfigGroup {
             anyhow::anyhow!("Failed to parse config file: {}. configs: {:?}", e, configs)
         })?;
 
-        tokio::fs::write  (&path, config_text).await.map_err(|e| {
+        tokio::fs::write(&path, config_text).await.map_err(|e| {
             anyhow::anyhow!("Failed to write config file: {}. path: {:?}", e, &path)
         })?;
 

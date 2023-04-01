@@ -1,4 +1,4 @@
-import { createEffect, onCleanup } from 'solid-js';
+import { createContext, createEffect, onCleanup } from 'solid-js';
 import { invoke } from '@tauri-apps/api/tauri';
 import { DisplayView } from './components/display-view';
 import { DisplayListContainer } from './components/display-list-container';
@@ -7,6 +7,11 @@ import { LedStripConfigContainer } from './models/led-strip-config';
 import { setLedStripStore } from './stores/led-strip.store';
 import { listen } from '@tauri-apps/api/event';
 import { LedStripPartsSorter } from './components/led-strip-parts-sorter';
+import { createStore } from 'solid-js/store';
+import {
+  LedStripConfigurationContext,
+  LedStripConfigurationContextType,
+} from './contexts/led-strip-configuration.context';
 
 function App() {
   createEffect(() => {
@@ -52,14 +57,33 @@ function App() {
     });
   });
 
+  const [ledStripConfiguration, setLedStripConfiguration] = createStore<
+    LedStripConfigurationContextType[0]
+  >({
+    selectedStripPart: null,
+  });
+
+  const ledStripConfigurationContextValue: LedStripConfigurationContextType = [
+    ledStripConfiguration,
+    {
+      setSelectedStripPart: (v) => {
+        setLedStripConfiguration({
+          selectedStripPart: v,
+        });
+      },
+    },
+  ];
+
   return (
     <div>
-      <LedStripPartsSorter />
-      <DisplayListContainer>
-        {displayStore.displays.map((display) => {
-          return <DisplayView display={display} />;
-        })}
-      </DisplayListContainer>
+      <LedStripConfigurationContext.Provider value={ledStripConfigurationContextValue}>
+        <LedStripPartsSorter />
+        <DisplayListContainer>
+          {displayStore.displays.map((display) => {
+            return <DisplayView display={display} />;
+          })}
+        </DisplayListContainer>
+      </LedStripConfigurationContext.Provider>
     </div>
   );
 }

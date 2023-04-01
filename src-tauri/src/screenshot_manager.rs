@@ -113,7 +113,7 @@ impl ScreenshotManager {
     ) -> anyhow::Result<()> {
         let channels = self.channels.to_owned();
         let encode_listeners = self.encode_listeners.to_owned();
-        log::info!("subscribe_encoded_screenshot_updated. {}", display_id);
+        // log::info!("subscribe_encoded_screenshot_updated. {}", display_id);
 
         {
             let encode_listeners = encode_listeners.read().await;
@@ -209,7 +209,7 @@ impl ScreenshotManager {
         let screenshot = take_screenshot(display_id, scale_factor);
         if let Ok(screenshot) = screenshot {
             tx.send(screenshot).unwrap();
-            log::info!("take_screenshot_loop: send success. display#{}", display_id)
+            // log::info!("take_screenshot_loop: send success. display#{}", display_id)
         } else {
             warn!("take_screenshot_loop: {}", screenshot.err().unwrap());
         }

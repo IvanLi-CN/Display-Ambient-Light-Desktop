@@ -1,14 +1,91 @@
-import { Component, createContext, createEffect, createSignal, For } from 'solid-js';
+import {
+  Component,
+  createContext,
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  JSX,
+  useContext,
+} from 'solid-js';
 import { LedStripConfig, LedStripPixelMapper } from '../models/led-strip-config';
 import { ledStripStore } from '../stores/led-strip.store';
+import { invoke } from '@tauri-apps/api';
+import { LedStripConfigurationContext } from '../contexts/led-strip-configuration.context';
 
-const SorterItem: Component<{ mapper: LedStripPixelMapper }> = (props) => {
+const SorterItem: Component<{ strip: LedStripConfig; mapper: LedStripPixelMapper }> = (
+  props,
+) => {
   const [fullLeds, setFullLeds] = createSignal<string[]>([]);
+  const [dragging, setDragging] = createSignal<boolean>(false);
+  const [dragStart, setDragStart] = createSignal<{ x: number; y: number } | null>(null);
+  const [dragCurr, setDragCurr] = createSignal<{ x: number; y: number } | null>(null);
+  const [dragStartIndex, setDragStartIndex] = createSignal<number>(0);
+  const [, { setSelectedStripPart }] = useContext(LedStripConfigurationContext);
 
+  const totalLedCount = createMemo(() => {
+    return ledStripStore.strips.reduce((acc, strip) => acc + strip.len, 0);
+  });
+
+  const move = (targetStart: number) => {
+    if (targetStart === props.mapper.start) {
+      return;
+    }
+    console.log(`target_start ${targetStart}`);
+    invoke('move_strip_part', {
+      displayId: props.strip.display_id,
+      border: props.strip.border,
+      targetStart,
+    }).catch((err) => console.error(err));
+  };
+
+  const onPointerDown = (ev: PointerEvent) => {
+    if (ev.button !== 0) {
+      return;
+    }
+    setDragging(true);
+    setDragStart({ x: ev.clientX, y: ev.clientY });
+    setDragCurr({ x: ev.clientX, y: ev.clientY });
+    setDragStartIndex(props.mapper.start);
+  };
+
+  const onPointerUp = () => (ev: PointerEvent) => {
+    if (ev.button !== 0) {
+      return;
+    }
+    setDragging(false);
+  };
+
+  const onPointerMove = (ev: PointerEvent) => {
+    setSelectedStripPart({
+      displayId: props.strip.display_id,
+      border: props.strip.border,
+    });
+    if (!(ev.buttons & 1)) {
+      return;
+    }
+    const draggingInfo = dragging();
+    if (!draggingInfo) {
+      return;
+    }
+    setDragCurr({ x: ev.clientX, y: ev.clientY });
+
+    const cellWidth = (ev.currentTarget as HTMLDivElement).clientWidth / totalLedCount();
+    const diff = ev.clientX - dragStart()!.x;
+    const moved = Math.round(diff / cellWidth);
+    if (moved === 0) {
+      return;
+    }
+    move(props.mapper.start + moved);
+  };
+
+  const onPointerLeave = () => {
+    setSelectedStripPart(null);
+  };
+
+  // update fullLeds
   createEffect(() => {
-    const strips = ledStripStore.strips;
-    const totalLedCount = strips.reduce((acc, strip) => acc + strip.len, 0);
-    const fullLeds = new Array(totalLedCount).fill('rgba(255,255,255,0.5)');
+    const fullLeds = new Array(totalLedCount()).fill('rgba(255,255,255,0.5)');
 
     for (let i = props.mapper.start, j = 0; i < props.mapper.end; i++, j++) {
       fullLeds[i] = `rgb(${ledStripStore.colors[i * 3]}, ${
@@ -18,8 +95,21 @@ const SorterItem: Component<{ mapper: LedStripPixelMapper }> = (props) => {
     setFullLeds(fullLeds);
   });
 
+  const style = createMemo<JSX.CSSProperties>(() => {
+    return {
+      transform: `translateX(${(dragCurr()?.x ?? 0) - (dragStart()?.x ?? 0)}px)`,
+    };
+  });
+
   return (
-    <div class="flex h-2 m-2">
+    <div
+      class="flex h-2 m-2 select-none cursor-ew-resize focus:cursor-ew-resize"
+      style={style()}
+      onPointerMove={onPointerMove}
+      onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
+      onPointerLeave={onPointerLeave}
+    >
       <For each={fullLeds()}>
         {(it) => (
           <div
@@ -78,10 +168,12 @@ export const LedStripPartsSorter: Component = () => {
   const context = createContext();
 
   return (
-    <div>
+    <div class="select-none overflow-hidden">
       <SorterResult />
       <For each={ledStripStore.strips}>
-        {(strip, index) => <SorterItem mapper={ledStripStore.mappers[index()]} />}
+        {(strip, index) => (
+          <SorterItem strip={strip} mapper={ledStripStore.mappers[index()]} />
+        )}
       </For>
     </div>
   );

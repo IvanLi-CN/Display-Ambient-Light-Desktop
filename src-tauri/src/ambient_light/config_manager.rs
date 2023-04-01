@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{borrow::BorrowMut, sync::Arc};
 
 use tauri::async_runtime::RwLock;
 use tokio::sync::OnceCell;
@@ -45,7 +45,7 @@ impl ConfigManager {
             .send(configs.clone())
             .map_err(|e| anyhow::anyhow!("Failed to send config update: {}", e))?;
 
-        log::info!("config updated: {:?}", configs);
+        // log::info!("config updated: {:?}", configs);
 
         Ok(())
     }
@@ -76,6 +76,53 @@ impl ConfigManager {
         }
 
         Self::rebuild_mappers(&mut config);
+
+        let cloned_config = config.clone();
+
+        drop(config);
+
+        self.update(&cloned_config).await?;
+
+        self.config_update_sender
+            .send(cloned_config)
+            .map_err(|e| anyhow::anyhow!("Failed to send config update: {}", e))?;
+
+        Ok(())
+    }
+
+    pub async fn move_strip_part(
+        &self,
+        display_id: u32,
+        border: Border,
+        target_start: usize,
+    ) -> anyhow::Result<()> {
+        let mut config = self.config.write().await;
+
+        for (index, strip) in config.clone().strips.iter().enumerate() {
+            if strip.display_id == display_id && strip.border == border {
+                let mut mapper = config.mappers[index].borrow_mut();
+
+                if target_start == mapper.start {
+                    return Ok(());
+                }
+
+                let target_end = mapper.end + target_start - mapper.start;
+
+                if target_start > 1000 || target_end > 1000 {
+                    return Err(anyhow::anyhow!(
+                        "Overflow. range: 0-1000, current: {}-{}",
+                        target_start,
+                        target_end
+                    ));
+                }
+
+                mapper.start = target_start as usize;
+                mapper.end = target_end as usize;
+
+                log::info!("mapper: {:?}", mapper);
+            }
+        }
+        log::info!("mapper: {:?}", config.mappers[4]);
 
         let cloned_config = config.clone();
 

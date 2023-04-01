@@ -10,10 +10,12 @@ import {
   JSX,
   onCleanup,
   splitProps,
+  useContext,
 } from 'solid-js';
 import { useTippy } from 'solid-tippy';
 import { followCursor } from 'tippy.js';
 import { LedStripConfig } from '../models/led-strip-config';
+import { LedStripConfigurationContext } from '../contexts/led-strip-configuration.context';
 
 type LedStripPartProps = {
   config?: LedStripConfig | null;
@@ -48,6 +50,7 @@ export const Pixel: Component<PixelProps> = (props) => {
 
 export const LedStripPart: Component<LedStripPartProps> = (props) => {
   const [localProps, rootProps] = splitProps(props, ['config']);
+  const [stripConfiguration] = useContext(LedStripConfigurationContext);
 
   const [ledSamplePoints, setLedSamplePoints] = createSignal();
   const [colors, setColors] = createSignal<string[]>([]);
@@ -143,8 +146,15 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
       {...rootProps}
       ref={setAnchor}
       class={
-        'flex flex-nowrap justify-around items-center overflow-hidden ' + rootProps.class
+        'flex rounded-full flex-nowrap justify-around items-center overflow-hidden ' +
+        rootProps.class
       }
+      classList={{
+        'ring ring-inset bg-yellow-400/50 ring-orange-400 animate-pulse':
+          stripConfiguration.selectedStripPart?.border === localProps.config?.border &&
+          stripConfiguration.selectedStripPart?.displayId ===
+            localProps.config?.display_id,
+      }}
       onWheel={onWheel}
     >
       <For each={colors()}>{(item) => <Pixel color={item} />}</For>
