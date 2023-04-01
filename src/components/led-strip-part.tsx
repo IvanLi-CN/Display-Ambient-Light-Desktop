@@ -138,19 +138,6 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
     }
   };
 
-  const pixels = createMemo(() => {
-    const _colors = colors();
-    if (_colors) {
-      return <For each={_colors}>{(item) => <Pixel color={item} />}</For>;
-    } else if (localProps.config) {
-      return (
-        <For each={new Array(localProps.config.len).fill(undefined)}>
-          {() => <Pixel color="transparent" />}
-        </For>
-      );
-    }
-  });
-
   return (
     <section
       {...rootProps}
@@ -160,7 +147,7 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
       }
       onWheel={onWheel}
     >
-      {pixels()}
+      <For each={colors()}>{(item) => <Pixel color={item} />}</For>
     </section>
   );
 };

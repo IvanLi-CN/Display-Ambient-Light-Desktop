@@ -7,6 +7,7 @@ import {
   For,
   JSX,
   onCleanup,
+  untrack,
 } from 'solid-js';
 import { LedStripConfig, LedStripPixelMapper } from '../models/led-strip-config';
 import { ledStripStore } from '../stores/led-strip.store';
@@ -19,29 +20,31 @@ const SorterItem: Component<{ mapper: LedStripPixelMapper; strip: LedStripConfig
   createEffect(() => {
     let stopped = false;
     const frame = () => {
-      const strips = ledStripStore.strips;
-      const totalLedCount = strips.reduce((acc, strip) => acc + strip.len, 0);
+      untrack(() => {
+        const strips = ledStripStore.strips;
+        const totalLedCount = strips.reduce((acc, strip) => acc + strip.len, 0);
+        const fullLeds = new Array(totalLedCount).fill('rgba(255,255,255,0.5)');
 
-      const fullLeds = new Array(totalLedCount).fill('rgba(255,255,255,0.5)');
-
-      for (let i = props.mapper.start, j = 0; i < props.mapper.end; i++, j++) {
-        fullLeds[i] = `rgb(${ledStripStore.colors[i * 3]}, ${
-          ledStripStore.colors[i * 3 + 1]
-        }, ${ledStripStore.colors[i * 3 + 2]})`;
-      }
-
-      setFullLeds(fullLeds);
+        for (let i = props.mapper.start, j = 0; i < props.mapper.end; i++, j++) {
+          fullLeds[i] = `rgb(${ledStripStore.colors[i * 3]}, ${
+            ledStripStore.colors[i * 3 + 1]
+          }, ${ledStripStore.colors[i * 3 + 2]})`;
+        }
+        setFullLeds(fullLeds);
+      });
 
       if (!stopped) {
-        requestAnimationFrame(frame);
+        setTimeout(() => {
+          frame();
+        }, 1000);
       }
     };
 
     frame();
 
     onCleanup(() => {
+      console.log('cleanup');
       stopped = true;
-      console.timeEnd('frame');
     });
   });
 

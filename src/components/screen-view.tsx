@@ -1,5 +1,4 @@
 import { invoke } from '@tauri-apps/api';
-import { listen } from '@tauri-apps/api/event';
 import { convertFileSrc } from '@tauri-apps/api/tauri';
 import {
   Component,
@@ -81,56 +80,45 @@ export const ScreenView: Component<ScreenViewProps> = (props) => {
     }
   };
 
+  // get screenshot
   createEffect(() => {
-    let pendingCount = 0;
-    const unlisten = listen<{
-      base64_image: string;
-      display_id: number;
-      height: number;
-      width: number;
-    }>('encoded-screenshot-updated', (event) => {
+    let stopped = false;
+    const frame = async () => {
       const { drawWidth, drawHeight } = drawInfo();
-      if (event.payload.display_id === localProps.displayId) {
-        const url = convertFileSrc(
-          `displays/${localProps.displayId}?width=${drawWidth}&height=${drawHeight}`,
-          'ambient-light',
-        );
-        if (pendingCount >= 1) {
-          return;
-        }
-        pendingCount++;
-        fetch(url, {
-          mode: 'cors',
-        })
-          .then((res) => res.body?.getReader().read())
-          .then((buffer) => {
-            if (buffer?.value) {
-              setImageData({
-                buffer: new Uint8ClampedArray(buffer?.value),
-                width: drawWidth,
-                height: drawHeight,
-              });
-            } else {
-              setImageData(null);
-            }
-            draw();
-          })
-          .finally(() => {
-            pendingCount--;
-          });
-      }
+      const url = convertFileSrc(
+        `displays/${localProps.displayId}?width=${drawWidth}&height=${drawHeight}`,
+        'ambient-light',
+      );
+      await fetch(url, {
+        mode: 'cors',
+      })
+        .then((res) => res.body?.getReader().read())
+        .then((buffer) => {
+          if (buffer?.value) {
+            setImageData({
+              buffer: new Uint8ClampedArray(buffer?.value),
+              width: drawWidth,
+              height: drawHeight,
+            });
+          } else {
+            setImageData(null);
+          }
+          draw();
+        });
+    };
 
-      // console.log(event.payload.display_id, localProps.displayId);
-    });
-    subscribeScreenshotUpdate(localProps.displayId);
+    (async () => {
+      while (!stopped) {
+        await frame();
+      }
+    })();
 
     onCleanup(() => {
-      unlisten.then((unlisten) => {
-        unlisten();
-      });
+      stopped = true;
     });
   });
 
+  // resize
   createEffect(() => {
     let resizeObserver: ResizeObserver;
 
