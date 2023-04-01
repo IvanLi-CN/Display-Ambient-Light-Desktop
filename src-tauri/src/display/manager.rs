@@ -159,7 +159,8 @@ impl Manager {
                         let rpc = rpc::Manager::global().await;
 
                         rpc.publish_desktop_cmd(
-                            format!("display{}/brightness", display_brightness.display_index).as_str(),
+                            format!("display{}/brightness", display_brightness.display_index)
+                                .as_str(),
                             target.to_be_bytes().to_vec(),
                         )
                         .await;

@@ -1,5 +1,4 @@
-import { Component, createMemo, ParentComponent } from 'solid-js';
-import { LedStripConfigOfBorders } from '../models/display-config';
+import { Component, createMemo } from 'solid-js';
 import { DisplayInfo } from '../models/display-info.model';
 import { displayStore } from '../stores/display.store';
 import { ledStripStore } from '../stores/led-strip.store';

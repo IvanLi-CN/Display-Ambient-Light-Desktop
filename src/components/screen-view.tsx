@@ -14,12 +14,6 @@ type ScreenViewProps = {
   displayId: number;
 } & JSX.HTMLAttributes<HTMLDivElement>;
 
-async function subscribeScreenshotUpdate(displayId: number) {
-  await invoke('subscribe_encoded_screenshot_updated', {
-    displayId,
-  });
-}
-
 export const ScreenView: Component<ScreenViewProps> = (props) => {
   const [localProps, rootProps] = splitProps(props, ['displayId']);
   let canvas: HTMLCanvasElement;

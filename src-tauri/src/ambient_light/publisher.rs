@@ -1,8 +1,8 @@
-use std::{borrow::BorrowMut, collections::HashMap, sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use paris::warn;
 use tauri::async_runtime::{Mutex, RwLock};
-use tokio::{sync::watch, time::sleep};
+use tokio::sync::watch;
 
 use crate::{
     ambient_light::{config, ConfigManager},

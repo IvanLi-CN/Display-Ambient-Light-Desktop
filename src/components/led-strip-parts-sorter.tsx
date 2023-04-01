@@ -1,14 +1,4 @@
-import {
-  Component,
-  createContext,
-  createEffect,
-  createMemo,
-  createSignal,
-  For,
-  JSX,
-  onCleanup,
-  untrack,
-} from 'solid-js';
+import { Component, createContext, createEffect, createSignal, For } from 'solid-js';
 import { LedStripConfig, LedStripPixelMapper } from '../models/led-strip-config';
 import { ledStripStore } from '../stores/led-strip.store';
 
