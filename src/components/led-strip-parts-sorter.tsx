@@ -18,34 +18,16 @@ const SorterItem: Component<{ mapper: LedStripPixelMapper; strip: LedStripConfig
   const [fullLeds, setFullLeds] = createSignal<string[]>([]);
 
   createEffect(() => {
-    let stopped = false;
-    const frame = () => {
-      untrack(() => {
-        const strips = ledStripStore.strips;
-        const totalLedCount = strips.reduce((acc, strip) => acc + strip.len, 0);
-        const fullLeds = new Array(totalLedCount).fill('rgba(255,255,255,0.5)');
+    const strips = ledStripStore.strips;
+    const totalLedCount = strips.reduce((acc, strip) => acc + strip.len, 0);
+    const fullLeds = new Array(totalLedCount).fill('rgba(255,255,255,0.5)');
 
-        for (let i = props.mapper.start, j = 0; i < props.mapper.end; i++, j++) {
-          fullLeds[i] = `rgb(${ledStripStore.colors[i * 3]}, ${
-            ledStripStore.colors[i * 3 + 1]
-          }, ${ledStripStore.colors[i * 3 + 2]})`;
-        }
-        setFullLeds(fullLeds);
-      });
-
-      if (!stopped) {
-        setTimeout(() => {
-          frame();
-        }, 1000);
-      }
-    };
-
-    frame();
-
-    onCleanup(() => {
-      console.log('cleanup');
-      stopped = true;
-    });
+    for (let i = props.mapper.start, j = 0; i < props.mapper.end; i++, j++) {
+      fullLeds[i] = `rgb(${ledStripStore.colors[i * 3]}, ${
+        ledStripStore.colors[i * 3 + 1]
+      }, ${ledStripStore.colors[i * 3 + 2]})`;
+    }
+    setFullLeds(fullLeds);
   });
 
   return (

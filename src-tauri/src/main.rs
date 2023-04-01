@@ -131,21 +131,6 @@ async fn get_one_edge_colors(
 }
 
 #[tauri::command]
-async fn get_all_colors(
-    configs: Vec<ambient_light::SamplePointConfig>,
-    mappers: Vec<ambient_light::SamplePointMapper>,
-) -> Result<Vec<u8>, String> {
-    let screenshot_manager = ScreenshotManager::global().await;
-
-    let channels = screenshot_manager.channels.to_owned();
-    let channels = channels.read().await;
-
-    Ok(screenshot_manager
-        .get_all_colors(&configs, &mappers, &channels)
-        .await)
-}
-
-#[tauri::command]
 async fn patch_led_strip_len(display_id: u32, border: Border, delta_len: i8) -> Result<(), String> {
     info!(
         "patch_led_strip_len: {} {:?} {}",
@@ -195,7 +180,6 @@ async fn main() {
             get_one_edge_colors,
             patch_led_strip_len,
             send_colors,
-            get_all_colors
         ])
         .register_uri_scheme_protocol("ambient-light", move |_app, request| {
             let response = ResponseBuilder::new().header("Access-Control-Allow-Origin", "*");
@@ -356,7 +340,9 @@ async fn main() {
 
                     let publisher = publisher_update_receiver.borrow().clone();
 
-                    app_handle.emit_all("led_colors_changed", publisher).unwrap();
+                    app_handle
+                        .emit_all("led_colors_changed", publisher)
+                        .unwrap();
                 }
             });
 

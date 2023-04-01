@@ -209,6 +209,7 @@ impl ScreenshotManager {
         let screenshot = take_screenshot(display_id, scale_factor);
         if let Ok(screenshot) = screenshot {
             tx.send(screenshot).unwrap();
+            log::info!("take_screenshot_loop: send success. display#{}", display_id)
         } else {
             warn!("take_screenshot_loop: {}", screenshot.err().unwrap());
         }
@@ -218,7 +219,7 @@ impl ScreenshotManager {
         &self,
         configs: &Vec<SamplePointConfig>,
         mappers: &Vec<SamplePointMapper>,
-        channels: &HashMap<u32, watch::Receiver<Screenshot>>,
+        screenshots: &Vec<Screenshot>,
     ) -> Vec<u8> {
         let total_leds = configs
             .iter()
@@ -227,17 +228,8 @@ impl ScreenshotManager {
         let mut global_colors = vec![0u8; total_leds * 3];
         let mut all_colors = vec![];
 
-        for config in configs {
-            let rx = channels.get(&config.display_id);
-            if rx.is_none() {
-                error!(
-                    "get_all_colors: can not find display_id {}",
-                    config.display_id
-                );
-                continue;
-            }
-            let rx = rx.unwrap();
-            let screenshot = rx.borrow().clone();
+        for (index, screenshot) in screenshots.iter().enumerate() {
+            let config = &configs[index];
             let mut colors = screenshot.get_colors_by_sample_points(&config.points).await;
 
             all_colors.append(&mut colors);
@@ -246,7 +238,12 @@ impl ScreenshotManager {
         let mut color_index = 0;
         mappers.iter().for_each(|group| {
             if group.end > all_colors.len() || group.start > all_colors.len() {
-                warn!("get_all_colors: group out of range. start: {}, end: {}, all_colors.len(): {}", group.start, group.end, all_colors.len());
+                warn!(
+                    "get_all_colors: group out of range. start: {}, end: {}, all_colors.len(): {}",
+                    group.start,
+                    group.end,
+                    all_colors.len()
+                );
                 return;
             }
             if group.end > group.start {
