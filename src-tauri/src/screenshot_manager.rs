@@ -226,6 +226,7 @@ impl ScreenshotManager {
 
         let mut global_colors = vec![0u8; total_leds * 3];
         let mut all_colors = vec![];
+
         for config in configs {
             let rx = channels.get(&config.display_id);
             if rx.is_none() {
@@ -244,11 +245,12 @@ impl ScreenshotManager {
 
         let mut color_index = 0;
         mappers.iter().for_each(|group| {
-            if group.end >= all_colors.len() || group.start >= all_colors.len() {
+            if group.end > all_colors.len() || group.start > all_colors.len() {
+                warn!("get_all_colors: group out of range. start: {}, end: {}, all_colors.len(): {}", group.start, group.end, all_colors.len());
                 return;
-            } 
+            }
             if group.end > group.start {
-                for i in group.start..group.end - 1 {
+                for i in group.start..group.end {
                     let rgb = all_colors[color_index].get_rgb();
                     color_index += 1;
 
@@ -257,7 +259,7 @@ impl ScreenshotManager {
                     global_colors[i * 3 + 2] = rgb[2];
                 }
             } else {
-                for i in (group.end..group.start - 1).rev() {
+                for i in (group.end..group.start).rev() {
                     let rgb = all_colors[color_index].get_rgb();
                     color_index += 1;
 

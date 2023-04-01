@@ -1,4 +1,4 @@
-use std::env::current_dir;
+use std::{env::current_dir, fmt::format};
 
 use paris::{error, info};
 use serde::{Deserialize, Serialize};
@@ -55,6 +55,8 @@ impl LedStripConfigGroup {
 
             let config: LedStripConfigGroup = toml::from_str(&config)
                 .map_err(|e| anyhow::anyhow!("Failed to parse config file: {}", e))?;
+
+            log::info!("config loaded: {:?}", config.strips.iter().map(|c| format!("{}#{}", c.index, c.display_id)).collect::<Vec<_>>());
 
             Ok(config)
         } else {

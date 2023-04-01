@@ -10,6 +10,8 @@ use crate::{
     screenshot_manager::ScreenshotManager,
 };
 
+use itertools::Itertools;
+
 pub struct LedColorsPublisher {
     rx: Arc<RwLock<watch::Receiver<Vec<u8>>>>,
     tx: Arc<RwLock<watch::Sender<Vec<u8>>>>,
@@ -45,14 +47,29 @@ impl LedColorsPublisher {
                 let configs = config_manager.configs().await;
                 let channels = screenshot_manager.channels.read().await;
 
+                let display_ids = configs
+                    .strips
+                    .iter()
+                    .map(|c| c.display_id)
+                    .unique().collect::<Vec<_>>();
+
                 let mut colors_configs = Vec::new();
 
-                for (display_id, rx) in channels.iter() {
+                for display_id in display_ids {
                     let led_strip_configs: Vec<_> = configs
                         .strips
                         .iter()
-                        .filter(|c| c.display_id == *display_id)
+                        .filter(|c| c.display_id == display_id)
                         .collect();
+
+                    let rx = channels.get(&display_id);
+
+                    if rx.is_none() {
+                        warn!("no channel for display_id: {}", display_id);
+                        continue;
+                    }
+
+                    let rx = rx.unwrap();
 
                     if led_strip_configs.len() == 0 {
                         warn!("no led strip config for display_id: {}", display_id);
@@ -72,14 +89,16 @@ impl LedColorsPublisher {
                             .collect();
 
                         let colors_config = config::SamplePointConfig {
-                            display_id: *display_id,
+                            display_id,
                             points,
                         };
 
                         colors_configs.push(colors_config);
                     }
                 }
-                let colors = screenshot_manager.get_all_colors(&colors_configs, &configs.mappers, &channels).await;
+                let colors = screenshot_manager
+                    .get_all_colors(&colors_configs, &configs.mappers, &channels)
+                    .await;
                 match tx.send(colors) {
                     Ok(_) => {
                         // log::info!("colors updated");

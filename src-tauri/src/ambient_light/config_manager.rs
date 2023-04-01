@@ -5,7 +5,7 @@ use tokio::sync::OnceCell;
 
 use crate::ambient_light::{config, LedStripConfigGroup};
 
-use super::Border;
+use super::{Border, SamplePointMapper};
 
 pub struct ConfigManager {
     config: Arc<RwLock<LedStripConfigGroup>>,
@@ -62,18 +62,20 @@ impl ConfigManager {
     ) -> anyhow::Result<()> {
         let mut config = self.config.write().await;
 
-        for config in config.strips.iter_mut() {
-            if config.display_id == display_id && config.border == border {
-                let target = config.len as i64 + delta_len as i64;
+        for strip in config.strips.iter_mut() {
+            if strip.display_id == display_id && strip.border == border {
+                let target = strip.len as i64 + delta_len as i64;
                 if target < 0 || target > 1000 {
                     return Err(anyhow::anyhow!(
                         "Overflow. range: 0-1000, current: {}",
                         target
                     ));
                 }
-                config.len = target as usize;
+                strip.len = target as usize;
             }
         }
+
+        Self::rebuild_mappers(&mut config);
 
         let cloned_config = config.clone();
 
@@ -86,6 +88,24 @@ impl ConfigManager {
             .map_err(|e| anyhow::anyhow!("Failed to send config update: {}", e))?;
 
         Ok(())
+    }
+
+    fn rebuild_mappers(config: &mut LedStripConfigGroup) {
+        let mut prev_end = 0;
+        let mappers: Vec<SamplePointMapper> = config
+            .strips
+            .iter()
+            .map(|strip| {
+                let mapper = SamplePointMapper {
+                    start: prev_end,
+                    end: prev_end + strip.len,
+                };
+                prev_end = mapper.end;
+                mapper
+            })
+            .collect();
+
+        config.mappers = mappers;
     }
 
     pub async fn set_items(&self, items: Vec<config::LedStripConfig>) -> anyhow::Result<()> {
