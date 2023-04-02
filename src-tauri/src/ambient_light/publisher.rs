@@ -37,10 +37,10 @@ impl LedColorsPublisher {
             .await
     }
 
-    pub fn start(&self) -> anyhow::Result<()> {
+    pub fn start(&self) {
         let tx = self.tx.clone();
 
-        let handler = tokio::spawn(async move {
+        tokio::spawn(async move {
             loop {
                 log::info!("colors update loop AAA");
 
@@ -103,7 +103,31 @@ impl LedColorsPublisher {
                 }
             }
         });
-        Ok(())
+
+        let rx = self.rx.clone();
+        tokio::spawn(async move {
+            let mut rx = rx.read().await.clone();
+            loop {
+                if let Err(err) = rx.changed().await {
+                    warn!("rx changed error: {}", err);
+                    sleep(Duration::from_millis(1000)).await;
+                    continue;
+                }
+
+                let colors = rx.borrow().clone();
+
+                let len = colors.len();
+
+                match Self::send_colors(colors).await {
+                    Ok(_) => {
+                        log::info!("colors sent. len: {}", len);
+                    }
+                    Err(err) => {
+                        warn!("colors send failed: {}", err);
+                    }
+                }
+            }
+        });
     }
 
     pub async fn send_colors(payload: Vec<u8>) -> anyhow::Result<()> {

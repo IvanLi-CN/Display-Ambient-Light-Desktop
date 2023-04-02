@@ -183,7 +183,7 @@ async fn main() {
     screenshot_manager.start().unwrap();
 
     let led_color_publisher = ambient_light::LedColorsPublisher::global().await;
-    led_color_publisher.start().unwrap();
+    led_color_publisher.start();
 
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
