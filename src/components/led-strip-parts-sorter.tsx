@@ -190,11 +190,12 @@ const SorterResult: Component = () => {
         let c1 = `rgb(${Math.floor(colors[i * 3] * 0.8)}, ${Math.floor(
           colors[i * 3 + 1] * 0.8,
         )}, ${Math.floor(colors[i * 3 + 2] * 0.8)})`;
-        let c2 = `rgb(${Math.floor(colors[i * 3] * 1.2)}, ${Math.floor(
-          colors[i * 3 + 1] * 1.2,
-        )}, ${Math.floor(colors[i * 3 + 2] * 1.2)})`;
+        let c2 = `rgb(${Math.min(Math.floor(colors[i * 3] * 1.2), 255)}, ${Math.min(
+          Math.floor(colors[i * 3 + 1] * 1.2),
+          255,
+        )}, ${Math.min(Math.floor(colors[i * 3 + 2] * 1.2), 255)})`;
 
-        return `linear-gradient(70deg, ${c1}, ${c2})`;
+        return `linear-gradient(70deg, ${c1} 10%, ${c2})`;
       });
     console.log(fullLeds);
     setFullLeds(fullLeds);
@@ -220,8 +221,6 @@ const SorterResult: Component = () => {
 };
 
 export const LedStripPartsSorter: Component = () => {
-  const context = createContext();
-
   return (
     <div
       class="select-none overflow-hidden"

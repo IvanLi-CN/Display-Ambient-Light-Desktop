@@ -82,6 +82,10 @@ impl Screenshot {
         leds: usize,
         single_axis_points: usize,
     ) -> Vec<LedSamplePoints> {
+        if leds == 0 {
+            return vec![];
+        }
+
         let cell_size_x = length as f64 / single_axis_points as f64 / leds as f64;
         let cell_size_y = width / single_axis_points;
 
@@ -100,6 +104,7 @@ impl Screenshot {
             .map(|&x| point_y_list.iter().map(move |&y| (x, y)))
             .flatten()
             .collect();
+
         points
             .chunks(single_axis_points * single_axis_points)
             .into_iter()
@@ -159,6 +164,7 @@ impl Screenshot {
             let mut b = 0.0;
             let len = led_points.len() as f64;
             for (x, y) in led_points {
+                // log::info!("x: {}, y: {}, bytes_per_row: {}", x, y, bytes_per_row);
                 let position = x * 4 + y * bytes_per_row;
                 b += bitmap[position] as f64;
                 g += bitmap[position + 1] as f64;
