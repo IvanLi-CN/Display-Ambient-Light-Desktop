@@ -105,17 +105,43 @@ const SorterItem: Component<{ strip: LedStripConfig; mapper: LedStripPixelMapper
     setSelectedStripPart(null);
   };
 
+  const reverse = () => {
+    invoke('reverse_led_strip_part', {
+      displayId: props.strip.display_id,
+      border: props.strip.border,
+    }).catch((err) => console.error(err));
+  };
+
   // update fullLeds
   createEffect(() => {
     const fullLeds = new Array(ledStripStore.totalLedCount).fill(null);
 
-    for (
-      let i = props.mapper.start, j = props.mapper.pos;
-      i < props.mapper.end;
-      i++, j++
-    ) {
+    // if (props.mapper.start < props.mapper.end) {
+    //   for (
+    //     let i = props.mapper.start, j = props.mapper.pos;
+    //     i < props.mapper.end;
+    //     i++, j++
+    //   ) {
+    //     fullLeds[i] = ledStripStore.colors[j];
+    //   }
+    // } else {
+    //   for (
+    //     let i = props.mapper.start, j = props.mapper.pos;
+    //     i >= props.mapper.end;
+    //     i--, j++
+    //   ) {
+    //     fullLeds[i] = ledStripStore.colors[j];
+    //   }
+    // }
+    // 优化上面的代码
+
+    const { start, end, pos } = props.mapper;
+    const isForward = start < end;
+    const step = isForward ? 1 : -1;
+    for (let i = start, j = pos; i !== end; i += step, j++) {
       fullLeds[i] = ledStripStore.colors[j];
     }
+
     setFullLeds(fullLeds);
   });
 
@@ -133,6 +159,7 @@ const SorterItem: Component<{ strip: LedStripConfig; mapper: LedStripPixelMapper
       onPointerDown={onPointerDown}
       onPointerUp={onPointerUp}
       onPointerLeave={onPointerLeave}
+      ondblclick={reverse}
     >
       <For each={fullLeds()}>
         {(it) => (
@@ -156,15 +183,20 @@ const SorterResult: Component = () => {
   const [fullLeds, setFullLeds] = createSignal<string[]>([]);
 
   createEffect(() => {
-    const fullLeds = new Array(ledStripStore.totalLedCount).fill('rgba(255,255,255,0.1)');
+    const colors = ledStripStore.sortedColors;
+    const fullLeds = new Array(ledStripStore.totalLedCount)
+      .fill('rgba(255,255,255,0.1)')
+      .map((_, i) => {
+        let c1 = `rgb(${Math.floor(colors[i * 3] * 0.8)}, ${Math.floor(
+          colors[i * 3 + 1] * 0.8,
+        )}, ${Math.floor(colors[i * 3 + 2] * 0.8)})`;
+        let c2 = `rgb(${Math.floor(colors[i * 3] * 1.2)}, ${Math.floor(
+          colors[i * 3 + 1] * 1.2,
+        )}, ${Math.floor(colors[i * 3 + 2] * 1.2)})`;
 
-    ledStripStore.mappers.forEach((mapper) => {
-      for (let i = mapper.start, j = 0; i < mapper.end; i++, j++) {
-        fullLeds[i] = `rgb(${ledStripStore.sortedColors[i * 3]}, ${
-          ledStripStore.sortedColors[i * 3 + 1]
-        }, ${ledStripStore.sortedColors[i * 3 + 2]})`;
-      }
-    });
+        return `linear-gradient(70deg, ${c1}, ${c2})`;
+      });
+    console.log(fullLeds);
     setFullLeds(fullLeds);
   });
 

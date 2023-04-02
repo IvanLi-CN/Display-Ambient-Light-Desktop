@@ -175,6 +175,18 @@ async fn move_strip_part(display_id: u32, border: Border, target_start: usize) -
         })
 }
 
+#[tauri::command]
+async fn reverse_led_strip_part(display_id: u32, border: Border) -> Result<(), String> {
+    let config_manager = ambient_light::ConfigManager::global().await;
+    config_manager
+        .reverse_led_strip_part(display_id, border)
+        .await
+        .map_err(|e| {
+            error!("can not reverse led strip part: {}", e);
+            e.to_string()
+        })
+}
+
 #[tokio::main]
 async fn main() {
     env_logger::init();
@@ -197,6 +209,7 @@ async fn main() {
             patch_led_strip_len,
             send_colors,
             move_strip_part,
+            reverse_led_strip_part,
         ])
         .register_uri_scheme_protocol("ambient-light", move |_app, request| {
             let response = ResponseBuilder::new().header("Access-Control-Allow-Origin", "*");

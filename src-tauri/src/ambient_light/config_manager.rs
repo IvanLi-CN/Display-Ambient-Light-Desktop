@@ -122,8 +122,36 @@ impl ConfigManager {
                 log::info!("mapper: {:?}", mapper);
             }
         }
-        
-        Self::rebuild_mappers(&mut config);
+
+        let cloned_config = config.clone();
+
+        drop(config);
+
+        self.update(&cloned_config).await?;
+
+        self.config_update_sender
+            .send(cloned_config)
+            .map_err(|e| anyhow::anyhow!("Failed to send config update: {}", e))?;
+
+        Ok(())
+    }
+
+    pub async fn reverse_led_strip_part(
+        &self,
+        display_id: u32,
+        border: Border,
+    ) -> anyhow::Result<()> {
+        let mut config = self.config.write().await;
+
+        for (index, strip) in config.clone().strips.iter().enumerate() {
+            if strip.display_id == display_id && strip.border == border {
+                let mut mapper = config.mappers[index].borrow_mut();
+
+                let start = mapper.start;
+                mapper.start = mapper.end;
+                mapper.end = start;
+            }
+        }
 
         let cloned_config = config.clone();
 

@@ -4,13 +4,13 @@ use core_graphics::display::{
     kCGNullWindowID, kCGWindowImageDefault, kCGWindowListOptionOnScreenOnly, CGDisplay,
 };
 use paris::{error, info, warn};
-use serde::{Deserialize, Serialize};
 use tauri::{async_runtime::RwLock, Window};
 use tokio::sync::{watch, OnceCell};
 
 use crate::{
     ambient_light::{SamplePointConfig, SamplePointMapper},
-    screenshot::{LedSamplePoints, ScreenSamplePoints, Screenshot, ScreenshotPayload}, led_color::LedColor,
+    led_color::LedColor,
+    screenshot::{ScreenSamplePoints, Screenshot, ScreenshotPayload},
 };
 
 pub fn take_screenshot(display_id: u32, scale_factor: f32) -> anyhow::Result<Screenshot> {
@@ -220,7 +220,6 @@ impl ScreenshotManager {
         configs: &Vec<SamplePointConfig>,
         screenshots: &Vec<Screenshot>,
     ) -> Vec<LedColor> {
-
         let mut all_colors = vec![];
 
         for (index, screenshot) in screenshots.iter().enumerate() {
@@ -233,7 +232,10 @@ impl ScreenshotManager {
         all_colors
     }
 
-    pub async fn get_sorted_colors(colors: &Vec<LedColor>, mappers: &Vec<SamplePointMapper>) -> Vec<u8> {
+    pub async fn get_sorted_colors(
+        colors: &Vec<LedColor>,
+        mappers: &Vec<SamplePointMapper>,
+    ) -> Vec<u8> {
         let total_leds = mappers
             .iter()
             .map(|mapper| usize::max(mapper.start, mapper.end))
