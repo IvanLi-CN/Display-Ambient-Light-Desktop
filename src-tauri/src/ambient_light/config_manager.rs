@@ -122,7 +122,8 @@ impl ConfigManager {
                 log::info!("mapper: {:?}", mapper);
             }
         }
-        log::info!("mapper: {:?}", config.mappers[4]);
+        
+        Self::rebuild_mappers(&mut config);
 
         let cloned_config = config.clone();
 
@@ -138,17 +139,31 @@ impl ConfigManager {
     }
 
     fn rebuild_mappers(config: &mut LedStripConfigGroup) {
-        let mut prev_end = 0;
+        let mut prev_pos_end = 0;
         let mappers: Vec<SamplePointMapper> = config
             .strips
             .iter()
-            .map(|strip| {
-                let mapper = SamplePointMapper {
-                    start: prev_end,
-                    end: prev_end + strip.len,
-                };
-                prev_end = mapper.end;
-                mapper
+            .enumerate()
+            .map(|(index, strip)| {
+                let mapper = &config.mappers[index];
+
+                if mapper.start < mapper.end {
+                    let mapper = SamplePointMapper {
+                        start: mapper.start,
+                        end: mapper.start + strip.len,
+                        pos: prev_pos_end,
+                    };
+                    prev_pos_end = prev_pos_end + strip.len;
+                    mapper
+                } else {
+                    let mapper = SamplePointMapper {
+                        end: mapper.end,
+                        start: mapper.end + strip.len,
+                        pos: prev_pos_end,
+                    };
+                    prev_pos_end = prev_pos_end + strip.len;
+                    mapper
+                }
             })
             .collect();
 

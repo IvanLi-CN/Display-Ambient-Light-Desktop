@@ -3,6 +3,7 @@ import { Borders } from '../constants/border';
 export type LedStripPixelMapper = {
   start: number;
   end: number;
+  pos: number;
 };
 
 export type LedStripConfigContainer = {

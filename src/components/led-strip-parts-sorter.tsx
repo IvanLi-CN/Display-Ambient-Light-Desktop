@@ -12,20 +12,17 @@ import { LedStripConfig, LedStripPixelMapper } from '../models/led-strip-config'
 import { ledStripStore } from '../stores/led-strip.store';
 import { invoke } from '@tauri-apps/api';
 import { LedStripConfigurationContext } from '../contexts/led-strip-configuration.context';
+import background from '../assets/transparent-grid-background.svg?url';
 
 const SorterItem: Component<{ strip: LedStripConfig; mapper: LedStripPixelMapper }> = (
   props,
 ) => {
-  const [fullLeds, setFullLeds] = createSignal<string[]>([]);
+  const [fullLeds, setFullLeds] = createSignal<Array<string | null>>([]);
   const [dragging, setDragging] = createSignal<boolean>(false);
   const [dragStart, setDragStart] = createSignal<{ x: number; y: number } | null>(null);
   const [dragCurr, setDragCurr] = createSignal<{ x: number; y: number } | null>(null);
   const [dragStartIndex, setDragStartIndex] = createSignal<number>(0);
   const [, { setSelectedStripPart }] = useContext(LedStripConfigurationContext);
-
-  const totalLedCount = createMemo(() => {
-    return ledStripStore.strips.reduce((acc, strip) => acc + strip.len, 0);
-  });
 
   const move = (targetStart: number) => {
     if (targetStart === props.mapper.start) {
@@ -70,7 +67,8 @@ const SorterItem: Component<{ strip: LedStripConfig; mapper: LedStripPixelMapper
     }
     setDragCurr({ x: ev.clientX, y: ev.clientY });
 
-    const cellWidth = (ev.currentTarget as HTMLDivElement).clientWidth / totalLedCount();
+    const cellWidth =
+      (ev.currentTarget as HTMLDivElement).clientWidth / ledStripStore.totalLedCount;
     const diff = ev.clientX - dragStart()!.x;
     const moved = Math.round(diff / cellWidth);
     if (moved === 0) {
@@ -85,9 +83,13 @@ const SorterItem: Component<{ strip: LedStripConfig; mapper: LedStripPixelMapper
 
   // update fullLeds
   createEffect(() => {
-    const fullLeds = new Array(totalLedCount()).fill('rgba(255,255,255,0.5)');
+    const fullLeds = new Array(ledStripStore.totalLedCount).fill(null);
 
-    for (let i = props.mapper.start, j = 0; i < props.mapper.end; i++, j++) {
+    for (
+      let i = props.mapper.start, j = props.mapper.pos;
+      i < props.mapper.end;
+      i++, j++
+    ) {
       fullLeds[i] = ledStripStore.colors[j];
     }
     setFullLeds(fullLeds);
@@ -112,11 +114,12 @@ const SorterItem: Component<{ strip: LedStripConfig; mapper: LedStripPixelMapper
         {(it) => (
           <div
             class="flex-auto flex h-full w-full justify-center items-center relative"
-            title={it}
+            title={it ?? ''}
           >
             <div
-              class="absolute top-1/2 -translate-y-1/2 h-2.5 w-2.5 rounded-full ring-1 ring-stone-300"
-              style={{ background: it }}
+              class="absolute top-1/2 -translate-y-1/2 h-2.5 w-2.5 rounded-full ring-1 ring-stone-100"
+              classList={{ 'ring-stone-300/50': !it }}
+              style={{ background: it ?? 'transparent' }}
             />
           </div>
         )}
@@ -129,8 +132,7 @@ const SorterResult: Component = () => {
   const [fullLeds, setFullLeds] = createSignal<string[]>([]);
 
   createEffect(() => {
-    const totalLedCount = Math.max(0, ...ledStripStore.mappers.map((m) => m.end));
-    const fullLeds = new Array(totalLedCount).fill('rgba(255,255,255,0.5)');
+    const fullLeds = new Array(ledStripStore.totalLedCount).fill('rgba(255,255,255,0.1)');
 
     ledStripStore.mappers.forEach((mapper) => {
       for (let i = mapper.start, j = 0; i < mapper.end; i++, j++) {
@@ -165,7 +167,12 @@ export const LedStripPartsSorter: Component = () => {
   const context = createContext();
 
   return (
-    <div class="select-none overflow-hidden">
+    <div
+      class="select-none overflow-hidden"
+      style={{
+        'background-image': `url(${background})`,
+      }}
+    >
       <SorterResult />
       <For each={ledStripStore.strips}>
         {(strip, index) => (

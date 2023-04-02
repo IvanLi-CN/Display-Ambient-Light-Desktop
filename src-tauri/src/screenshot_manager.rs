@@ -236,22 +236,33 @@ impl ScreenshotManager {
     pub async fn get_sorted_colors(colors: &Vec<LedColor>, mappers: &Vec<SamplePointMapper>) -> Vec<u8> {
         let total_leds = mappers
             .iter()
-            .map(|mapper| mapper.end)
+            .map(|mapper| usize::max(mapper.start, mapper.end))
             .max()
             .unwrap_or(0) as usize;
         let mut global_colors = vec![0u8; total_leds * 3];
 
         let mut color_index = 0;
         mappers.iter().for_each(|group| {
-            if group.end > colors.len() || group.start > colors.len() {
+            if group.end > global_colors.len() || group.start > global_colors.len() {
                 warn!(
-                    "get_sorted_colors: group out of range. start: {}, end: {}, colors.len(): {}",
+                    "get_sorted_colors: group out of range. start: {}, end: {}, global_colors.len(): {}",
                     group.start,
                     group.end,
+                    global_colors.len()
+                );
+                return;
+            }
+
+            if color_index + group.start.abs_diff(group.end) > colors.len() {
+                warn!(
+                    "get_sorted_colors: color_index out of range. color_index: {}, strip len: {}, colors.len(): {}",
+                    color_index,
+                    group.start.abs_diff(group.end),
                     colors.len()
                 );
                 return;
             }
+
             if group.end > group.start {
                 for i in group.start..group.end {
                     let rgb = colors[color_index].get_rgb();

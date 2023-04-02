@@ -16,6 +16,7 @@ import { useTippy } from 'solid-tippy';
 import { followCursor } from 'tippy.js';
 import { LedStripConfig } from '../models/led-strip-config';
 import { LedStripConfigurationContext } from '../contexts/led-strip-configuration.context';
+import { ledStripStore } from '../stores/led-strip.store';
 
 type LedStripPartProps = {
   config?: LedStripConfig | null;
@@ -55,44 +56,31 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
   const [ledSamplePoints, setLedSamplePoints] = createSignal();
   const [colors, setColors] = createSignal<string[]>([]);
 
-  // get led strip colors when screenshot updated
+  // update led strip colors from global store
   createEffect(() => {
-    const samplePoints = ledSamplePoints();
-    if (!localProps.config || !samplePoints) {
+    if (!localProps.config) {
       return;
     }
 
-    let pendingCount = 0;
-    const unlisten = listen<{
-      base64_image: string;
-      display_id: number;
-      height: number;
-      width: number;
-    }>('encoded-screenshot-updated', (event) => {
-      if (event.payload.display_id !== localProps.config!.display_id) {
-        return;
-      }
-      if (pendingCount >= 1) {
-        return;
-      }
-      pendingCount++;
+    const index = ledStripStore.strips.findIndex(
+      (s) =>
+        s.display_id === localProps.config!.display_id &&
+        s.border === localProps.config!.border,
+    );
 
-      invoke<string[]>('get_one_edge_colors', {
-        samplePoints,
-        displayId: event.payload.display_id,
-      })
-        .then((colors) => {
-          setColors(colors);
-        })
-        .finally(() => {
-          pendingCount--;
-        });
-    });
-    subscribeScreenshotUpdate(localProps.config.display_id);
+    if (index === -1) {
+      return;
+    }
 
-    onCleanup(() => {
-      unlisten.then((unlisten) => unlisten());
-    });
+    const mapper = ledStripStore.mappers[index];
+    if (!mapper) {
+      return;
+    }
+
+    const offset = mapper.pos;
+
+    const colors = ledStripStore.colors.slice(offset, offset + localProps.config.len);
+    setColors(colors);
   });
 
   // get led strip sample points
