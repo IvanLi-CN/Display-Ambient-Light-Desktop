@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use paris::warn;
+use paris::{info, warn};
 use tauri::async_runtime::{Mutex, RwLock};
 use tokio::{sync::watch, time::sleep};
 
@@ -8,7 +8,7 @@ use crate::{
     ambient_light::{config, ConfigManager},
     rpc::MqttRpc,
     screenshot::Screenshot,
-    screenshot_manager::ScreenshotManager,
+    screenshot_manager::ScreenshotManager, led_color::LedColor,
 };
 
 use itertools::Itertools;
@@ -16,8 +16,10 @@ use itertools::Itertools;
 use super::{LedStripConfigGroup, SamplePointConfig};
 
 pub struct LedColorsPublisher {
-    rx: Arc<RwLock<watch::Receiver<Vec<u8>>>>,
-    tx: Arc<RwLock<watch::Sender<Vec<u8>>>>,
+    sorted_colors_rx: Arc<RwLock<watch::Receiver<Vec<u8>>>>,
+    sorted_colors_tx: Arc<RwLock<watch::Sender<Vec<u8>>>>,
+    colors_rx: Arc<RwLock<watch::Receiver<Vec<LedColor>>>>,
+    colors_tx: Arc<RwLock<watch::Sender<Vec<LedColor>>>>,
 }
 
 impl LedColorsPublisher {
@@ -25,26 +27,29 @@ impl LedColorsPublisher {
         static LED_COLORS_PUBLISHER_GLOBAL: tokio::sync::OnceCell<LedColorsPublisher> =
             tokio::sync::OnceCell::const_new();
 
+        let (sorted_tx, sorted_rx) = watch::channel(Vec::new());
         let (tx, rx) = watch::channel(Vec::new());
 
         LED_COLORS_PUBLISHER_GLOBAL
             .get_or_init(|| async {
                 LedColorsPublisher {
-                    rx: Arc::new(RwLock::new(rx)),
-                    tx: Arc::new(RwLock::new(tx)),
+                    sorted_colors_rx: Arc::new(RwLock::new(sorted_rx)),
+                    sorted_colors_tx: Arc::new(RwLock::new(sorted_tx)),
+                    colors_rx: Arc::new(RwLock::new(rx)),
+                    colors_tx: Arc::new(RwLock::new(tx)),
                 }
             })
             .await
     }
 
     pub fn start(&self) {
-        let tx = self.tx.clone();
+        let sorted_colors_tx = self.sorted_colors_tx.clone();
+        let colors_tx = self.colors_tx.clone();
 
         tokio::spawn(async move {
             loop {
-                log::info!("colors update loop AAA");
-
-                let tx = tx.write().await;
+                let sorted_colors_tx = sorted_colors_tx.write().await;
+                let colors_tx = colors_tx.write().await;
                 let screenshot_manager = ScreenshotManager::global().await;
 
                 let config_manager = ConfigManager::global().await;
@@ -79,13 +84,13 @@ impl LedColorsPublisher {
                     }
 
                     let colors = screenshot_manager
-                        .get_all_colors(
-                            &configs.sample_point_groups,
-                            &configs.mappers,
-                            &screenshots,
-                        )
+                        .get_all_colors(&configs.sample_point_groups, &screenshots)
                         .await;
-                    match tx.send(colors) {
+
+                    let sorted_colors =
+                        ScreenshotManager::get_sorted_colors(&colors, &configs.mappers).await;
+
+                    match colors_tx.send(colors) {
                         Ok(_) => {
                             // log::info!("colors updated");
                         }
@@ -94,17 +99,31 @@ impl LedColorsPublisher {
                         }
                     }
 
-                    if some_screenshot_receiver_is_none
-                        || config_receiver.has_changed().unwrap_or(true)
-                    {
+                    match sorted_colors_tx.send(sorted_colors) {
+                        Ok(_) => {
+                            // log::info!("colors updated");
+                        }
+                        Err(_) => {
+                            warn!("colors update failed");
+                        }
+                    }
+
+                    if some_screenshot_receiver_is_none {
+                        info!("some screenshot receiver is none. reload.");
                         sleep(Duration::from_millis(1000)).await;
+                        break;
+                    }
+
+                    if config_receiver.has_changed().unwrap_or(true) {
+                        info!("config changed. reload.");
+                        sleep(Duration::from_millis(100)).await;
                         break;
                     }
                 }
             }
         });
 
-        let rx = self.rx.clone();
+        let rx = self.sorted_colors_rx.clone();
         tokio::spawn(async move {
             let mut rx = rx.read().await.clone();
             loop {
@@ -136,8 +155,8 @@ impl LedColorsPublisher {
         mqtt.publish_led_sub_pixels(payload).await
     }
 
-    pub async fn clone_receiver(&self) -> watch::Receiver<Vec<u8>> {
-        self.rx.read().await.clone()
+    pub async fn clone_sorted_colors_receiver(&self) -> watch::Receiver<Vec<u8>> {
+        self.sorted_colors_rx.read().await.clone()
     }
 
     pub async fn get_colors_configs(configs: &LedStripConfigGroup) -> AllColorConfig {
@@ -206,6 +225,10 @@ impl LedColorsPublisher {
             mappers,
             screenshot_receivers: local_rx_list,
         };
+    }
+
+    pub async fn clone_colors_receiver(&self) -> watch::Receiver<Vec<LedColor>> {
+        self.colors_rx.read().await.clone()
     }
 }
 

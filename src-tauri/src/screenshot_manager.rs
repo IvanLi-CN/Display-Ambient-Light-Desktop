@@ -10,7 +10,7 @@ use tokio::sync::{watch, OnceCell};
 
 use crate::{
     ambient_light::{SamplePointConfig, SamplePointMapper},
-    screenshot::{LedSamplePoints, ScreenSamplePoints, Screenshot, ScreenshotPayload},
+    screenshot::{LedSamplePoints, ScreenSamplePoints, Screenshot, ScreenshotPayload}, led_color::LedColor,
 };
 
 pub fn take_screenshot(display_id: u32, scale_factor: f32) -> anyhow::Result<Screenshot> {
@@ -218,14 +218,9 @@ impl ScreenshotManager {
     pub async fn get_all_colors(
         &self,
         configs: &Vec<SamplePointConfig>,
-        mappers: &Vec<SamplePointMapper>,
         screenshots: &Vec<Screenshot>,
-    ) -> Vec<u8> {
-        let total_leds = configs
-            .iter()
-            .fold(0, |acc, config| acc + config.points.len());
+    ) -> Vec<LedColor> {
 
-        let mut global_colors = vec![0u8; total_leds * 3];
         let mut all_colors = vec![];
 
         for (index, screenshot) in screenshots.iter().enumerate() {
@@ -235,20 +230,31 @@ impl ScreenshotManager {
             all_colors.append(&mut colors);
         }
 
+        all_colors
+    }
+
+    pub async fn get_sorted_colors(colors: &Vec<LedColor>, mappers: &Vec<SamplePointMapper>) -> Vec<u8> {
+        let total_leds = mappers
+            .iter()
+            .map(|mapper| mapper.end)
+            .max()
+            .unwrap_or(0) as usize;
+        let mut global_colors = vec![0u8; total_leds * 3];
+
         let mut color_index = 0;
         mappers.iter().for_each(|group| {
-            if group.end > all_colors.len() || group.start > all_colors.len() {
+            if group.end > colors.len() || group.start > colors.len() {
                 warn!(
-                    "get_all_colors: group out of range. start: {}, end: {}, all_colors.len(): {}",
+                    "get_sorted_colors: group out of range. start: {}, end: {}, colors.len(): {}",
                     group.start,
                     group.end,
-                    all_colors.len()
+                    colors.len()
                 );
                 return;
             }
             if group.end > group.start {
                 for i in group.start..group.end {
-                    let rgb = all_colors[color_index].get_rgb();
+                    let rgb = colors[color_index].get_rgb();
                     color_index += 1;
 
                     global_colors[i * 3] = rgb[0];
@@ -257,7 +263,7 @@ impl ScreenshotManager {
                 }
             } else {
                 for i in (group.end..group.start).rev() {
-                    let rgb = all_colors[color_index].get_rgb();
+                    let rgb = colors[color_index].get_rgb();
                     color_index += 1;
 
                     global_colors[i * 3] = rgb[0];

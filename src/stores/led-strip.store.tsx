@@ -7,4 +7,5 @@ export const [ledStripStore, setLedStripStore] = createStore({
   strips: new Array<LedStripConfig>(),
   mappers: new Array<LedStripPixelMapper>(),
   colors: new Uint8ClampedArray(),
+  sortedColors: new Array<string>(),
 });

@@ -348,7 +348,24 @@ async fn main() {
             let app_handle = app.handle().clone();
             tokio::spawn(async move {
                 let publisher = ambient_light::LedColorsPublisher::global().await;
-                let mut publisher_update_receiver = publisher.clone_receiver().await;
+                let mut publisher_update_receiver = publisher.clone_sorted_colors_receiver().await;
+                loop {
+                    if let Err(err) = publisher_update_receiver.changed().await {
+                        error!("publisher update receiver changed error: {}", err);
+                        return;
+                    }
+
+                    let publisher = publisher_update_receiver.borrow().clone();
+
+                    app_handle
+                        .emit_all("led_sorted_colors_changed", publisher)
+                        .unwrap();
+                }
+            });
+            let app_handle = app.handle().clone();
+            tokio::spawn(async move {
+                let publisher = ambient_light::LedColorsPublisher::global().await;
+                let mut publisher_update_receiver = publisher.clone_colors_receiver().await;
                 loop {
                     if let Err(err) = publisher_update_receiver.changed().await {
                         error!("publisher update receiver changed error: {}", err);

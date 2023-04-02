@@ -88,9 +88,7 @@ const SorterItem: Component<{ strip: LedStripConfig; mapper: LedStripPixelMapper
     const fullLeds = new Array(totalLedCount()).fill('rgba(255,255,255,0.5)');
 
     for (let i = props.mapper.start, j = 0; i < props.mapper.end; i++, j++) {
-      fullLeds[i] = `rgb(${ledStripStore.colors[i * 3]}, ${
-        ledStripStore.colors[i * 3 + 1]
-      }, ${ledStripStore.colors[i * 3 + 2]})`;
+      fullLeds[i] = ledStripStore.colors[j];
     }
     setFullLeds(fullLeds);
   });
@@ -131,15 +129,14 @@ const SorterResult: Component = () => {
   const [fullLeds, setFullLeds] = createSignal<string[]>([]);
 
   createEffect(() => {
-    const strips = ledStripStore.strips;
-    const totalLedCount = strips.reduce((acc, strip) => acc + strip.len, 0);
+    const totalLedCount = Math.max(0, ...ledStripStore.mappers.map((m) => m.end));
     const fullLeds = new Array(totalLedCount).fill('rgba(255,255,255,0.5)');
 
     ledStripStore.mappers.forEach((mapper) => {
       for (let i = mapper.start, j = 0; i < mapper.end; i++, j++) {
-        fullLeds[i] = `rgb(${ledStripStore.colors[i * 3]}, ${
-          ledStripStore.colors[i * 3 + 1]
-        }, ${ledStripStore.colors[i * 3 + 2]})`;
+        fullLeds[i] = `rgb(${ledStripStore.sortedColors[i * 3]}, ${
+          ledStripStore.sortedColors[i * 3 + 1]
+        }, ${ledStripStore.sortedColors[i * 3 + 2]})`;
       }
     });
     setFullLeds(fullLeds);

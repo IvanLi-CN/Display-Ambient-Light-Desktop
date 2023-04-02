@@ -57,6 +57,21 @@ function App() {
     });
   });
 
+  // listen to led_sorted_colors_changed event
+  createEffect(() => {
+    const unlisten = listen<Array<string>>('led_sorted_colors_changed', (event) => {
+      const sortedColors = event.payload;
+
+      setLedStripStore({
+        sortedColors,
+      });
+    });
+
+    onCleanup(() => {
+      unlisten.then((unlisten) => unlisten());
+    });
+  });
+
   const [ledStripConfiguration, setLedStripConfiguration] = createStore<
     LedStripConfigurationContextType[0]
   >({
