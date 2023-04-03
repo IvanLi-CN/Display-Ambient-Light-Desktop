@@ -58,21 +58,6 @@ fn list_display_info() -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn subscribe_encoded_screenshot_updated(
-    window: tauri::Window,
-    display_id: u32,
-) -> Result<(), String> {
-    let screenshot_manager = ScreenshotManager::global().await;
-    screenshot_manager
-        .subscribe_encoded_screenshot_updated(window, display_id)
-        .await
-        .map_err(|err| {
-            error!("subscribe_encoded_screenshot_updated: {}", err);
-            err.to_string()
-        })
-}
-
-#[tauri::command]
 async fn read_led_strip_configs() -> Result<LedStripConfigGroup, String> {
     let config = ambient_light::LedStripConfigGroup::read_config()
         .await
@@ -201,7 +186,6 @@ async fn main() {
         .invoke_handler(tauri::generate_handler![
             greet,
             list_display_info,
-            subscribe_encoded_screenshot_updated,
             read_led_strip_configs,
             write_led_strip_configs,
             get_led_strips_sample_points,

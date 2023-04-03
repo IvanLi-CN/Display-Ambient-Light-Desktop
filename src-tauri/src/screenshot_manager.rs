@@ -3,14 +3,15 @@ use std::{collections::HashMap, sync::Arc};
 use core_graphics::display::{
     kCGNullWindowID, kCGWindowImageDefault, kCGWindowListOptionOnScreenOnly, CGDisplay,
 };
-use paris::{error, info, warn};
-use tauri::{async_runtime::RwLock, Window};
-use tokio::sync::{watch, OnceCell};
+use paris::warn;
+use tauri::async_runtime::RwLock;
+use tokio::sync::{broadcast, watch, OnceCell};
+use tokio::time::{self, Duration};
 
 use crate::{
     ambient_light::{SamplePointConfig, SamplePointMapper},
     led_color::LedColor,
-    screenshot::{ScreenSamplePoints, Screenshot, ScreenshotPayload},
+    screenshot::{ScreenSamplePoints, Screenshot},
 };
 
 pub fn take_screenshot(display_id: u32, scale_factor: f32) -> anyhow::Result<Screenshot> {
@@ -54,7 +55,8 @@ pub fn take_screenshot(display_id: u32, scale_factor: f32) -> anyhow::Result<Scr
 
 pub struct ScreenshotManager {
     pub channels: Arc<RwLock<HashMap<u32, watch::Receiver<Screenshot>>>>,
-    encode_listeners: Arc<RwLock<HashMap<u32, Vec<Window>>>>,
+    merged_screenshot_rx: Arc<RwLock<broadcast::Receiver<Screenshot>>>,
+    merged_screenshot_tx: Arc<RwLock<broadcast::Sender<Screenshot>>>,
 }
 
 impl ScreenshotManager {
@@ -64,10 +66,11 @@ impl ScreenshotManager {
         SCREENSHOT_MANAGER
             .get_or_init(|| async {
                 let channels = Arc::new(RwLock::new(HashMap::new()));
-                let encode_listeners = Arc::new(RwLock::new(HashMap::new()));
+                let (merged_screenshot_tx, merged_screenshot_rx) = broadcast::channel(2);
                 Self {
                     channels,
-                    encode_listeners,
+                    merged_screenshot_rx: Arc::new(RwLock::new(merged_screenshot_rx)),
+                    merged_screenshot_tx: Arc::new(RwLock::new(merged_screenshot_tx)),
                 }
             })
             .await
@@ -83,6 +86,7 @@ impl ScreenshotManager {
 
     fn start_one(&self, display_id: u32, scale_factor: f32) -> anyhow::Result<()> {
         let channels = self.channels.to_owned();
+        let merged_screenshot_tx = self.merged_screenshot_tx.clone();
         tokio::spawn(async move {
             let screenshot = take_screenshot(display_id, scale_factor);
 
@@ -90,126 +94,45 @@ impl ScreenshotManager {
                 warn!("take_screenshot_loop: {}", screenshot.err().unwrap());
                 return;
             }
+            let mut interval = time::interval(Duration::from_millis(33));
 
             let screenshot = screenshot.unwrap();
-            let (tx, rx) = watch::channel(screenshot);
+            let (screenshot_tx, screenshot_rx) = watch::channel(screenshot);
             {
+                let channels = channels.clone();
                 let mut channels = channels.write().await;
-                channels.insert(display_id, rx);
+                channels.insert(display_id, screenshot_rx.clone());
             }
+
+            let merged_screenshot_tx = merged_screenshot_tx.read().await.clone();
+
             loop {
-                Self::take_screenshot_loop(display_id, scale_factor, &tx).await;
-                tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+                // interval.tick().await;
+                Self::take_screenshot_loop(
+                    display_id,
+                    scale_factor,
+                    &screenshot_tx,
+                    &merged_screenshot_tx,
+                )
+                .await;
+                tokio::time::sleep(Duration::from_millis(20)).await;
             }
         });
 
-        Ok(())
-    }
-
-    pub async fn subscribe_encoded_screenshot_updated(
-        &self,
-        window: Window,
-        display_id: u32,
-    ) -> anyhow::Result<()> {
-        let channels = self.channels.to_owned();
-        let encode_listeners = self.encode_listeners.to_owned();
-        // log::info!("subscribe_encoded_screenshot_updated. {}", display_id);
-
-        {
-            let encode_listeners = encode_listeners.read().await;
-            let listening_windows = encode_listeners.get(&display_id);
-            if listening_windows.is_some() && listening_windows.unwrap().contains(&window) {
-                log::debug!("subscribe_encoded_screenshot_updated: already listening. display#{}, window#{}", display_id, window.label());
-                return Ok(());
-            }
-        }
-        {
-            encode_listeners
-                .write()
-                .await
-                .entry(display_id)
-                .or_default()
-                .push(window);
-        }
-
-        tokio::spawn(async move {
-            info!("subscribe_encoded_screenshot_updated: start");
-            let channels = channels.read().await;
-            let rx = channels.get(&display_id);
-            if rx.is_none() {
-                error!(
-                    "subscribe_encoded_screenshot_updated: can not find display_id {}",
-                    display_id
-                );
-                return;
-            }
-            let mut rx = rx.unwrap().clone();
-            loop {
-                if let Err(err) = rx.changed().await {
-                    error!(
-                        "subscribe_encoded_screenshot_updated: can not wait rx {}",
-                        err
-                    );
-                    break;
-                }
-                let encode_listeners = encode_listeners.read().await;
-                let windows = encode_listeners.get(&display_id);
-                if windows.is_none() || windows.unwrap().is_empty() {
-                    info!("subscribe_encoded_screenshot_updated: no listener, stop");
-                    break;
-                }
-                let screenshot = rx.borrow().clone();
-                // let base64_image = Self::encode_screenshot_to_base64(&screenshot).await;
-                let height = screenshot.height;
-                let width = screenshot.width;
-
-                // if base64_image.is_err() {
-                //     error!(
-                //         "subscribe_encoded_screenshot_updated: encode_screenshot_to_base64 error {}",
-                //         base64_image.err().unwrap()
-                //     );
-                //     continue;
-                // }
-
-                // let base64_image = base64_image.unwrap();
-                for window in windows.unwrap().into_iter() {
-                    // let base64_image = base64_image.clone();
-                    let payload = ScreenshotPayload {
-                        display_id,
-                        // base64_image,
-                        height,
-                        width,
-                    };
-                    if let Err(err) = window.emit("encoded-screenshot-updated", payload) {
-                        error!("subscribe_encoded_screenshot_updated: emit error {}", err)
-                    } else {
-                        log::debug!(
-                            "subscribe_encoded_screenshot_updated: emit success. display#{}",
-                            display_id
-                        )
-                    }
-                }
-            }
-        });
-        Ok(())
-    }
-
-    async fn unsubscribe_encoded_screenshot_updated(&self, display_id: u32) -> anyhow::Result<()> {
-        let channels = self.channels.to_owned();
-        let mut channels = channels.write().await;
-        channels.remove(&display_id);
         Ok(())
     }
 
     async fn take_screenshot_loop(
         display_id: u32,
         scale_factor: f32,
-        tx: &watch::Sender<Screenshot>,
+        screenshot_tx: &watch::Sender<Screenshot>,
+        merged_screenshot_tx: &broadcast::Sender<Screenshot>,
     ) {
         let screenshot = take_screenshot(display_id, scale_factor);
         if let Ok(screenshot) = screenshot {
-            tx.send(screenshot).unwrap();
-            // log::info!("take_screenshot_loop: send success. display#{}", display_id)
+            screenshot_tx.send(screenshot.clone()).unwrap();
+            merged_screenshot_tx.send(screenshot).unwrap();
+            log::debug!("take_screenshot_loop: send success. display#{}", display_id)
         } else {
             warn!("take_screenshot_loop: {}", screenshot.err().unwrap());
         }
@@ -218,7 +141,7 @@ impl ScreenshotManager {
     pub async fn get_all_colors(
         &self,
         configs: &Vec<SamplePointConfig>,
-        screenshots: &Vec<Screenshot>,
+        screenshots: &Vec<&Screenshot>,
     ) -> Vec<LedColor> {
         let mut all_colors = vec![];
 
@@ -286,5 +209,9 @@ impl ScreenshotManager {
             }
         });
         global_colors
+    }
+
+    pub async fn clone_merged_screenshot_rx(&self) -> broadcast::Receiver<Screenshot> {
+        self.merged_screenshot_tx.read().await.subscribe()
     }
 }

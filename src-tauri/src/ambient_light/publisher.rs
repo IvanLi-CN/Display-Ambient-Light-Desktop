@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use paris::{info, warn};
 use tauri::async_runtime::{Mutex, RwLock};
@@ -6,9 +6,10 @@ use tokio::{sync::watch, time::sleep};
 
 use crate::{
     ambient_light::{config, ConfigManager},
+    led_color::LedColor,
     rpc::MqttRpc,
-    screenshot::Screenshot,
-    screenshot_manager::ScreenshotManager, led_color::LedColor,
+    screenshot::{self, Screenshot},
+    screenshot_manager::ScreenshotManager,
 };
 
 use itertools::Itertools;
@@ -57,67 +58,76 @@ impl LedColorsPublisher {
                 let configs = config_receiver.borrow().clone();
                 let configs = Self::get_colors_configs(&configs).await;
 
-                let mut some_screenshot_receiver_is_none = false;
+                if let Err(err) = configs {
+                    warn!("Failed to get configs: {}", err);
+                    sleep(Duration::from_millis(100)).await;
+                    continue;
+                }
+
+                let configs = configs.unwrap();
+
+                let mut merged_screenshot_receiver =
+                    screenshot_manager.clone_merged_screenshot_rx().await;
+
+                let mut screenshots = HashMap::new();
 
                 loop {
-                    let mut screenshots = Vec::new();
+                    let screenshot = merged_screenshot_receiver.recv().await;
 
-                    for rx in configs.screenshot_receivers.to_owned() {
-                        let mut rx = rx.lock_owned().await;
-                        if rx.is_none() {
-                            some_screenshot_receiver_is_none = true;
-                            warn!("screenshot receiver is none");
-                            continue;
-                        }
-
-                        let rx = rx.as_mut().unwrap();
-
-                        if let Err(err) = rx.changed().await {
-                            warn!("rx changed error: {}", err);
-                            continue;
-                        }
-                        // log::info!("screenshot updated");
-
-                        let screenshot = rx.borrow().clone();
-
-                        screenshots.push(screenshot);
-                    }
-
-                    let colors = screenshot_manager
-                        .get_all_colors(&configs.sample_point_groups, &screenshots)
-                        .await;
-
-                    let sorted_colors =
-                        ScreenshotManager::get_sorted_colors(&colors, &configs.mappers).await;
-
-                    match colors_tx.send(colors) {
-                        Ok(_) => {
-                            // log::info!("colors updated");
-                        }
-                        Err(_) => {
-                            warn!("colors update failed");
+                    if let Err(err) = screenshot {
+                        match err {
+                            tokio::sync::broadcast::error::RecvError::Closed => {
+                                warn!("closed");
+                                continue;
+                            },
+                            tokio::sync::broadcast::error::RecvError::Lagged(_) => {
+                                warn!("lagged");
+                                continue;
+                            },
                         }
                     }
 
-                    match sorted_colors_tx.send(sorted_colors) {
-                        Ok(_) => {
-                            // log::info!("colors updated");
-                        }
-                        Err(_) => {
-                            warn!("colors update failed");
-                        }
-                    }
+                    let screenshot = screenshot.unwrap();
+                    // log::info!("got screenshot: {:?}", screenshot.display_id);
 
-                    if some_screenshot_receiver_is_none {
-                        info!("some screenshot receiver is none. reload.");
-                        sleep(Duration::from_millis(1000)).await;
-                        break;
-                    }
+                    screenshots.insert(screenshot.display_id, screenshot);
 
-                    if config_receiver.has_changed().unwrap_or(true) {
-                        info!("config changed. reload.");
-                        sleep(Duration::from_millis(100)).await;
-                        break;
+                    if screenshots.len() == configs.sample_point_groups.len() {
+                        {
+                            let screenshots = configs
+                                .sample_point_groups
+                                .iter()
+                                .map(|strip| screenshots.get(&strip.display_id).unwrap())
+                                .collect::<Vec<_>>();
+
+                            let colors = screenshot_manager
+                                .get_all_colors(&configs.sample_point_groups, &screenshots)
+                                .await;
+
+                            let sorted_colors =
+                                ScreenshotManager::get_sorted_colors(&colors, &configs.mappers)
+                                    .await;
+
+                            match colors_tx.send(colors) {
+                                Ok(_) => {
+                                    // log::info!("colors updated");
+                                }
+                                Err(_) => {
+                                    warn!("colors update failed");
+                                }
+                            }
+
+                            match sorted_colors_tx.send(sorted_colors) {
+                                Ok(_) => {
+                                    // log::info!("colors updated");
+                                }
+                                Err(_) => {
+                                    warn!("colors update failed");
+                                }
+                            }
+                        }
+
+                        screenshots.clear();
                     }
                 }
             }
@@ -158,8 +168,9 @@ impl LedColorsPublisher {
     pub async fn clone_sorted_colors_receiver(&self) -> watch::Receiver<Vec<u8>> {
         self.sorted_colors_rx.read().await.clone()
     }
-
-    pub async fn get_colors_configs(configs: &LedStripConfigGroup) -> AllColorConfig {
+    pub async fn get_colors_configs(
+        configs: &LedStripConfigGroup,
+    ) -> anyhow::Result<AllColorConfig> {
         let screenshot_manager = ScreenshotManager::global().await;
 
         let channels = screenshot_manager.channels.read().await;
@@ -180,11 +191,13 @@ impl LedColorsPublisher {
             let display_id = *display_id;
 
             let channel = channels.get(&display_id);
-            let channel = match channel {
-                Some(channel) => Some(channel.clone()),
-                None => None,
-            };
-            local_rx_list.push(Arc::new(Mutex::new(channel.clone())));
+            if channel.is_none() {
+                anyhow::bail!("no channel for display_id: {}", display_id);
+            }
+
+            let channel_rx = channel.unwrap().clone();
+
+            local_rx_list.push(channel.unwrap().clone());
 
             let led_strip_configs: Vec<_> = configs
                 .strips
@@ -192,39 +205,31 @@ impl LedColorsPublisher {
                 .filter(|c| c.display_id == display_id)
                 .collect();
 
-            let rx = channel;
-            if rx.is_none() {
-                warn!("no channel for display_id: {}", display_id);
-                continue;
-            }
-
             if led_strip_configs.len() == 0 {
                 warn!("no led strip config for display_id: {}", display_id);
                 continue;
             }
-            let mut rx = rx.unwrap().to_owned();
+            let rx = channel_rx.to_owned();
 
-            if rx.changed().await.is_ok() {
-                let screenshot = rx.borrow().clone();
-                log::info!("screenshot updated: {:?}", display_id);
+            let screenshot = rx.borrow().clone();
+            log::debug!("screenshot updated: {:?}", display_id);
 
-                let points: Vec<_> = led_strip_configs
-                    .iter()
-                    .map(|config| screenshot.get_sample_points(&config))
-                    .flatten()
-                    .collect();
+            let points: Vec<_> = led_strip_configs
+                .iter()
+                .map(|config| screenshot.get_sample_points(&config))
+                .flatten()
+                .collect();
 
-                let colors_config = config::SamplePointConfig { display_id, points };
+            let colors_config = config::SamplePointConfig { display_id, points };
 
-                colors_configs.push(colors_config);
-            }
+            colors_configs.push(colors_config);
         }
 
-        return AllColorConfig {
+        return Ok(AllColorConfig {
             sample_point_groups: colors_configs,
             mappers,
             screenshot_receivers: local_rx_list,
-        };
+        });
     }
 
     pub async fn clone_colors_receiver(&self) -> watch::Receiver<Vec<LedColor>> {
@@ -232,8 +237,9 @@ impl LedColorsPublisher {
     }
 }
 
+#[derive(Debug)]
 pub struct AllColorConfig {
     pub sample_point_groups: Vec<SamplePointConfig>,
     pub mappers: Vec<config::SamplePointMapper>,
-    pub screenshot_receivers: Vec<Arc<Mutex<Option<watch::Receiver<Screenshot>>>>>,
+    pub screenshot_receivers: Vec<watch::Receiver<Screenshot>>,
 }

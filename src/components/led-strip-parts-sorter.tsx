@@ -116,25 +116,6 @@ const SorterItem: Component<{ strip: LedStripConfig; mapper: LedStripPixelMapper
   createEffect(() => {
     const fullLeds = new Array(ledStripStore.totalLedCount).fill(null);
 
-    // if (props.mapper.start < props.mapper.end) {
-    //   for (
-    //     let i = props.mapper.start, j = props.mapper.pos;
-    //     i < props.mapper.end;
-    //     i++, j++
-    //   ) {
-    //     fullLeds[i] = ledStripStore.colors[j];
-    //   }
-    // } else {
-    //   for (
-    //     let i = props.mapper.start, j = props.mapper.pos;
-    //     i >= props.mapper.end;
-    //     i--, j++
-    //   ) {
-    //     fullLeds[i] = ledStripStore.colors[j];
-    //   }
-    // }
-    // 优化上面的代码
-
     const { start, end, pos } = props.mapper;
     const isForward = start < end;
     const step = isForward ? 1 : -1;
@@ -197,7 +178,6 @@ const SorterResult: Component = () => {
 
         return `linear-gradient(70deg, ${c1} 10%, ${c2})`;
       });
-    console.log(fullLeds);
     setFullLeds(fullLeds);
   });
 

@@ -1,4 +1,3 @@
-import { invoke } from '@tauri-apps/api';
 import { convertFileSrc } from '@tauri-apps/api/tauri';
 import {
   Component,
@@ -30,6 +29,7 @@ export const ScreenView: Component<ScreenViewProps> = (props) => {
     width: number;
     height: number;
   } | null>(null);
+  const [hidden, setHidden] = createSignal(false);
 
   const resetSize = () => {
     const aspectRatio = canvas.width / canvas.height;
@@ -103,6 +103,10 @@ export const ScreenView: Component<ScreenViewProps> = (props) => {
 
     (async () => {
       while (!stopped) {
+        if (hidden()) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          continue;
+        }
         await frame();
       }
     })();
@@ -125,6 +129,26 @@ export const ScreenView: Component<ScreenViewProps> = (props) => {
 
     onCleanup(() => {
       resizeObserver?.unobserve(root);
+    });
+  });
+
+  // update hidden
+  createEffect(() => {
+    const hide = () => {
+      setHidden(true);
+      console.log('hide');
+    };
+    const show = () => {
+      setHidden(false);
+      console.log('show');
+    };
+
+    window.addEventListener('focus', show);
+    window.addEventListener('blur', hide);
+
+    onCleanup(() => {
+      window.removeEventListener('focus', show);
+      window.removeEventListener('blur', hide);
     });
   });
 

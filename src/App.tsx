@@ -1,4 +1,4 @@
-import { createContext, createEffect, onCleanup } from 'solid-js';
+import { createEffect, onCleanup } from 'solid-js';
 import { invoke } from '@tauri-apps/api/tauri';
 import { DisplayView } from './components/display-view';
 import { DisplayListContainer } from './components/display-list-container';
