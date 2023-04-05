@@ -1,5 +1,4 @@
 import { invoke } from '@tauri-apps/api';
-import { listen } from '@tauri-apps/api/event';
 import {
   Component,
   createEffect,
@@ -8,7 +7,6 @@ import {
   createSignal,
   For,
   JSX,
-  onCleanup,
   splitProps,
   useContext,
 } from 'solid-js';
@@ -77,9 +75,15 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
       return;
     }
 
-    const offset = mapper.pos;
+    const offset = mapper.pos * 3;
 
-    const colors = ledStripStore.colors.slice(offset, offset + localProps.config.len);
+    const colors = new Array(localProps.config.len).fill(null).map((_, i) => {
+      const index = offset + i * 3;
+      return `rgb(${ledStripStore.colors[index]}, ${ledStripStore.colors[index + 1]}, ${
+        ledStripStore.colors[index + 2]
+      })`;
+    });
+
     setColors(colors);
   });
 

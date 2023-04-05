@@ -106,7 +106,7 @@ async fn get_one_edge_colors(
     if let Some(rx) = channels.get(&display_id) {
         let rx = rx.clone();
         let screenshot = rx.borrow().clone();
-        let bytes = screenshot.bytes.read().await;
+        let bytes = screenshot.bytes.read().await.to_owned();
         let colors =
             Screenshot::get_one_edge_colors(&sample_points, &bytes, screenshot.bytes_per_row);
         Ok(colors)

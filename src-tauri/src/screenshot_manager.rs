@@ -1,13 +1,16 @@
+use std::cell::{Ref, RefCell};
 use std::{collections::HashMap, sync::Arc};
 
 use core_graphics::display::{
     kCGNullWindowID, kCGWindowImageDefault, kCGWindowListOptionOnScreenOnly, CGDisplay,
 };
+use core_graphics::geometry::{CGPoint, CGRect, CGSize};
 use paris::warn;
 use tauri::async_runtime::RwLock;
 use tokio::sync::{broadcast, watch, OnceCell};
 use tokio::time::{self, Duration};
 
+use crate::screenshot::LedSamplePoints;
 use crate::{
     ambient_light::{SamplePointConfig, SamplePointMapper},
     led_color::LedColor,
@@ -16,7 +19,6 @@ use crate::{
 
 pub fn take_screenshot(display_id: u32, scale_factor: f32) -> anyhow::Result<Screenshot> {
     log::debug!("take_screenshot");
-    // let start_at = std::time::Instant::now();
 
     let cg_display = CGDisplay::new(display_id);
     let cg_image = CGDisplay::screenshot(
@@ -26,7 +28,6 @@ pub fn take_screenshot(display_id: u32, scale_factor: f32) -> anyhow::Result<Scr
         kCGWindowImageDefault,
     )
     .ok_or_else(|| anyhow::anyhow!("Display#{}: take screenshot failed", display_id))?;
-    // println!("take screenshot took {}ms", start_at.elapsed().as_millis());
 
     let buffer = cg_image.data();
     let bytes_per_row = cg_image.bytes_per_row();
@@ -34,8 +35,7 @@ pub fn take_screenshot(display_id: u32, scale_factor: f32) -> anyhow::Result<Scr
     let height = cg_image.height();
     let width = cg_image.width();
 
-    let mut bytes = vec![0u8; buffer.len() as usize];
-    bytes.copy_from_slice(&buffer);
+    let bytes = buffer.bytes().to_owned();
 
     Ok(Screenshot::new(
         display_id,
@@ -44,18 +44,76 @@ pub fn take_screenshot(display_id: u32, scale_factor: f32) -> anyhow::Result<Scr
         bytes_per_row,
         bytes,
         scale_factor,
-        ScreenSamplePoints {
-            top: vec![],
-            bottom: vec![],
-            left: vec![],
-            right: vec![],
-        },
     ))
+}
+
+pub fn get_display_colors(
+    display_id: u32,
+    sample_points: &Vec<Vec<LedSamplePoints>>,
+) -> anyhow::Result<Vec<LedColor>> {
+    log::debug!("take_screenshot");
+    let cg_display = CGDisplay::new(display_id);
+
+    let mut colors = vec![];
+    let start_at = std::time::Instant::now();
+    for points in sample_points {
+        if points.len() == 0 {
+            continue;
+        }
+        let start_x = points[0][0].0;
+        let start_y = points[0][0].1;
+        let end_x = points.last().unwrap().last().unwrap().0;
+        let end_y = points.last().unwrap().last().unwrap().1;
+
+        let (start_x, end_x) = (usize::min(start_x, end_x), usize::max(start_x, end_x));
+        let (start_y, end_y) = (usize::min(start_y, end_y), usize::max(start_y, end_y));
+
+        let origin = CGPoint {
+            x: start_x as f64 + cg_display.bounds().origin.x,
+            y: start_y as f64 + cg_display.bounds().origin.y,
+        };
+        let size = CGSize {
+            width: (end_x - start_x + 1) as f64,
+            height: (end_y - start_y + 1) as f64,
+        };
+
+        let cg_image = CGDisplay::screenshot(
+            CGRect::new(&origin, &size),
+            kCGWindowListOptionOnScreenOnly,
+            kCGNullWindowID,
+            kCGWindowImageDefault,
+        )
+        .ok_or_else(|| anyhow::anyhow!("Display#{}: take screenshot failed", display_id))?;
+
+        let bitmap = cg_image.data();
+
+        let points = points
+            .iter()
+            .map(|points| {
+                points
+                    .iter()
+                    .map(|(x, y)| (*x - start_x, *y - start_y))
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+
+        let mut part_colors =
+            Screenshot::get_one_edge_colors_by_cg_image(&points, bitmap, cg_image.bytes_per_row());
+        colors.append(&mut part_colors);
+    }
+
+    // if display_id == 4849664 {
+    //     log::info!(
+    //         "======= get_display_colors {} took {}ms",
+    //         display_id,
+    //         start_at.elapsed().as_millis()
+    //     );
+    // }
+    Ok(colors)
 }
 
 pub struct ScreenshotManager {
     pub channels: Arc<RwLock<HashMap<u32, watch::Receiver<Screenshot>>>>,
-    merged_screenshot_rx: Arc<RwLock<broadcast::Receiver<Screenshot>>>,
     merged_screenshot_tx: Arc<RwLock<broadcast::Sender<Screenshot>>>,
 }
 
@@ -66,10 +124,9 @@ impl ScreenshotManager {
         SCREENSHOT_MANAGER
             .get_or_init(|| async {
                 let channels = Arc::new(RwLock::new(HashMap::new()));
-                let (merged_screenshot_tx, merged_screenshot_rx) = broadcast::channel(2);
+                let (merged_screenshot_tx, _) = broadcast::channel::<Screenshot>(2);
                 Self {
                     channels,
-                    merged_screenshot_rx: Arc::new(RwLock::new(merged_screenshot_rx)),
                     merged_screenshot_tx: Arc::new(RwLock::new(merged_screenshot_tx)),
                 }
             })
@@ -94,7 +151,8 @@ impl ScreenshotManager {
                 warn!("take_screenshot_loop: {}", screenshot.err().unwrap());
                 return;
             }
-            let mut interval = time::interval(Duration::from_millis(33));
+            let mut interval = time::interval(Duration::from_millis(3300));
+            let mut start = tokio::time::Instant::now();
 
             let screenshot = screenshot.unwrap();
             let (screenshot_tx, screenshot_rx) = watch::channel(screenshot);
@@ -107,7 +165,7 @@ impl ScreenshotManager {
             let merged_screenshot_tx = merged_screenshot_tx.read().await.clone();
 
             loop {
-                // interval.tick().await;
+                start = tokio::time::Instant::now();
                 Self::take_screenshot_loop(
                     display_id,
                     scale_factor,
@@ -115,7 +173,8 @@ impl ScreenshotManager {
                     &merged_screenshot_tx,
                 )
                 .await;
-                tokio::time::sleep(Duration::from_millis(20)).await;
+                interval.tick().await;
+                tokio::time::sleep(Duration::from_millis(1)).await;
             }
         });
 
@@ -130,9 +189,14 @@ impl ScreenshotManager {
     ) {
         let screenshot = take_screenshot(display_id, scale_factor);
         if let Ok(screenshot) = screenshot {
-            screenshot_tx.send(screenshot.clone()).unwrap();
-            merged_screenshot_tx.send(screenshot).unwrap();
-            log::debug!("take_screenshot_loop: send success. display#{}", display_id)
+            match merged_screenshot_tx.send(screenshot.clone()) {
+                Ok(_) => {}
+                Err(err) => {
+                    // warn!("take_screenshot_loop: merged_screenshot_tx.send failed. display#{}. err: {}", display_id, err);
+                }
+            }
+            screenshot_tx.send(screenshot).unwrap();
+            // log::info!("take_screenshot_loop: send success. display#{}", display_id)
         } else {
             warn!("take_screenshot_loop: {}", screenshot.err().unwrap());
         }
@@ -155,10 +219,7 @@ impl ScreenshotManager {
         all_colors
     }
 
-    pub async fn get_sorted_colors(
-        colors: &Vec<LedColor>,
-        mappers: &Vec<SamplePointMapper>,
-    ) -> Vec<u8> {
+    pub fn get_sorted_colors(colors: &Vec<u8>, mappers: &Vec<SamplePointMapper>) -> Vec<u8> {
         let total_leds = mappers
             .iter()
             .map(|mapper| usize::max(mapper.start, mapper.end))
@@ -178,33 +239,29 @@ impl ScreenshotManager {
                 return;
             }
 
-            if color_index + group.start.abs_diff(group.end) > colors.len() {
+            if color_index + group.start.abs_diff(group.end) * 3 > colors.len(){
                 warn!(
                     "get_sorted_colors: color_index out of range. color_index: {}, strip len: {}, colors.len(): {}",
-                    color_index,
+                    color_index / 3,
                     group.start.abs_diff(group.end),
-                    colors.len()
+                    colors.len() / 3
                 );
                 return;
             }
 
             if group.end > group.start {
                 for i in group.start..group.end {
-                    let rgb = colors[color_index].get_rgb();
-                    color_index += 1;
-
-                    global_colors[i * 3] = rgb[0];
-                    global_colors[i * 3 + 1] = rgb[1];
-                    global_colors[i * 3 + 2] = rgb[2];
+                    global_colors[i * 3] = colors[color_index +0];
+                    global_colors[i * 3 + 1] = colors[color_index +1];
+                    global_colors[i * 3 + 2] = colors[color_index +2];
+                    color_index += 3;
                 }
             } else {
                 for i in (group.end..group.start).rev() {
-                    let rgb = colors[color_index].get_rgb();
-                    color_index += 1;
-
-                    global_colors[i * 3] = rgb[0];
-                    global_colors[i * 3 + 1] = rgb[1];
-                    global_colors[i * 3 + 2] = rgb[2];
+                    global_colors[i * 3] = colors[color_index +0];
+                    global_colors[i * 3 + 1] = colors[color_index +1];
+                    global_colors[i * 3 + 2] = colors[color_index +2];
+                    color_index += 3;
                 }
             }
         });

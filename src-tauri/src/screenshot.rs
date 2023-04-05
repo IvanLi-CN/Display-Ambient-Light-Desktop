@@ -1,8 +1,9 @@
-use std::iter;
+use std::cell::RefCell;
+use std::{iter, cell::Ref};
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
-use tauri::async_runtime::RwLock;
+use tauri::async_runtime::{RwLock, Mutex};
 
 use crate::{ambient_light::LedStripConfig, led_color::LedColor};
 
@@ -14,8 +15,9 @@ pub struct Screenshot {
     pub bytes_per_row: usize,
     pub bytes: Arc<RwLock<Vec<u8>>>,
     pub scale_factor: f32,
-    pub sample_points: ScreenSamplePoints,
 }
+
+static SINGLE_AXIS_POINTS: usize = 5;
 
 impl Screenshot {
     pub fn new(
@@ -25,7 +27,6 @@ impl Screenshot {
         bytes_per_row: usize,
         bytes: Vec<u8>,
         scale_factor: f32,
-        sample_points: ScreenSamplePoints,
     ) -> Self {
         Self {
             display_id,
@@ -34,7 +35,6 @@ impl Screenshot {
             bytes_per_row,
             bytes: Arc::new(RwLock::new(bytes)),
             scale_factor,
-            sample_points,
         }
     }
 
@@ -44,10 +44,10 @@ impl Screenshot {
 
         match config.border {
             crate::ambient_light::Border::Top => {
-                Self::get_one_edge_sample_points(height / 8, width, config.len, 5)
+                Self::get_one_edge_sample_points(height / 18, width, config.len, SINGLE_AXIS_POINTS)
             }
             crate::ambient_light::Border::Bottom => {
-                let points = Self::get_one_edge_sample_points(height / 9, width, config.len, 5);
+                let points = Self::get_one_edge_sample_points(height / 18, width, config.len, SINGLE_AXIS_POINTS);
                 points
                     .into_iter()
                     .map(|groups| -> Vec<Point> {
@@ -56,7 +56,7 @@ impl Screenshot {
                     .collect()
             }
             crate::ambient_light::Border::Left => {
-                let points = Self::get_one_edge_sample_points(width / 16, height, config.len, 5);
+                let points = Self::get_one_edge_sample_points(width / 32, height, config.len, SINGLE_AXIS_POINTS);
                 points
                     .into_iter()
                     .map(|groups| -> Vec<Point> {
@@ -65,7 +65,7 @@ impl Screenshot {
                     .collect()
             }
             crate::ambient_light::Border::Right => {
-                let points = Self::get_one_edge_sample_points(width / 16, height, config.len, 5);
+                let points = Self::get_one_edge_sample_points(width / 32, height, config.len, SINGLE_AXIS_POINTS);
                 points
                     .into_iter()
                     .map(|groups| -> Vec<Point> {
@@ -112,49 +112,33 @@ impl Screenshot {
             .collect()
     }
 
-    pub async fn get_colors(&self) -> DisplayColorsOfLedStrips {
-        let bitmap = self.bytes.read().await;
-
-        let top =
-            Self::get_one_edge_colors(&self.sample_points.top, bitmap.as_ref(), self.bytes_per_row)
-                .into_iter()
-                .flat_map(|color| color.get_rgb())
-                .collect();
-        let bottom = Self::get_one_edge_colors(
-            &self.sample_points.bottom,
-            bitmap.as_ref(),
-            self.bytes_per_row,
-        )
-        .into_iter()
-        .flat_map(|color| color.get_rgb())
-        .collect();
-        let left = Self::get_one_edge_colors(
-            &self.sample_points.left,
-            bitmap.as_ref(),
-            self.bytes_per_row,
-        )
-        .into_iter()
-        .flat_map(|color| color.get_rgb())
-        .collect();
-        let right = Self::get_one_edge_colors(
-            &self.sample_points.right,
-            bitmap.as_ref(),
-            self.bytes_per_row,
-        )
-        .into_iter()
-        .flat_map(|color| color.get_rgb())
-        .collect();
-        DisplayColorsOfLedStrips {
-            top,
-            bottom,
-            left,
-            right,
-        }
-    }
-
     pub fn get_one_edge_colors(
         sample_points_of_leds: &Vec<LedSamplePoints>,
         bitmap: &Vec<u8>,
+        bytes_per_row: usize,
+    ) -> Vec<LedColor> {
+        let mut colors = vec![];
+        for led_points in sample_points_of_leds {
+            let mut r = 0.0;
+            let mut g = 0.0;
+            let mut b = 0.0;
+            let len = led_points.len() as f64;
+            for (x, y) in led_points {
+                // log::info!("x: {}, y: {}, bytes_per_row: {}", x, y, bytes_per_row);
+                let position = x * 4 + y * bytes_per_row;
+                b += bitmap[position] as f64;
+                g += bitmap[position + 1] as f64;
+                r += bitmap[position + 2] as f64;
+            }
+            let color = LedColor::new((r / len) as u8, (g / len) as u8, (b / len) as u8);
+            colors.push(color);
+        }
+        colors
+    }
+
+    pub fn get_one_edge_colors_by_cg_image(
+        sample_points_of_leds: &Vec<LedSamplePoints>,
+        bitmap: core_foundation::data::CFData,
         bytes_per_row: usize,
     ) -> Vec<LedColor> {
         let mut colors = vec![];

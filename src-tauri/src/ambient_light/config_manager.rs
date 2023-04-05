@@ -21,6 +21,8 @@ impl ConfigManager {
                 let configs = LedStripConfigGroup::read_config().await.unwrap();
                 let (config_update_sender, config_update_receiver) =
                     tokio::sync::watch::channel(configs.clone());
+
+                    config_update_sender.send(configs.clone()).unwrap();
                 ConfigManager {
                     config: Arc::new(RwLock::new(configs)),
                     config_update_receiver,

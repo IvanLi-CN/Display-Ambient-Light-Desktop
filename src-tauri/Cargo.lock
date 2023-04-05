@@ -2790,6 +2790,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "color_space",
+ "core-foundation",
  "core-graphics",
  "display-info",
  "env_logger",

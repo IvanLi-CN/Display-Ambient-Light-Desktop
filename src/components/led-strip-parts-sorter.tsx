@@ -115,12 +115,21 @@ const SorterItem: Component<{ strip: LedStripConfig; mapper: LedStripPixelMapper
   // update fullLeds
   createEffect(() => {
     const fullLeds = new Array(ledStripStore.totalLedCount).fill(null);
+    const colors = ledStripStore.colors;
 
     const { start, end, pos } = props.mapper;
     const isForward = start < end;
     const step = isForward ? 1 : -1;
     for (let i = start, j = pos; i !== end; i += step, j++) {
-      fullLeds[i] = ledStripStore.colors[j];
+      let c1 = `rgb(${Math.floor(colors[j * 3] * 0.8)}, ${Math.floor(
+        colors[j * 3 + 1] * 0.8,
+      )}, ${Math.floor(colors[j * 3 + 2] * 0.8)})`;
+      let c2 = `rgb(${Math.min(Math.floor(colors[j * 3] * 1.2), 255)}, ${Math.min(
+        Math.floor(colors[j * 3 + 1] * 1.2),
+        255,
+      )}, ${Math.min(Math.floor(colors[j * 3 + 2] * 1.2), 255)})`;
+
+      fullLeds[i] = `linear-gradient(70deg, ${c1} 10%, ${c2})`;
     }
 
     setFullLeds(fullLeds);

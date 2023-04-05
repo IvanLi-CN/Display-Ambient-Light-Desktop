@@ -44,7 +44,7 @@ function App() {
 
   // listen to led_colors_changed event
   createEffect(() => {
-    const unlisten = listen<Array<string>>('led_colors_changed', (event) => {
+    const unlisten = listen<Uint8ClampedArray>('led_colors_changed', (event) => {
       const colors = event.payload;
 
       setLedStripStore({
