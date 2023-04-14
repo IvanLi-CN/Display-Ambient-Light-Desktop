@@ -76,6 +76,15 @@ pub fn get_display_colors(
             height: (end_y - start_y + 1) as f64,
         };
 
+        // log::info!(
+        //     "origin: {:?}, size: {:?}, start_x: {}, start_y: {}, bounds: {:?}",
+        //     origin,
+        //     size,
+        //     start_x,
+        //     start_y,
+        //     cg_display.bounds().size
+        // );
+
         let cg_image = CGDisplay::screenshot(
             CGRect::new(&origin, &size),
             kCGWindowListOptionOnScreenOnly,
@@ -150,7 +159,7 @@ impl ScreenshotManager {
                 warn!("take_screenshot_loop: {}", screenshot.err().unwrap());
                 return;
             }
-            let mut interval = time::interval(Duration::from_millis(3300));
+            let mut interval = time::interval(Duration::from_millis(1000));
             let mut start = tokio::time::Instant::now();
 
             let screenshot = screenshot.unwrap();
@@ -189,7 +198,9 @@ impl ScreenshotManager {
         let screenshot = take_screenshot(display_id, scale_factor);
         if let Ok(screenshot) = screenshot {
             match merged_screenshot_tx.send(screenshot.clone()) {
-                Ok(_) => {}
+                Ok(_) => {
+                    log::info!("take_screenshot_loop: merged_screenshot_tx.send success. display#{}", display_id);
+                }
                 Err(err) => {
                     // warn!("take_screenshot_loop: merged_screenshot_tx.send failed. display#{}. err: {}", display_id, err);
                 }
@@ -199,23 +210,6 @@ impl ScreenshotManager {
         } else {
             warn!("take_screenshot_loop: {}", screenshot.err().unwrap());
         }
-    }
-
-    pub async fn get_all_colors(
-        &self,
-        configs: &Vec<SamplePointConfig>,
-        screenshots: &Vec<&Screenshot>,
-    ) -> Vec<LedColor> {
-        let mut all_colors = vec![];
-
-        for (index, screenshot) in screenshots.iter().enumerate() {
-            let config = &configs[index];
-            let mut colors = screenshot.get_colors_by_sample_points(&config.points).await;
-
-            all_colors.append(&mut colors);
-        }
-
-        all_colors
     }
 
     pub fn get_sorted_colors(colors: &Vec<u8>, mappers: &Vec<SamplePointMapper>) -> Vec<u8> {
