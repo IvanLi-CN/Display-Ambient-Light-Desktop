@@ -1,4 +1,3 @@
-use std::cell::{Ref, RefCell};
 use std::{collections::HashMap, sync::Arc};
 
 use core_graphics::display::{
@@ -14,7 +13,7 @@ use crate::screenshot::LedSamplePoints;
 use crate::{
     ambient_light::{SamplePointConfig, SamplePointMapper},
     led_color::LedColor,
-    screenshot::{ScreenSamplePoints, Screenshot},
+    screenshot::Screenshot,
 };
 
 pub fn take_screenshot(display_id: u32, scale_factor: f32) -> anyhow::Result<Screenshot> {

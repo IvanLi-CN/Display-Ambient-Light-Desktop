@@ -24,12 +24,6 @@ type PixelProps = {
   color: string;
 };
 
-async function subscribeScreenshotUpdate(displayId: number) {
-  await invoke('subscribe_encoded_screenshot_updated', {
-    displayId,
-  });
-}
-
 export const Pixel: Component<PixelProps> = (props) => {
   const style = createMemo(() => ({
     background: props.color,
@@ -51,7 +45,6 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
   const [localProps, rootProps] = splitProps(props, ['config']);
   const [stripConfiguration] = useContext(LedStripConfigurationContext);
 
-  const [ledSamplePoints, setLedSamplePoints] = createSignal();
   const [colors, setColors] = createSignal<string[]>([]);
 
   // update led strip colors from global store
@@ -85,17 +78,6 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
     });
 
     setColors(colors);
-  });
-
-  // get led strip sample points
-  createEffect(() => {
-    if (localProps.config) {
-      invoke('get_led_strips_sample_points', {
-        config: localProps.config,
-      }).then((points) => {
-        setLedSamplePoints(points);
-      });
-    }
   });
 
   const [anchor, setAnchor] = createSignal<HTMLElement>();
