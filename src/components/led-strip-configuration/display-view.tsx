@@ -1,7 +1,7 @@
 import { Component, createMemo } from 'solid-js';
-import { DisplayInfo } from '../models/display-info.model';
-import { displayStore } from '../stores/display.store';
-import { ledStripStore } from '../stores/led-strip.store';
+import { DisplayInfo } from '../../models/display-info.model';
+import { displayStore } from '../../stores/display.store';
+import { ledStripStore } from '../../stores/led-strip.store';
 import { DisplayInfoPanel } from './display-info-panel';
 import { LedStripPart } from './led-strip-part';
 import { ScreenView } from './screen-view';

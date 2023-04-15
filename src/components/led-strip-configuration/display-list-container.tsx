@@ -6,8 +6,8 @@ import {
   onMount,
   ParentComponent,
 } from 'solid-js';
-import { displayStore, setDisplayStore } from '../stores/display.store';
-import background from '../assets/transparent-grid-background.svg?url';
+import { displayStore, setDisplayStore } from '../../stores/display.store';
+import background from '../../assets/transparent-grid-background.svg?url';
 
 export const DisplayListContainer: ParentComponent = (props) => {
   let root: HTMLElement;

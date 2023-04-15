@@ -12,9 +12,9 @@ import {
 } from 'solid-js';
 import { useTippy } from 'solid-tippy';
 import { followCursor } from 'tippy.js';
-import { LedStripConfig } from '../models/led-strip-config';
-import { LedStripConfigurationContext } from '../contexts/led-strip-configuration.context';
-import { ledStripStore } from '../stores/led-strip.store';
+import { LedStripConfig } from '../../models/led-strip-config';
+import { LedStripConfigurationContext } from '../../contexts/led-strip-configuration.context';
+import { ledStripStore } from '../../stores/led-strip.store';
 
 type LedStripPartProps = {
   config?: LedStripConfig | null;

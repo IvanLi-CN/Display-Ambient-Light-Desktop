@@ -14,11 +14,11 @@ import {
   untrack,
   useContext,
 } from 'solid-js';
-import { LedStripConfig, LedStripPixelMapper } from '../models/led-strip-config';
-import { ledStripStore } from '../stores/led-strip.store';
+import { LedStripConfig, LedStripPixelMapper } from '../../models/led-strip-config';
+import { ledStripStore } from '../../stores/led-strip.store';
 import { invoke } from '@tauri-apps/api';
-import { LedStripConfigurationContext } from '../contexts/led-strip-configuration.context';
-import background from '../assets/transparent-grid-background.svg?url';
+import { LedStripConfigurationContext } from '../../contexts/led-strip-configuration.context';
+import background from '../../assets/transparent-grid-background.svg?url';
 
 const SorterItem: Component<{ strip: LedStripConfig; mapper: LedStripPixelMapper }> = (
   props,

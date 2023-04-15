@@ -1,5 +1,5 @@
 import { Component, JSX, ParentComponent, splitProps } from 'solid-js';
-import { DisplayInfo } from '../models/display-info.model';
+import { DisplayInfo } from '../../models/display-info.model';
 
 type DisplayInfoItemProps = {
   label: string;
