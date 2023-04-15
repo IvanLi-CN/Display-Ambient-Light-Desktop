@@ -7,6 +7,15 @@ export const [ledStripStore, setLedStripStore] = createStore({
   colors: new Uint8ClampedArray(),
   sortedColors: new Uint8ClampedArray(),
   get totalLedCount() {
-    return Math.max(0, ...ledStripStore.mappers.map((m) => Math.max(m.start, m.end)));
+    return Math.max(
+      0,
+      ...ledStripStore.mappers.map((m) => {
+        if (m.start === m.end) {
+          return 0;
+        } else {
+          return Math.max(m.start, m.end);
+        }
+      }),
+    );
   },
 });
