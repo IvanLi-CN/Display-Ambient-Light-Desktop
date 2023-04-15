@@ -51,12 +51,13 @@ impl LedColorsPublisher {
         &self,
         display_id: u32,
         sample_points: Vec<Vec<LedSamplePoints>>,
+        bound_scale_factor: f32,
         display_colors_tx: broadcast::Sender<(u32, Vec<u8>)>,
     ) {
         let internal_tasks_version = self.inner_tasks_version.clone();
 
         tokio::spawn(async move {
-            let colors = screenshot_manager::get_display_colors(display_id, &sample_points);
+            let colors = screenshot_manager::get_display_colors(display_id, &sample_points, bound_scale_factor);
 
             if let Err(err) = colors {
                 warn!("Failed to get colors: {}", err);
@@ -85,7 +86,7 @@ impl LedColorsPublisher {
 
                 // log::info!("tick: {}ms", start.elapsed().as_millis());
                 start = tokio::time::Instant::now();
-                let colors = screenshot_manager::get_display_colors(display_id, &sample_points);
+                let colors = screenshot_manager::get_display_colors(display_id, &sample_points, bound_scale_factor);
 
                 if let Err(err) = colors {
                     warn!("Failed to get colors: {}", err);
@@ -222,10 +223,12 @@ impl LedColorsPublisher {
                 for sample_point_group in configs.sample_point_groups.clone() {
                     let display_id = sample_point_group.display_id;
                     let sample_points = sample_point_group.points;
+                    let bound_scale_factor = sample_point_group.bound_scale_factor;
 
                     publisher.start_one_display_colors_fetcher(
                         display_id,
                         sample_points,
+                        bound_scale_factor,
                         display_colors_tx.clone(),
                     );
                 }
@@ -338,7 +341,9 @@ impl LedColorsPublisher {
                         .map(|config| screenshot.get_sample_points(&config))
                         .collect();
 
-                    let colors_config = DisplaySamplePointGroup { display_id, points };
+                    let bound_scale_factor = screenshot.bound_scale_factor;
+
+                    let colors_config = DisplaySamplePointGroup { display_id, points, bound_scale_factor };
 
                     colors_configs.push(colors_config);
                 }
@@ -369,4 +374,5 @@ pub struct AllColorConfig {
 pub struct DisplaySamplePointGroup {
     pub display_id: u32,
     pub points: Vec<Vec<LedSamplePoints>>,
+    pub bound_scale_factor: f32,
 }

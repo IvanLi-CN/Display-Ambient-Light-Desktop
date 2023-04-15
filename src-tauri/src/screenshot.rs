@@ -1,7 +1,7 @@
+
 use std::iter;
 use std::sync::Arc;
 
-use core_graphics::display::CGDisplay;
 use serde::{Deserialize, Serialize};
 use tauri::async_runtime::RwLock;
 
@@ -15,9 +15,10 @@ pub struct Screenshot {
     pub bytes_per_row: usize,
     pub bytes: Arc<RwLock<Vec<u8>>>,
     pub scale_factor: f32,
+    pub bound_scale_factor: f32,
 }
 
-static SINGLE_AXIS_POINTS: usize = 1;
+static SINGLE_AXIS_POINTS: usize = 5;
 
 impl Screenshot {
     pub fn new(
@@ -27,6 +28,7 @@ impl Screenshot {
         bytes_per_row: usize,
         bytes: Vec<u8>,
         scale_factor: f32,
+        bound_scale_factor: f32,
     ) -> Self {
         Self {
             display_id,
@@ -35,24 +37,22 @@ impl Screenshot {
             bytes_per_row,
             bytes: Arc::new(RwLock::new(bytes)),
             scale_factor,
+            bound_scale_factor,
         }
     }
 
     pub fn get_sample_points(&self, config: &LedStripConfig) -> Vec<LedSamplePoints> {
-        let height = CGDisplay::new(self.display_id).bounds().size.height as usize;
-        let width = CGDisplay::new(self.display_id).bounds().size.width as usize;
-
+        let height = self.height as usize;
+        let width = self.width as usize;
+        // let height = CGDisplay::new(self.display_id).bounds().size.height as usize;
+        // let width = CGDisplay::new(self.display_id).bounds().size.width as usize;
+        
         match config.border {
             crate::ambient_light::Border::Top => {
                 Self::get_one_edge_sample_points(height / 18, width, config.len, SINGLE_AXIS_POINTS)
             }
             crate::ambient_light::Border::Bottom => {
-                let points = Self::get_one_edge_sample_points(
-                    height / 18,
-                    width,
-                    config.len,
-                    SINGLE_AXIS_POINTS,
-                );
+                let points = Self::get_one_edge_sample_points(height / 18, width, config.len, SINGLE_AXIS_POINTS);
                 points
                     .into_iter()
                     .map(|groups| -> Vec<Point> {
@@ -61,12 +61,7 @@ impl Screenshot {
                     .collect()
             }
             crate::ambient_light::Border::Left => {
-                let points = Self::get_one_edge_sample_points(
-                    width / 32,
-                    height,
-                    config.len,
-                    SINGLE_AXIS_POINTS,
-                );
+                let points = Self::get_one_edge_sample_points(width / 32, height, config.len, SINGLE_AXIS_POINTS);
                 points
                     .into_iter()
                     .map(|groups| -> Vec<Point> {
@@ -75,12 +70,7 @@ impl Screenshot {
                     .collect()
             }
             crate::ambient_light::Border::Right => {
-                let points = Self::get_one_edge_sample_points(
-                    width / 32,
-                    height,
-                    config.len,
-                    SINGLE_AXIS_POINTS,
-                );
+                let points = Self::get_one_edge_sample_points(width / 32, height, config.len, SINGLE_AXIS_POINTS);
                 points
                     .into_iter()
                     .map(|groups| -> Vec<Point> {
@@ -168,6 +158,7 @@ impl Screenshot {
                 b += bitmap[position] as f64;
                 g += bitmap[position + 1] as f64;
                 r += bitmap[position + 2] as f64;
+                // log::info!("position: {}, total: {}", position, bitmap.len());
             }
             let color = LedColor::new((r / len) as u8, (g / len) as u8, (b / len) as u8);
             colors.push(color);

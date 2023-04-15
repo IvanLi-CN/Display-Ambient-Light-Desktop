@@ -11,7 +11,7 @@ use tokio::time::{self, Duration};
 
 use crate::screenshot::LedSamplePoints;
 use crate::{
-    ambient_light::{SamplePointConfig, SamplePointMapper},
+    ambient_light::SamplePointMapper,
     led_color::LedColor,
     screenshot::Screenshot,
 };
@@ -36,6 +36,10 @@ pub fn take_screenshot(display_id: u32, scale_factor: f32) -> anyhow::Result<Scr
 
     let bytes = buffer.bytes().to_owned();
 
+
+    let cg_display = CGDisplay::new(display_id);
+    let bound_scale_factor = (cg_display.bounds().size.width / width as f64) as f32;
+
     Ok(Screenshot::new(
         display_id,
         height as u32,
@@ -43,12 +47,14 @@ pub fn take_screenshot(display_id: u32, scale_factor: f32) -> anyhow::Result<Scr
         bytes_per_row,
         bytes,
         scale_factor,
+        bound_scale_factor
     ))
 }
 
 pub fn get_display_colors(
     display_id: u32,
     sample_points: &Vec<Vec<LedSamplePoints>>,
+    bound_scale_factor: f32,
 ) -> anyhow::Result<Vec<LedColor>> {
     log::debug!("take_screenshot");
     let cg_display = CGDisplay::new(display_id);
@@ -68,8 +74,8 @@ pub fn get_display_colors(
         let (start_y, end_y) = (usize::min(start_y, end_y), usize::max(start_y, end_y));
 
         let origin = CGPoint {
-            x: start_x as f64 + cg_display.bounds().origin.x,
-            y: start_y as f64 + cg_display.bounds().origin.y,
+            x: start_x as f64  * bound_scale_factor as f64 + cg_display.bounds().origin.x,
+            y: start_y as f64  * bound_scale_factor as f64  + cg_display.bounds().origin.y,
         };
         let size = CGSize {
             width: (end_x - start_x + 1) as f64,
