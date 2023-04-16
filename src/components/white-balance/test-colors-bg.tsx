@@ -19,6 +19,7 @@ const ColorItem: Component<{
       onClick={() => {
         props.onClick?.(props.color);
       }}
+      title={props.color}
     />
   );
 };
