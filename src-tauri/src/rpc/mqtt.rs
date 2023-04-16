@@ -5,10 +5,13 @@ use std::time::Duration;
 use time::{format_description, OffsetDateTime};
 use tokio::{sync::OnceCell, task};
 
+use crate::ambient_light::{ColorCalibration, ConfigManager};
+
 const DISPLAY_TOPIC: &'static str = "display-ambient-light/display";
 const DESKTOP_TOPIC: &'static str = "display-ambient-light/desktop";
 const DISPLAY_BRIGHTNESS_TOPIC: &'static str = "display-ambient-light/board/brightness";
 const BOARD_SEND_CMD: &'static str = "display-ambient-light/board/cmd";
+const COLOR_CALIBRATION: &'static str = "display-ambient-light/desktop/color-calibration";
 
 pub struct MqttRpc {
     client: mqtt::AsyncClient,
@@ -165,6 +168,7 @@ impl MqttRpc {
         // self.subscribe_board()?;
         // self.subscribe_display()?;
         self.broadcast_desktop_online();
+        Self::publish_color_calibration_worker();
         anyhow::Ok(())
     }
 
@@ -181,6 +185,31 @@ impl MqttRpc {
             .wait()
             .map_err(|err| anyhow::anyhow!("subscribe board failed. {:?}", err))
             .map(|_| ())
+    }
+    fn publish_color_calibration_worker() {
+        tokio::spawn(async move {
+            let mqtt = Self::global().await;
+            let config_manager = ConfigManager::global().await;
+            let mut config_receiver = config_manager.clone_config_update_receiver();
+
+            let config = config_manager.configs().await;
+            if let Err(err) = mqtt
+                .publish_color_calibration(config.color_calibration)
+                .await
+            {
+                warn!("can not publish color calibration. {}", err);
+            }
+
+            while config_receiver.changed().await.is_ok() {
+                let config = config_receiver.borrow().clone();
+                if let Err(err) = mqtt
+                    .publish_color_calibration(config.color_calibration)
+                    .await
+                {
+                    warn!("can not publish color calibration. {}", err);
+                }
+            }
+        });
     }
 
     fn broadcast_desktop_online(&self) {
@@ -237,5 +266,16 @@ impl MqttRpc {
             ))
             .await
             .map_err(|error| anyhow::anyhow!("mqtt publish failed. {}", error))
+    }
+
+    pub async fn publish_color_calibration(&self, payload: ColorCalibration) -> anyhow::Result<()> {
+        self.client
+            .publish(mqtt::Message::new(
+                COLOR_CALIBRATION,
+                payload.to_bytes(),
+                mqtt::QOS_1,
+            ))
+            .await
+            .map_err(|error| anyhow::anyhow!("mqtt publish color calibration failed. {}", error))
     }
 }

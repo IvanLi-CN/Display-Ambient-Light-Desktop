@@ -1,8 +1,23 @@
 import { Routes, Route } from '@solidjs/router';
 import { LedStripConfiguration } from './components/led-strip-configuration/led-strip-configuration';
 import { WhiteBalance } from './components/white-balance/white-balance';
+import { createEffect } from 'solid-js';
+import { invoke } from '@tauri-apps/api';
+import { setLedStripStore } from './stores/led-strip.store';
+import { LedStripConfigContainer } from './models/led-strip-config';
 
 function App() {
+  createEffect(() => {
+    invoke<LedStripConfigContainer>('read_config').then((config) => {
+      console.log('read config', config);
+      setLedStripStore({
+        strips: config.strips,
+        mappers: config.mappers,
+        colorCalibration: config.color_calibration,
+      });
+    });
+  });
+
   return (
     <div>
       <div>

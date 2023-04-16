@@ -33,6 +33,16 @@ pub struct ColorCalibration {
     b: f32,
 }
 
+impl ColorCalibration {
+    pub fn to_bytes(&self) -> [u8; 3] {
+        [
+            (self.r * 255.0) as u8,
+            (self.g * 255.0) as u8,
+            (self.b * 255.0) as u8,
+        ]
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct LedStripConfigGroup {
     pub strips: Vec<LedStripConfig>,

@@ -181,6 +181,12 @@ async fn set_color_calibration(calibration: ColorCalibration) -> Result<(), Stri
         })
 }
 
+#[tauri::command]
+async fn read_config() -> ambient_light::LedStripConfigGroup {
+    let config_manager = ambient_light::ConfigManager::global().await;
+    config_manager.configs().await
+}
+
 #[tokio::main]
 async fn main() {
     env_logger::init();
@@ -204,6 +210,7 @@ async fn main() {
             move_strip_part,
             reverse_led_strip_part,
             set_color_calibration,
+            read_config,
         ])
         .register_uri_scheme_protocol("ambient-light", move |_app, request| {
             let response = ResponseBuilder::new().header("Access-Control-Allow-Origin", "*");
