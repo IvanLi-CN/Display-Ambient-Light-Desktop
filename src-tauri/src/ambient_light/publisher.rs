@@ -68,7 +68,7 @@ impl LedColorsPublisher {
                 return;
             }
 
-            let mut interval = tokio::time::interval(Duration::from_millis(66));
+            let mut interval = tokio::time::interval(Duration::from_millis(33));
             let init_version = internal_tasks_version.read().await.clone();
 
             loop {
