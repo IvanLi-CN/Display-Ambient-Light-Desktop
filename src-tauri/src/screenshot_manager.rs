@@ -10,11 +10,7 @@ use tokio::sync::{broadcast, watch, OnceCell};
 use tokio::time::{self, Duration};
 
 use crate::screenshot::LedSamplePoints;
-use crate::{
-    ambient_light::SamplePointMapper,
-    led_color::LedColor,
-    screenshot::Screenshot,
-};
+use crate::{ambient_light::SamplePointMapper, led_color::LedColor, screenshot::Screenshot};
 
 pub fn take_screenshot(display_id: u32, scale_factor: f32) -> anyhow::Result<Screenshot> {
     log::debug!("take_screenshot");
@@ -36,7 +32,6 @@ pub fn take_screenshot(display_id: u32, scale_factor: f32) -> anyhow::Result<Scr
 
     let bytes = buffer.bytes().to_owned();
 
-
     let cg_display = CGDisplay::new(display_id);
     let bound_scale_factor = (cg_display.bounds().size.width / width as f64) as f32;
 
@@ -47,7 +42,7 @@ pub fn take_screenshot(display_id: u32, scale_factor: f32) -> anyhow::Result<Scr
         bytes_per_row,
         bytes,
         scale_factor,
-        bound_scale_factor
+        bound_scale_factor,
     ))
 }
 
@@ -60,7 +55,6 @@ pub fn get_display_colors(
     let cg_display = CGDisplay::new(display_id);
 
     let mut colors = vec![];
-    let start_at = std::time::Instant::now();
     for points in sample_points {
         if points.len() == 0 {
             continue;
@@ -74,8 +68,8 @@ pub fn get_display_colors(
         let (start_y, end_y) = (usize::min(start_y, end_y), usize::max(start_y, end_y));
 
         let origin = CGPoint {
-            x: start_x as f64  * bound_scale_factor as f64 + cg_display.bounds().origin.x,
-            y: start_y as f64  * bound_scale_factor as f64  + cg_display.bounds().origin.y,
+            x: start_x as f64 * bound_scale_factor as f64 + cg_display.bounds().origin.x,
+            y: start_y as f64 * bound_scale_factor as f64 + cg_display.bounds().origin.y,
         };
         let size = CGSize {
             width: (end_x - start_x + 1) as f64,
@@ -116,13 +110,6 @@ pub fn get_display_colors(
         colors.append(&mut part_colors);
     }
 
-    // if display_id == 4849664 {
-    //     log::info!(
-    //         "======= get_display_colors {} took {}ms",
-    //         display_id,
-    //         start_at.elapsed().as_millis()
-    //     );
-    // }
     Ok(colors)
 }
 
@@ -166,7 +153,6 @@ impl ScreenshotManager {
                 return;
             }
             let mut interval = time::interval(Duration::from_millis(1000));
-            let mut start = tokio::time::Instant::now();
 
             let screenshot = screenshot.unwrap();
             let (screenshot_tx, screenshot_rx) = watch::channel(screenshot);
@@ -179,7 +165,6 @@ impl ScreenshotManager {
             let merged_screenshot_tx = merged_screenshot_tx.read().await.clone();
 
             loop {
-                start = tokio::time::Instant::now();
                 Self::take_screenshot_loop(
                     display_id,
                     scale_factor,
@@ -205,10 +190,12 @@ impl ScreenshotManager {
         if let Ok(screenshot) = screenshot {
             match merged_screenshot_tx.send(screenshot.clone()) {
                 Ok(_) => {
-                    log::info!("take_screenshot_loop: merged_screenshot_tx.send success. display#{}", display_id);
+                    log::info!(
+                        "take_screenshot_loop: merged_screenshot_tx.send success. display#{}",
+                        display_id
+                    );
                 }
-                Err(err) => {
-                    // warn!("take_screenshot_loop: merged_screenshot_tx.send failed. display#{}. err: {}", display_id, err);
+                Err(_) => {
                 }
             }
             screenshot_tx.send(screenshot).unwrap();

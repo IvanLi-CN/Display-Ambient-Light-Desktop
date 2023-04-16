@@ -8,12 +8,7 @@ mod rpc;
 pub mod screenshot;
 mod screenshot_manager;
 
-use ambient_light::{
-    Border, ColorCalibration, LedColorsPublisher, LedStripConfig, LedStripConfigGroup,
-};
-use core_graphics::display::{
-    kCGNullWindowID, kCGWindowImageDefault, kCGWindowListOptionOnScreenOnly, CGDisplay,
-};
+use ambient_light::{Border, ColorCalibration, LedStripConfig, LedStripConfigGroup};
 use display_info::DisplayInfo;
 use paris::{error, info, warn};
 use screenshot::Screenshot;

@@ -16,7 +16,7 @@ use crate::{
 
 use itertools::Itertools;
 
-use super::{LedStripConfigGroup, SamplePointConfig, SamplePointMapper};
+use super::{LedStripConfigGroup, SamplePointMapper};
 
 pub struct LedColorsPublisher {
     sorted_colors_rx: Arc<RwLock<watch::Receiver<Vec<u8>>>>,
@@ -68,7 +68,6 @@ impl LedColorsPublisher {
                 return;
             }
 
-            let mut start: tokio::time::Instant = tokio::time::Instant::now();
             let mut interval = tokio::time::interval(Duration::from_millis(66));
             let init_version = internal_tasks_version.read().await.clone();
 
@@ -88,8 +87,6 @@ impl LedColorsPublisher {
                     break;
                 }
 
-                // log::info!("tick: {}ms", start.elapsed().as_millis());
-                start = tokio::time::Instant::now();
                 let colors = screenshot_manager::get_display_colors(
                     display_id,
                     &sample_points,
@@ -104,7 +101,7 @@ impl LedColorsPublisher {
 
                 let colors = colors.unwrap();
 
-                let color_len = colors.len();
+                // let color_len = colors.len();
 
                 match display_colors_tx.send((
                     display_id,
@@ -265,11 +262,8 @@ impl LedColorsPublisher {
 
                 let colors = rx.borrow().clone();
 
-                let len = colors.len();
-
                 match Self::send_colors(colors).await {
                     Ok(_) => {
-                        // log::info!("colors sent. len: {}", len);
                     }
                     Err(err) => {
                         warn!("colors send failed: {}", err);
