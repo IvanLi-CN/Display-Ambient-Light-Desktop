@@ -14,7 +14,12 @@
 			],
 			"problemMatcher": [
 				"$eslint-stylish"
-			]
+			],
+			"options": {
+				"env": {
+					"RUST_LOG": "info"
+				}
+			}
 		},
 		{
 			"label": "ui:dev",

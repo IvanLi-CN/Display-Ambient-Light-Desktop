@@ -1,9 +1,14 @@
 import { createStore } from 'solid-js/store';
-import { LedStripConfig, LedStripPixelMapper } from '../models/led-strip-config';
+import {
+  ColorCalibration,
+  LedStripConfig,
+  LedStripPixelMapper,
+} from '../models/led-strip-config';
 
 export const [ledStripStore, setLedStripStore] = createStore({
   strips: new Array<LedStripConfig>(),
   mappers: new Array<LedStripPixelMapper>(),
+  colorCalibration: new ColorCalibration(),
   colors: new Uint8ClampedArray(),
   sortedColors: new Uint8ClampedArray(),
   get totalLedCount() {

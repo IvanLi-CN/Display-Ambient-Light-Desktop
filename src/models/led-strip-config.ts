@@ -6,9 +6,16 @@ export type LedStripPixelMapper = {
   pos: number;
 };
 
+export class ColorCalibration {
+  r: number = 1;
+  g: number = 1;
+  b: number = 1;
+}
+
 export type LedStripConfigContainer = {
   strips: LedStripConfig[];
   mappers: LedStripPixelMapper[];
+  color_calibration: ColorCalibration;
 };
 
 export class LedStripConfig {

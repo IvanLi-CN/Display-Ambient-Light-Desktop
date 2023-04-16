@@ -5,7 +5,7 @@ use paris::{error, info};
 use serde::{Deserialize, Serialize};
 use tauri::api::path::config_dir;
 
-use crate::screenshot::{self, LedSamplePoints};
+use crate::screenshot::LedSamplePoints;
 
 const CONFIG_FILE_NAME: &str = "cc.ivanli.ambient_light/led_strip_config.toml";
 
@@ -26,10 +26,18 @@ pub struct LedStripConfig {
     pub len: usize,
 }
 
+#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
+pub struct ColorCalibration {
+    r: f32,
+    g: f32,
+    b: f32,
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct LedStripConfigGroup {
     pub strips: Vec<LedStripConfig>,
     pub mappers: Vec<SamplePointMapper>,
+    pub color_calibration: ColorCalibration,
 }
 
 impl LedStripConfigGroup {
@@ -115,7 +123,17 @@ impl LedStripConfigGroup {
                 })
             }
         }
-        Ok(Self { strips, mappers })
+        let color_calibration = ColorCalibration {
+            r: 1.0,
+            g: 1.0,
+            b: 1.0,
+        };
+
+        Ok(Self {
+            strips,
+            mappers,
+            color_calibration,
+        })
     }
 }
 

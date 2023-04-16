@@ -5,7 +5,7 @@ use tokio::sync::OnceCell;
 
 use crate::ambient_light::{config, LedStripConfigGroup};
 
-use super::{Border, SamplePointMapper};
+use super::{Border, SamplePointMapper, ColorCalibration};
 
 pub struct ConfigManager {
     config: Arc<RwLock<LedStripConfigGroup>>,
@@ -222,5 +222,16 @@ impl ConfigManager {
         &self,
     ) -> tokio::sync::watch::Receiver<LedStripConfigGroup> {
         self.config_update_receiver.clone()
+    }
+
+    pub async fn set_color_calibration(&self, color_calibration: ColorCalibration) -> anyhow::Result<()> {
+        let config = self.config.write().await;
+
+        let mut cloned_config = config.clone();
+        cloned_config.color_calibration = color_calibration;
+
+        drop(config);
+
+        self.update(&cloned_config).await
     }
 }

@@ -192,7 +192,7 @@ impl LedColorsPublisher {
                                 warn!("Failed to send sorted colors: {}", err);
                             }
                         };
-                        log::info!("tick: {}ms", start.elapsed().as_millis());
+                        log::debug!("tick: {}ms", start.elapsed().as_millis());
                         start = tokio::time::Instant::now();
                     }
                 }

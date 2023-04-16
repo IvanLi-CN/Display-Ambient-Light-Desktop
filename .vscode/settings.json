@@ -2,7 +2,8 @@
   "files.autoSave": "onWindowChange",
   "cSpell.words": [
     "Itertools",
-    "Leds"
+    "Leds",
+    "unlisten"
   ],
   "idf.customExtraVars": {
     "OPENOCD_SCRIPTS": "/Users/ivan/.espressif/tools/openocd-esp32/v0.11.0-esp32-20211220/openocd-esp32/share/openocd/scripts"

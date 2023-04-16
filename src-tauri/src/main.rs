@@ -8,7 +8,9 @@ mod rpc;
 pub mod screenshot;
 mod screenshot_manager;
 
-use ambient_light::{Border, LedColorsPublisher, LedStripConfig, LedStripConfigGroup};
+use ambient_light::{
+    Border, ColorCalibration, LedColorsPublisher, LedStripConfig, LedStripConfigGroup,
+};
 use core_graphics::display::{
     kCGNullWindowID, kCGWindowImageDefault, kCGWindowListOptionOnScreenOnly, CGDisplay,
 };
@@ -145,14 +147,14 @@ async fn send_colors(buffer: Vec<u8>) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn move_strip_part(display_id: u32, border: Border, target_start: usize) -> Result<(), String> {
+async fn move_strip_part(
+    display_id: u32,
+    border: Border,
+    target_start: usize,
+) -> Result<(), String> {
     let config_manager = ambient_light::ConfigManager::global().await;
     config_manager
-        .move_strip_part(
-            display_id,
-            border,
-            target_start,
-        )
+        .move_strip_part(display_id, border, target_start)
         .await
         .map_err(|e| {
             error!("can not move strip part: {}", e);
@@ -168,6 +170,18 @@ async fn reverse_led_strip_part(display_id: u32, border: Border) -> Result<(), S
         .await
         .map_err(|e| {
             error!("can not reverse led strip part: {}", e);
+            e.to_string()
+        })
+}
+
+#[tauri::command]
+async fn set_color_calibration(calibration: ColorCalibration) -> Result<(), String> {
+    let config_manager = ambient_light::ConfigManager::global().await;
+    config_manager
+        .set_color_calibration(calibration)
+        .await
+        .map_err(|e| {
+            error!("can not set color calibration: {}", e);
             e.to_string()
         })
 }
@@ -194,6 +208,7 @@ async fn main() {
             send_colors,
             move_strip_part,
             reverse_led_strip_part,
+            set_color_calibration,
         ])
         .register_uri_scheme_protocol("ambient-light", move |_app, request| {
             let response = ResponseBuilder::new().header("Access-Control-Allow-Origin", "*");
@@ -359,6 +374,7 @@ async fn main() {
                         .unwrap();
                 }
             });
+
             let app_handle = app.handle().clone();
             tokio::spawn(async move {
                 let publisher = ambient_light::LedColorsPublisher::global().await;
