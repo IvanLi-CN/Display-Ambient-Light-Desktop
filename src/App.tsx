@@ -1,5 +1,6 @@
 import { Routes, Route } from '@solidjs/router';
 import { LedStripConfiguration } from './components/led-strip-configuration/led-strip-configuration';
+import { WhiteBalance } from './components/white-balance/white-balance';
 
 function App() {
   return (
@@ -10,7 +11,7 @@ function App() {
       </div>
       <Routes>
         <Route path="/led-strips-configuration" component={LedStripConfiguration} />
-        <Route path="/white-balance" component={LedStripConfiguration} />
+        <Route path="/white-balance" component={WhiteBalance} />
       </Routes>
     </div>
   );

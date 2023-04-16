@@ -57,7 +57,11 @@ impl LedColorsPublisher {
         let internal_tasks_version = self.inner_tasks_version.clone();
 
         tokio::spawn(async move {
-            let colors = screenshot_manager::get_display_colors(display_id, &sample_points, bound_scale_factor);
+            let colors = screenshot_manager::get_display_colors(
+                display_id,
+                &sample_points,
+                bound_scale_factor,
+            );
 
             if let Err(err) = colors {
                 warn!("Failed to get colors: {}", err);
@@ -86,7 +90,11 @@ impl LedColorsPublisher {
 
                 // log::info!("tick: {}ms", start.elapsed().as_millis());
                 start = tokio::time::Instant::now();
-                let colors = screenshot_manager::get_display_colors(display_id, &sample_points, bound_scale_factor);
+                let colors = screenshot_manager::get_display_colors(
+                    display_id,
+                    &sample_points,
+                    bound_scale_factor,
+                );
 
                 if let Err(err) = colors {
                     warn!("Failed to get colors: {}", err);
@@ -117,14 +125,18 @@ impl LedColorsPublisher {
         });
     }
 
-    fn start_all_colors_worker(&self, display_ids: Vec<u32>, mappers: Vec<SamplePointMapper>, mut display_colors_rx: broadcast::Receiver<(u32, Vec<u8>)>) {
+    fn start_all_colors_worker(
+        &self,
+        display_ids: Vec<u32>,
+        mappers: Vec<SamplePointMapper>,
+        mut display_colors_rx: broadcast::Receiver<(u32, Vec<u8>)>,
+    ) {
         let sorted_colors_tx = self.sorted_colors_tx.clone();
         let colors_tx = self.colors_tx.clone();
         log::debug!("start all_colors_worker");
 
         tokio::spawn(async move {
             for _ in 0..10 {
-
                 let sorted_colors_tx = sorted_colors_tx.write().await;
                 let colors_tx = colors_tx.write().await;
 
@@ -212,13 +224,12 @@ impl LedColorsPublisher {
 
                 let configs = configs.unwrap();
 
-
                 let mut inner_tasks_version = inner_tasks_version.write().await;
                 *inner_tasks_version = inner_tasks_version.overflowing_add(1).0;
                 drop(inner_tasks_version);
 
-
-                let (display_colors_tx, display_colors_rx) = broadcast::channel::<(u32, Vec<u8>)>(8);
+                let (display_colors_tx, display_colors_rx) =
+                    broadcast::channel::<(u32, Vec<u8>)>(8);
 
                 for sample_point_group in configs.sample_point_groups.clone() {
                     let display_id = sample_point_group.display_id;
@@ -343,7 +354,11 @@ impl LedColorsPublisher {
 
                     let bound_scale_factor = screenshot.bound_scale_factor;
 
-                    let colors_config = DisplaySamplePointGroup { display_id, points, bound_scale_factor };
+                    let colors_config = DisplaySamplePointGroup {
+                        display_id,
+                        points,
+                        bound_scale_factor,
+                    };
 
                     colors_configs.push(colors_config);
                 }
