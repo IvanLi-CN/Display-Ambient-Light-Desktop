@@ -132,8 +132,8 @@ async fn patch_led_strip_len(display_id: u32, border: Border, delta_len: i8) -> 
 }
 
 #[tauri::command]
-async fn send_colors(buffer: Vec<u8>) -> Result<(), String> {
-    ambient_light::LedColorsPublisher::send_colors(buffer)
+async fn send_colors(offset: u16, buffer: Vec<u8>) -> Result<(), String> {
+    ambient_light::LedColorsPublisher::send_colors(offset, buffer)
         .await
         .map_err(|e| {
             error!("can not send colors: {}", e);
