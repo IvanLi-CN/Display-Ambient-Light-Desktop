@@ -1,4 +1,4 @@
-use std::{borrow::Borrow, collections::HashMap, io::Read, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use paris::warn;
 use tauri::async_runtime::RwLock;
@@ -10,7 +10,7 @@ use tokio::{
 
 use crate::{
     ambient_light::{config, ConfigManager},
-    rpc::MqttRpc,
+    led_color::LedColor,
     screenshot::LedSamplePoints,
     screenshot_manager::{self, ScreenshotManager},
 };
@@ -103,52 +103,24 @@ impl LedColorsPublisher {
 
                 let colors: Vec<crate::led_color::LedColor> = colors.unwrap();
 
-                // let color_len = colors.len();
-                let display_led_offset = mappers
-                    .clone()
-                    .iter()
-                    .flat_map(|mapper| [mapper.start, mapper.end])
-                    .min()
-                    .unwrap();
+                let colors_copy = colors.clone();
 
-                for group in mappers.clone() {
-                    if (group.start.abs_diff(group.end)) > colors.len() {
-                        warn!(
-                            "get_sorted_colors: color_index out of range. color_index: {}, strip len: {}, colors.len(): {}",
-                            group.pos,
-                            group.start.abs_diff(group.end),
-                            colors.len()
-                        );
-                        return;
-                    }
+                let mappers = mappers.clone();
 
-                    let group_size = group.start.abs_diff(group.end);
-                    let mut buffer = Vec::<u8>::with_capacity(group_size * 3);
-
-                    if group.end > group.start {
-                        for i in group.pos-display_led_offset..group_size + group.pos-display_led_offset {
-                            let bytes = colors[i].as_bytes();
-                            buffer.append(&mut bytes.to_vec());
+                tokio::spawn(async move {
+                    match Self::send_colors_by_display(colors, mappers).await {
+                        Ok(_) => {
+                            log::info!("sent colors: #{: >15}", display_id);
                         }
-                    } else {
-                        for i in (group.pos-display_led_offset..group_size + group.pos-display_led_offset).rev() {
-                            let bytes = colors[i].as_bytes();
-                            buffer.append(&mut bytes.to_vec());
-                        }
-                    }
-                    match Self::send_colors((group.start.min(group.end)) as u16, buffer).await {
-                        Ok(_) => {}
                         Err(err) => {
-                            warn!("Failed to send colors: {}", err);
+                            warn!("Failed to send colors:  #{: >15}\t{}", display_id, err);
                         }
-                    };
-                }
-
-                log::info!("sent colors: #{: >15} {:?}", display_id, colors.len());
+                    }
+                });
 
                 match display_colors_tx.send((
                     display_id,
-                    colors
+                    colors_copy
                         .into_iter()
                         .map(|color| color.get_rgb())
                         .flatten()
@@ -292,27 +264,6 @@ impl LedColorsPublisher {
                 );
             }
         });
-
-        // let rx = self.sorted_colors_rx.clone();
-        // tokio::spawn(async move {
-        //     let mut rx = rx.read().await.clone();
-        //     loop {
-        //         if let Err(err) = rx.changed().await {
-        //             warn!("rx changed error: {}", err);
-        //             sleep(Duration::from_millis(1000)).await;
-        //             continue;
-        //         }
-
-        //         let colors = rx.borrow().clone();
-
-        //         match Self::send_colors(colors).await {
-        //             Ok(_) => {}
-        //             Err(err) => {
-        //                 warn!("colors send failed: {}", err);
-        //             }
-        //         }
-        //     }
-        // });
     }
 
     pub async fn send_colors(offset: u16, mut payload: Vec<u8>) -> anyhow::Result<()> {
@@ -326,6 +277,65 @@ impl LedColorsPublisher {
         buffer.push((offset & 0xff) as u8);
         buffer.append(&mut payload);
         socket.send_to(&buffer, "192.168.31.206:23042").await?;
+        Ok(())
+    }
+
+    pub async fn send_colors_by_display(
+        colors: Vec<LedColor>,
+        mappers: Vec<SamplePointMapper>,
+    ) -> anyhow::Result<()> {
+        // let color_len = colors.len();
+        let display_led_offset = mappers
+            .clone()
+            .iter()
+            .flat_map(|mapper| [mapper.start, mapper.end])
+            .min()
+            .unwrap();
+
+        let socket = UdpSocket::bind("0.0.0.0:0").await?;
+        for group in mappers.clone() {
+            if (group.start.abs_diff(group.end)) > colors.len() {
+                return Err(anyhow::anyhow!(
+                    "get_sorted_colors: color_index out of range. color_index: {}, strip len: {}, colors.len(): {}",
+                    group.pos,
+                    group.start.abs_diff(group.end),
+                    colors.len()
+                ));
+            }
+
+            let group_size = group.start.abs_diff(group.end);
+            let mut buffer = Vec::<u8>::with_capacity(group_size * 3);
+
+            if group.end > group.start {
+                for i in group.pos - display_led_offset..group_size + group.pos - display_led_offset
+                {
+                    let bytes = colors[i].as_bytes();
+                    buffer.append(&mut bytes.to_vec());
+                }
+            } else {
+                for i in (group.pos - display_led_offset
+                    ..group_size + group.pos - display_led_offset)
+                    .rev()
+                {
+                    let bytes = colors[i].as_bytes();
+                    buffer.append(&mut bytes.to_vec());
+                }
+            }
+
+            let offset = group.start.min(group.end);
+            let mut tx_buffer = vec![2];
+            tx_buffer.push((offset >> 8) as u8);
+            tx_buffer.push((offset & 0xff) as u8);
+            tx_buffer.append(&mut buffer);
+            socket.send_to(&tx_buffer, "192.168.31.206:23042").await?;
+            match Self::send_colors((group.start.min(group.end)) as u16, buffer).await {
+                Ok(_) => {}
+                Err(err) => {
+                    warn!("Failed to send colors: {}", err);
+                }
+            };
+        }
+
         Ok(())
     }
 

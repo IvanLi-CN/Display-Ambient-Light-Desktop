@@ -1,5 +1,3 @@
-use std::ops::Index;
-
 use color_space::{Hsv, Rgb};
 use serde::Serialize;
 

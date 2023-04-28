@@ -1,5 +1,5 @@
 use paho_mqtt as mqtt;
-use paris::{error, info, warn};
+use paris::{info, warn};
 use serde_json::json;
 use std::time::Duration;
 use time::{format_description, OffsetDateTime};
@@ -9,8 +9,6 @@ use crate::ambient_light::{ColorCalibration, ConfigManager};
 
 const DISPLAY_TOPIC: &'static str = "display-ambient-light/display";
 const DESKTOP_TOPIC: &'static str = "display-ambient-light/desktop";
-const DISPLAY_BRIGHTNESS_TOPIC: &'static str = "display-ambient-light/board/brightness";
-const BOARD_SEND_CMD: &'static str = "display-ambient-light/board/cmd";
 const COLOR_CALIBRATION: &'static str = "display-ambient-light/desktop/color-calibration";
 
 pub struct MqttRpc {
@@ -43,7 +41,7 @@ impl MqttRpc {
 
             client.subscribe(format!("{}/#", DISPLAY_TOPIC), mqtt::QOS_1);
         });
-        client.set_connection_lost_callback(|client| {
+        client.set_connection_lost_callback(|_| {
             info!("MQTT server connection lost.");
         });
         client.set_disconnected_callback(|_, a1, a2| {
@@ -91,101 +89,12 @@ impl MqttRpc {
         Ok(Self { client })
     }
 
-    pub async fn listen(&self) {
-        // let change_display_brightness_tx2 = self.change_display_brightness_tx.clone();
-        // let message_tx_cloned = self.message_tx.clone();
-
-        // let mut stream = self.client.to_owned().get_stream(100);
-
-        // while let Some(notification) = stream.next().await {
-        //     match notification {
-        //         Some(notification) => match notification.topic() {
-        //             DISPLAY_BRIGHTNESS_TOPIC => {
-        //                 let payload_text = String::from_utf8(notification.payload().to_vec());
-        //                 match payload_text {
-        //                     Ok(payload_text) => {
-        //                         let display_brightness: Result<display::DisplayBrightness, _> =
-        //                             serde_json::from_str(payload_text.as_str());
-        //                         match display_brightness {
-        //                             Ok(display_brightness) => {
-        //                                 match change_display_brightness_tx2.send(display_brightness)
-        //                                 {
-        //                                     Ok(_) => {}
-        //                                     Err(err) => {
-        //                                         warn!(
-        //                                                 "can not send display brightness to channel. {:?}",
-        //                                                 err
-        //                                             );
-        //                                     }
-        //                                 }
-        //                             }
-        //                             Err(err) => {
-        //                                 warn!(
-        //                                     "can not parse display brightness from payload. {:?}",
-        //                                     err
-        //                                 );
-        //                             }
-        //                         }
-        //                     }
-        //                     Err(err) => {
-        //                         warn!("can not parse display brightness from payload. {:?}", err);
-        //                     }
-        //                 }
-        //             }
-        //             BOARD_SEND_CMD => {
-        //                 let payload_text = String::from_utf8(notification.payload().to_vec());
-        //                 match payload_text {
-        //                     Ok(payload_text) => {
-        //                         let message: Result<models::CmdMqMessage, _> =
-        //                             serde_json::from_str(payload_text.as_str());
-        //                         match message {
-        //                             Ok(message) => match message_tx_cloned.send(message) {
-        //                                 Ok(_) => {}
-        //                                 Err(err) => {
-        //                                     warn!("can not send message to channel. {:?}", err);
-        //                                 }
-        //                             },
-        //                             Err(err) => {
-        //                                 warn!("can not parse message from payload. {:?}", err);
-        //                             }
-        //                         }
-        //                     }
-        //                     Err(err) => {
-        //                         warn!("can not parse message from payload. {:?}", err);
-        //                     }
-        //                 }
-        //             }
-        //             _ => {}
-        //         },
-        //         _ => {
-        //             warn!("can not get notification from MQTT server.");
-        //         }
-        //     }
-        // }
-    }
-
     pub async fn initialize(&self) -> anyhow::Result<()> {
-        // self.subscribe_board()?;
-        // self.subscribe_display()?;
         self.broadcast_desktop_online();
         Self::publish_color_calibration_worker();
         anyhow::Ok(())
     }
 
-    fn subscribe_board(&self) -> anyhow::Result<()> {
-        self.client
-            .subscribe("display-ambient-light/board/#", mqtt::QOS_1)
-            .wait()
-            .map_err(|err| anyhow::anyhow!("subscribe board failed. {:?}", err))
-            .map(|_| ())
-    }
-    fn subscribe_display(&self) -> anyhow::Result<()> {
-        self.client
-            .subscribe(format!("{}/#", DISPLAY_TOPIC), mqtt::QOS_1)
-            .wait()
-            .map_err(|err| anyhow::anyhow!("subscribe board failed. {:?}", err))
-            .map(|_| ())
-    }
     fn publish_color_calibration_worker() {
         tokio::spawn(async move {
             let mqtt = Self::global().await;
@@ -241,34 +150,7 @@ impl MqttRpc {
         });
     }
 
-    pub async fn publish_led_sub_pixels(&self, payload: Vec<u8>) -> anyhow::Result<()> {
-        self.client
-            .publish(mqtt::Message::new(
-                "display-ambient-light/desktop/colors",
-                payload,
-                mqtt::QOS_1,
-            ))
-            .await
-            .map_err(|error| anyhow::anyhow!("mqtt publish failed. {}", error))
-    }
-
-    // pub fn subscribe_change_display_brightness_rx(
-    //     &self,
-    // ) -> broadcast::Receiver<display::DisplayBrightness> {
-    //     self.change_display_brightness_tx.subscribe()
-    // }
-    pub async fn publish_desktop_cmd(&self, field: &str, payload: Vec<u8>) -> anyhow::Result<()> {
-        self.client
-            .publish(mqtt::Message::new(
-                format!("{}/{}", DESKTOP_TOPIC, field),
-                payload,
-                mqtt::QOS_1,
-            ))
-            .await
-            .map_err(|error| anyhow::anyhow!("mqtt publish failed. {}", error))
-    }
-
-    pub async fn publish_color_calibration(&self, payload: ColorCalibration) -> anyhow::Result<()> {
+     pub async fn publish_color_calibration(&self, payload: ColorCalibration) -> anyhow::Result<()> {
         self.client
             .publish(mqtt::Message::new(
                 COLOR_CALIBRATION,
