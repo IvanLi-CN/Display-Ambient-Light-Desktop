@@ -5,6 +5,7 @@ import { createEffect } from 'solid-js';
 import { invoke } from '@tauri-apps/api';
 import { setLedStripStore } from './stores/led-strip.store';
 import { LedStripConfigContainer } from './models/led-strip-config';
+import { InfoIndex } from './components/info/info-index';
 
 function App() {
   createEffect(() => {
@@ -21,10 +22,12 @@ function App() {
   return (
     <div>
       <div>
+        <a href="/info">基本信息</a>
         <a href="/led-strips-configuration">灯条配置</a>
         <a href="/white-balance">白平衡</a>
       </div>
       <Routes>
+        <Route path="/info" component={InfoIndex} />
         <Route path="/led-strips-configuration" component={LedStripConfiguration} />
         <Route path="/white-balance" component={WhiteBalance} />
       </Routes>

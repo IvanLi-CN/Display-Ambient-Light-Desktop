@@ -11,7 +11,7 @@ mod screenshot_manager;
 use ambient_light::{Border, ColorCalibration, LedStripConfig, LedStripConfigGroup};
 use display_info::DisplayInfo;
 use paris::{error, info, warn};
-use rpc::{MqttRpc, UdpRpc};
+use rpc::{BoardInfo, MqttRpc, UdpRpc};
 use screenshot::Screenshot;
 use screenshot_manager::ScreenshotManager;
 use serde::{Deserialize, Serialize};
@@ -188,6 +188,21 @@ async fn read_config() -> ambient_light::LedStripConfigGroup {
     config_manager.configs().await
 }
 
+#[tauri::command]
+async fn get_boards() -> Result<Vec<BoardInfo>, String> {
+    let udp_rpc = UdpRpc::global().await;
+
+    if let Err(e) = udp_rpc {
+        return Err(format!("can not ping: {}", e));
+    }
+
+    let udp_rpc = udp_rpc.as_ref().unwrap();
+
+    let boards = udp_rpc.get_boards().await;
+    let boards = boards.into_iter().collect::<Vec<_>>();
+    Ok(boards)
+}
+
 #[tokio::main]
 async fn main() {
     env_logger::init();
@@ -199,8 +214,6 @@ async fn main() {
     led_color_publisher.start();
 
     let _mqtt = MqttRpc::global().await;
-
-    let _udp = UdpRpc::global().await;
 
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -216,6 +229,7 @@ async fn main() {
             reverse_led_strip_part,
             set_color_calibration,
             read_config,
+            get_boards,
         ])
         .register_uri_scheme_protocol("ambient-light", move |_app, request| {
             let response = ResponseBuilder::new().header("Access-Control-Allow-Origin", "*");
@@ -397,6 +411,33 @@ async fn main() {
                     app_handle
                         .emit_all("led_colors_changed", publisher)
                         .unwrap();
+                }
+            });
+
+            let app_handle = app.handle().clone();
+            tokio::spawn(async move {
+                loop {
+                    match UdpRpc::global().await {
+                        Ok(udp_rpc) => {
+                            let mut receiver = udp_rpc.clone_boards_change_receiver().await;
+                            loop {
+                                if let Err(err) = receiver.changed().await {
+                                    error!("boards change receiver changed error: {}", err);
+                                    return;
+                                }
+
+                                let boards = receiver.borrow().clone();
+
+                                let boards = boards.into_iter().collect::<Vec<_>>();
+
+                                app_handle.emit_all("boards_changed", boards).unwrap();
+                            }
+                        }
+                        Err(err) => {
+                            error!("udp rpc error: {}", err);
+                            return;
+                        }
+                    }
                 }
             });
 

@@ -4,7 +4,7 @@ use mdns_sd::{ServiceDaemon, ServiceEvent};
 use paris::{error, info, warn};
 use tokio::{
     net::UdpSocket,
-    sync::{Mutex, OnceCell},
+    sync::{watch, Mutex, OnceCell},
 };
 
 use super::BoardInfo;
@@ -13,6 +13,8 @@ use super::BoardInfo;
 pub struct UdpRpc {
     socket: Arc<Mutex<UdpSocket>>,
     boards: Arc<Mutex<HashSet<BoardInfo>>>,
+    boards_change_sender: Arc<Mutex<watch::Sender<HashSet<BoardInfo>>>>,
+    boards_change_receiver: Arc<Mutex<watch::Receiver<HashSet<BoardInfo>>>>,
 }
 
 impl UdpRpc {
@@ -32,7 +34,15 @@ impl UdpRpc {
         let socket = UdpSocket::bind("0.0.0.0:0").await?;
         let socket = Arc::new(Mutex::new(socket));
         let boards = Arc::new(Mutex::new(HashSet::new()));
-        Ok(Self { socket, boards })
+        let (boards_change_sender, boards_change_receiver) = watch::channel(HashSet::new());
+        let boards_change_sender = Arc::new(Mutex::new(boards_change_sender));
+        let boards_change_receiver = Arc::new(Mutex::new(boards_change_receiver));
+        Ok(Self {
+            socket,
+            boards,
+            boards_change_sender,
+            boards_change_receiver,
+        })
     }
 
     async fn initialize(&self) {
@@ -52,12 +62,10 @@ impl UdpRpc {
         });
     }
 
-    pub async fn search_boards(&self) -> anyhow::Result<()> {
+    async fn search_boards(&self) -> anyhow::Result<()> {
+        let service_type = "_ambient_light._udp.local.";
         let mdns = ServiceDaemon::new()?;
         let shared_self = Arc::new(Mutex::new(self.clone()));
-
-        let service_type = "_ambient_light._udp.local.";
-
         let receiver = mdns.browse(&service_type).map_err(|e| {
             warn!("Failed to browse for {:?}: {:?}", service_type, e);
             e
@@ -87,6 +95,9 @@ impl UdpRpc {
                     if boards.insert(board.clone()) {
                         info!("added board {:?}", board);
                     }
+
+                    let sender = self.boards_change_sender.clone().lock_owned().await;
+                    sender.send(boards.clone())?;
                 }
                 other_event => {
                     warn!("{:?}", &other_event);
@@ -95,5 +106,17 @@ impl UdpRpc {
         }
 
         Ok(())
+    }
+
+    pub async fn clone_boards_change_receiver(
+        &self,
+    ) -> watch::Receiver<HashSet<BoardInfo>> {
+        let boards_change_receiver = self.boards_change_receiver.clone().lock_owned().await;
+        boards_change_receiver.clone()
+    }
+
+    pub async fn get_boards(&self) -> HashSet<BoardInfo> {
+        let boards = self.boards.clone().lock_owned().await;
+        boards.clone()
     }
 }
