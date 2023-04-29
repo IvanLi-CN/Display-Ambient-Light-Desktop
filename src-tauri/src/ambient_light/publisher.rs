@@ -110,7 +110,7 @@ impl LedColorsPublisher {
                 tokio::spawn(async move {
                     match Self::send_colors_by_display(colors, mappers).await {
                         Ok(_) => {
-                            log::info!("sent colors: #{: >15}", display_id);
+                            // log::info!("sent colors: #{: >15}", display_id);
                         }
                         Err(err) => {
                             warn!("Failed to send colors:  #{: >15}\t{}", display_id, err);
@@ -328,12 +328,6 @@ impl LedColorsPublisher {
             tx_buffer.push((offset & 0xff) as u8);
             tx_buffer.append(&mut buffer);
             socket.send_to(&tx_buffer, "192.168.31.206:23042").await?;
-            match Self::send_colors((group.start.min(group.end)) as u16, buffer).await {
-                Ok(_) => {}
-                Err(err) => {
-                    warn!("Failed to send colors: {}", err);
-                }
-            };
         }
 
         Ok(())

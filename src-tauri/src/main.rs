@@ -11,7 +11,7 @@ mod screenshot_manager;
 use ambient_light::{Border, ColorCalibration, LedStripConfig, LedStripConfigGroup};
 use display_info::DisplayInfo;
 use paris::{error, info, warn};
-use rpc::MqttRpc;
+use rpc::{MqttRpc, UdpRpc};
 use screenshot::Screenshot;
 use screenshot_manager::ScreenshotManager;
 use serde::{Deserialize, Serialize};
@@ -199,6 +199,8 @@ async fn main() {
     led_color_publisher.start();
 
     let _mqtt = MqttRpc::global().await;
+
+    let _udp = UdpRpc::global().await;
 
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
