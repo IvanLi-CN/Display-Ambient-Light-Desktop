@@ -1,18 +1,20 @@
 use std::{collections::HashSet, sync::Arc, time::Duration};
 
+use futures::future::join_all;
+use itertools::Itertools;
 use mdns_sd::{ServiceDaemon, ServiceEvent};
 use paris::{error, info, warn};
 use tokio::{
     net::UdpSocket,
-    sync::{watch, Mutex, OnceCell},
+    sync::{watch, Mutex, OnceCell, RwLock},
 };
 
 use super::BoardInfo;
 
 #[derive(Debug, Clone)]
 pub struct UdpRpc {
-    socket: Arc<Mutex<UdpSocket>>,
-    boards: Arc<Mutex<HashSet<BoardInfo>>>,
+    socket: Arc<UdpSocket>,
+    boards: Arc<RwLock<HashSet<BoardInfo>>>,
     boards_change_sender: Arc<Mutex<watch::Sender<HashSet<BoardInfo>>>>,
     boards_change_receiver: Arc<Mutex<watch::Receiver<HashSet<BoardInfo>>>>,
 }
@@ -32,8 +34,8 @@ impl UdpRpc {
 
     async fn new() -> anyhow::Result<Self> {
         let socket = UdpSocket::bind("0.0.0.0:0").await?;
-        let socket = Arc::new(Mutex::new(socket));
-        let boards = Arc::new(Mutex::new(HashSet::new()));
+        let socket = Arc::new(socket);
+        let boards = Arc::new(RwLock::new(HashSet::new()));
         let (boards_change_sender, boards_change_receiver) = watch::channel(HashSet::new());
         let boards_change_sender = Arc::new(Mutex::new(boards_change_sender));
         let boards_change_receiver = Arc::new(Mutex::new(boards_change_receiver));
@@ -84,7 +86,7 @@ impl UdpRpc {
                 );
 
                     let shared_self = shared_self.lock().await;
-                    let mut boards = shared_self.boards.clone().lock_owned().await;
+                    let mut boards = shared_self.boards.write().await;
 
                     let board = BoardInfo {
                         name: info.get_fullname().to_string(),
@@ -116,7 +118,30 @@ impl UdpRpc {
     }
 
     pub async fn get_boards(&self) -> HashSet<BoardInfo> {
-        let boards = self.boards.clone().lock_owned().await;
+        let boards = self.boards.read().await;
         boards.clone()
+    }
+
+    pub async fn send_to_all(&self, buff: &Vec<u8>) -> anyhow::Result<()> {
+        let boards = self.get_boards().await;
+        let socket = self.socket.clone();
+        
+        let handlers = boards.into_iter()
+        .map(|board| {
+            let socket = socket.clone();
+            let buff = buff.clone();
+            tokio::spawn(async move {
+                match socket.send_to(&buff, (board.address, board.port)).await {
+                    Ok(_) => {},
+                    Err(err) => {
+                        error!("failed to send to {}: {:?}", board.name, err);
+                    },
+                }
+            })
+        });
+
+        join_all(handlers).await;
+
+        Ok(())
     }
 }

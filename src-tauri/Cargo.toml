@@ -34,6 +34,7 @@ itertools = "0.10.5"
 core-foundation = "0.9.3"
 tokio-stream = "0.1.14"
 mdns-sd = "0.7.2"
+futures = "0.3.28"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem

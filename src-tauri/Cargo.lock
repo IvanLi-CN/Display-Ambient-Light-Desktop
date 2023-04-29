@@ -2913,6 +2913,7 @@ dependencies = [
  "core-graphics",
  "display-info",
  "env_logger",
+ "futures",
  "hex",
  "itertools",
  "log",

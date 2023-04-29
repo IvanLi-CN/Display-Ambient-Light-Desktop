@@ -12,7 +12,7 @@ use crate::{
     ambient_light::{config, ConfigManager},
     led_color::LedColor,
     screenshot::LedSamplePoints,
-    screenshot_manager::{self, ScreenshotManager},
+    screenshot_manager::{self, ScreenshotManager}, rpc::UdpRpc,
 };
 
 use itertools::Itertools;
@@ -292,7 +292,13 @@ impl LedColorsPublisher {
             .min()
             .unwrap();
 
-        let socket = UdpSocket::bind("0.0.0.0:0").await?;
+        let udp_rpc = UdpRpc::global().await;
+        if let Err(err) = udp_rpc {
+            warn!("udp_rpc can not be initialized: {}", err);
+        }
+        let udp_rpc = udp_rpc.as_ref().unwrap();
+
+        // let socket = UdpSocket::bind("0.0.0.0:0").await?;
         for group in mappers.clone() {
             if (group.start.abs_diff(group.end)) > colors.len() {
                 return Err(anyhow::anyhow!(
@@ -327,7 +333,8 @@ impl LedColorsPublisher {
             tx_buffer.push((offset >> 8) as u8);
             tx_buffer.push((offset & 0xff) as u8);
             tx_buffer.append(&mut buffer);
-            socket.send_to(&tx_buffer, "192.168.31.206:23042").await?;
+
+            udp_rpc.send_to_all(&tx_buffer).await?;
         }
 
         Ok(())
