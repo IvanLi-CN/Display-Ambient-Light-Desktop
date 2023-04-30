@@ -419,12 +419,13 @@ async fn main() {
                 loop {
                     match UdpRpc::global().await {
                         Ok(udp_rpc) => {
-                            let mut receiver = udp_rpc.clone_boards_change_receiver().await;
+                            let mut receiver = udp_rpc.subscribe_boards_change();
                             loop {
                                 if let Err(err) = receiver.changed().await {
                                     error!("boards change receiver changed error: {}", err);
                                     return;
                                 }
+                                log::info!("boards changed");
 
                                 let boards = receiver.borrow().clone();
 

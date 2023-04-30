@@ -1,5 +1,8 @@
 export type BoardInfo = {
-  name: string;
+  host: string;
   address: string;
   port: number;
+  ttl: number;
+  is_online: boolean;
+  checked_at: Date;
 };
