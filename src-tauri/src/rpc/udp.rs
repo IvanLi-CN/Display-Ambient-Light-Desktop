@@ -1,4 +1,9 @@
-use std::{collections::HashSet, sync::Arc, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    net::Ipv4Addr,
+    sync::Arc,
+    time::Duration,
+};
 
 use futures::future::join_all;
 use mdns_sd::{ServiceDaemon, ServiceEvent};
@@ -8,12 +13,12 @@ use tokio::{
     sync::{watch, OnceCell, RwLock},
 };
 
-use super::BoardInfo;
+use super::{BoardConnectStatus, BoardInfo};
 
 #[derive(Debug, Clone)]
 pub struct UdpRpc {
     socket: Arc<UdpSocket>,
-    boards: Arc<RwLock<HashSet<BoardInfo>>>,
+    boards: Arc<RwLock<HashMap<Ipv4Addr, BoardInfo>>>,
     boards_change_sender: Arc<watch::Sender<Vec<BoardInfo>>>,
 }
 
@@ -33,7 +38,7 @@ impl UdpRpc {
     async fn new() -> anyhow::Result<Self> {
         let socket = UdpSocket::bind("0.0.0.0:0").await?;
         let socket = Arc::new(socket);
-        let boards = Arc::new(RwLock::new(HashSet::new()));
+        let boards = Arc::new(RwLock::new(HashMap::new()));
         let (boards_change_sender, _) = watch::channel(Vec::new());
         let boards_change_sender = Arc::new(boards_change_sender);
 
@@ -109,11 +114,11 @@ impl UdpRpc {
                         info.get_port(),
                     );
 
-                    if boards.insert(board.clone()) {
+                    if boards.insert(board.address, board.clone()).is_some() {
                         info!("added board {:?}", board);
                     }
 
-                    let tx_boards = boards.iter().cloned().collect();
+                    let tx_boards = boards.values().cloned().collect();
                     drop(boards);
 
                     sender.send(tx_boards)?;
@@ -133,8 +138,8 @@ impl UdpRpc {
     }
 
     pub async fn get_boards(&self) -> Vec<BoardInfo> {
-        let boards: tokio::sync::RwLockReadGuard<HashSet<BoardInfo>> = self.boards.read().await;
-        boards.iter().cloned().collect()
+        let boards = self.boards.read().await;
+        boards.values().cloned().collect()
     }
 
     pub async fn send_to_all(&self, buff: &Vec<u8>) -> anyhow::Result<()> {
@@ -160,29 +165,30 @@ impl UdpRpc {
     }
 
     pub async fn check_boards(&self) {
+        let mut interval = tokio::time::interval(Duration::from_secs(1));
         loop {
-            tokio::time::sleep(Duration::from_secs(1)).await;
-
-            let mut boards = self.get_boards().await;
+            let mut boards = self.boards.clone().write_owned().await;
 
             if boards.is_empty() {
                 info!("no boards found");
                 continue;
             }
 
-            for board in &mut boards {
+            for (_, board) in boards.iter_mut() {
                 if let Err(err) = board.check().await {
                     error!("failed to check board {}: {:?}", board.host, err);
                 }
             }
 
+            let board_vec = boards.values().cloned().collect::<Vec<_>>();
+            drop(boards);
+
             let board_change_sender = self.boards_change_sender.clone();
-            if let Err(err) = board_change_sender.send(boards) {
+            if let Err(err) = board_change_sender.send(board_vec) {
                 error!("failed to send board change: {:?}", err);
-            } else {
-                info!("send");
             }
             drop(board_change_sender);
+            interval.tick().await;
         }
     }
 }

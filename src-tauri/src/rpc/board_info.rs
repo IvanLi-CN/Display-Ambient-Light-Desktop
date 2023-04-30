@@ -1,15 +1,23 @@
 use std::{net::Ipv4Addr, time::Duration};
 
-use paris::warn;
+use paris::{warn, info};
 use serde::{Deserialize, Serialize};
 use tokio::{net::UdpSocket, time::timeout};
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+pub enum BoardConnectStatus {
+    Connected,
+    Connecting(u8),
+    Disconnected,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct BoardInfo {
     pub host: String,
     pub address: Ipv4Addr,
     pub port: u16,
-    pub is_online: bool,
+    pub connect_status: BoardConnectStatus,
     pub checked_at: Option<std::time::SystemTime>,
     pub ttl: Option<u128>,
 }
@@ -20,7 +28,7 @@ impl BoardInfo {
             host,
             address,
             port,
-            is_online: false,
+            connect_status: BoardConnectStatus::Unknown,
             checked_at: None,
             ttl: None,
         }
@@ -36,20 +44,39 @@ impl BoardInfo {
         let mut buf = [0u8; 1];
         let recv_future = socket.recv(&mut buf);
 
-        match timeout(Duration::from_secs(5), recv_future).await {
+        match timeout(Duration::from_secs(1), recv_future).await {
             Ok(_) => {
                 let ttl = instant.elapsed();
-                log::info!("buf: {:?}", buf);
                 if buf == [1] {
-                    self.is_online = true;
+                    self.connect_status = BoardConnectStatus::Connected;
                 } else {
-                    self.is_online = false;
+                    if let BoardConnectStatus::Connecting(retry) = self.connect_status {
+                        if retry < 10 {
+                            self.connect_status = BoardConnectStatus::Connecting(retry + 1);
+                            info!("reconnect: {}", retry + 1);
+                        } else {
+                            self.connect_status = BoardConnectStatus::Disconnected;
+                            warn!("board Disconnected: bad pong.");
+                        }
+                    } else if self.connect_status != BoardConnectStatus::Disconnected {
+                        self.connect_status = BoardConnectStatus::Connecting(1);
+                    }
                 }
                 self.ttl = Some(ttl.as_millis());
             }
             Err(_) => {
-                warn!("timeout");
-                self.is_online = false;
+                if let BoardConnectStatus::Connecting(retry) = self.connect_status {
+                    if retry < 10 {
+                        self.connect_status = BoardConnectStatus::Connecting(retry + 1);
+                        info!("reconnect: {}", retry + 1);
+                    } else {
+                        self.connect_status = BoardConnectStatus::Disconnected;
+                        warn!("board Disconnected: timeout");
+                    }
+                } else if self.connect_status != BoardConnectStatus::Disconnected {
+                    self.connect_status = BoardConnectStatus::Connecting(1);
+                }
+
                 self.ttl = None;
             }
         }

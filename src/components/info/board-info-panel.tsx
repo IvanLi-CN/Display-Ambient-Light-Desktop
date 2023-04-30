@@ -16,7 +16,7 @@ const Item: ParentComponent<ItemProps> = (props) => {
 
 export const BoardInfoPanel: Component<{ board: BoardInfo }> = (props) => {
   const ttl = createMemo(() => {
-    if (!props.board.is_online) {
+    if (props.board.connect_status !== 'Connected') {
       return '--';
     }
 
@@ -31,6 +31,16 @@ export const BoardInfoPanel: Component<{ board: BoardInfo }> = (props) => {
     );
   });
 
+  const connectStatus = createMemo(() => {
+    if (typeof props.board.connect_status === 'string') {
+      return props.board.connect_status;
+    }
+
+    if ('Connecting' in props.board.connect_status) {
+      return `Connecting (${props.board.connect_status.Connecting.toFixed(0)})`;
+    }
+  });
+
   return (
     <section class="p-2 rounded shadow">
       <Item label="Host">{props.board.host}</Item>
@@ -41,7 +51,7 @@ export const BoardInfoPanel: Component<{ board: BoardInfo }> = (props) => {
         <span class="font-mono">{props.board.port}</span>
       </Item>
       <Item label="Status">
-        <span class="font-mono">{props.board.is_online ? 'Online' : 'Offline'}</span>
+        <span class="font-mono">{connectStatus()}</span>
       </Item>
       <Item label="TTL">{ttl()}</Item>
     </section>
