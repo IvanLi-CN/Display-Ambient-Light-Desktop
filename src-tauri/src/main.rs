@@ -425,7 +425,6 @@ async fn main() {
                                     error!("boards change receiver changed error: {}", err);
                                     return;
                                 }
-                                log::info!("boards changed");
 
                                 let boards = receiver.borrow().clone();
 

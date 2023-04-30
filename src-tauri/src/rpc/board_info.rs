@@ -14,6 +14,7 @@ pub enum BoardConnectStatus {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct BoardInfo {
+    pub fullname: String,
     pub host: String,
     pub address: Ipv4Addr,
     pub port: u16,
@@ -23,8 +24,9 @@ pub struct BoardInfo {
 }
 
 impl BoardInfo {
-    pub fn new(host: String, address: Ipv4Addr, port: u16) -> Self {
+    pub fn new(fullname: String, host: String, address: Ipv4Addr, port: u16) -> Self {
         Self {
+            fullname,
             host,
             address,
             port,

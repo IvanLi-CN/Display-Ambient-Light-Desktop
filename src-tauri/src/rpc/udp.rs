@@ -1,9 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    net::Ipv4Addr,
-    sync::Arc,
-    time::Duration,
-};
+use std::{collections::HashMap, net::Ipv4Addr, sync::Arc, time::Duration};
 
 use futures::future::join_all;
 use mdns_sd::{ServiceDaemon, ServiceEvent};
@@ -13,12 +8,12 @@ use tokio::{
     sync::{watch, OnceCell, RwLock},
 };
 
-use super::{BoardConnectStatus, BoardInfo};
+use super::{BoardInfo, BoardConnectStatus};
 
 #[derive(Debug, Clone)]
 pub struct UdpRpc {
     socket: Arc<UdpSocket>,
-    boards: Arc<RwLock<HashMap<Ipv4Addr, BoardInfo>>>,
+    boards: Arc<RwLock<HashMap<String, BoardInfo>>>,
     boards_change_sender: Arc<watch::Sender<Vec<BoardInfo>>>,
 }
 
@@ -71,18 +66,6 @@ impl UdpRpc {
         tokio::spawn(async move {
             shared_self_for_check.check_boards().await;
         });
-
-        // let shared_self_for_watch = shared_self.clone();
-        // tokio::spawn(async move {
-        //     let mut rx = shared_self_for_watch.clone_boards_change_receiver().await;
-
-        //     // let mut rx  = sub_tx.subscribe();
-        //     // drop(sub_tx);
-        //     while rx.changed().await.is_ok() {
-        //         let boards = rx.borrow().clone();
-        //         info!("boards changed: {:?}", boards);
-        //     }
-        // });
     }
 
     async fn search_boards(&self) -> anyhow::Result<()> {
@@ -110,11 +93,12 @@ impl UdpRpc {
 
                     let board = BoardInfo::new(
                         info.get_fullname().to_string(),
+                        info.get_fullname().to_string(),
                         info.get_addresses().iter().next().unwrap().clone(),
                         info.get_port(),
                     );
 
-                    if boards.insert(board.address, board.clone()).is_some() {
+                    if boards.insert(board.fullname.clone(), board.clone()).is_some() {
                         info!("added board {:?}", board);
                     }
 
@@ -124,8 +108,21 @@ impl UdpRpc {
                     sender.send(tx_boards)?;
                     tokio::task::yield_now().await;
                 }
+                ServiceEvent::ServiceRemoved(_, fullname) => {
+                        info!("removed board {:?}", fullname);
+                    let mut boards = self.boards.write().await;
+                    if boards.remove(&fullname).is_some() {
+                        info!("removed board {:?} successful", fullname);
+                    }
+
+                    let tx_boards = boards.values().cloned().collect();
+                    drop(boards);
+
+                    sender.send(tx_boards)?;
+                    tokio::task::yield_now().await;
+                }
                 other_event => {
-                    warn!("{:?}", &other_event);
+                    // log::info!("{:?}", &other_event);
                 }
             }
         }
@@ -147,6 +144,12 @@ impl UdpRpc {
         let socket = self.socket.clone();
 
         let handlers = boards.into_iter().map(|board| {
+            if board.connect_status == BoardConnectStatus::Disconnected {
+                return tokio::spawn(async move {
+                    log::debug!("board {} is disconnected, skip.", board.host);
+                });
+            }
+
             let socket = socket.clone();
             let buff = buff.clone();
             tokio::spawn(async move {
