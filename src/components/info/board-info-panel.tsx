@@ -43,6 +43,7 @@ export const BoardInfoPanel: Component<{ board: BoardInfo }> = (props) => {
 
   return (
     <section class="p-2 rounded shadow">
+      <Item label="Host">{props.board.fullname}</Item>
       <Item label="Host">{props.board.host}</Item>
       <Item label="Ip Addr">
         <span class="font-mono">{props.board.address}</span>
