@@ -9,6 +9,7 @@ pub mod screenshot;
 mod screenshot_manager;
 
 use ambient_light::{Border, ColorCalibration, LedStripConfig, LedStripConfigGroup};
+use display::{DisplayManager, DisplayState};
 use display_info::DisplayInfo;
 use paris::{error, info, warn};
 use rpc::{BoardInfo, MqttRpc, UdpRpc};
@@ -203,6 +204,13 @@ async fn get_boards() -> Result<Vec<BoardInfo>, String> {
     Ok(boards)
 }
 
+#[tauri::command]
+async fn get_displays() -> Vec<DisplayState> {
+    let display_manager = DisplayManager::global().await;
+
+    display_manager.get_displays().await
+}
+
 #[tokio::main]
 async fn main() {
     env_logger::init();
@@ -230,6 +238,7 @@ async fn main() {
             set_color_calibration,
             read_config,
             get_boards,
+            get_displays
         ])
         .register_uri_scheme_protocol("ambient-light", move |_app, request| {
             let response = ResponseBuilder::new().header("Access-Control-Allow-Origin", "*");

@@ -1,11 +1,12 @@
 // mod brightness;
 // mod manager;
-mod display_config;
+mod display_state;
+mod manager;
 
-pub use display_config::*;
+pub use display_state::*;
 
 // pub use brightness::*;
-// pub use manager::*;
+pub use manager::*;
 
 
 

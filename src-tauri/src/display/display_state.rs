@@ -3,8 +3,7 @@ use std::time::SystemTime;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug)]
-pub struct DisplayConfig {
-    pub id: usize,
+pub struct DisplayState {
     pub brightness: u16,
     pub max_brightness: u16,
     pub min_brightness: u16,
@@ -17,10 +16,9 @@ pub struct DisplayConfig {
     pub last_modified_at: SystemTime,
 }
 
-impl DisplayConfig {
-    pub fn default(index: usize) -> Self {
+impl DisplayState {
+    pub fn default() -> Self {
         Self {
-            id: index,
             brightness: 30,
             contrast: 50,
             mode: 0,
