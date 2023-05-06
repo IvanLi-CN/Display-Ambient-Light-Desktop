@@ -1,21 +1,23 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
-use paris::{info, warn};
-use tokio::{net::UdpSocket, sync::RwLock, time::timeout};
+use paris::{info, warn, error};
+use tokio::{net::UdpSocket, sync::RwLock, time::timeout, io};
 
 use super::{BoardConnectStatus, BoardInfo};
 
 #[derive(Debug)]
 pub struct Board {
-    pub info: RwLock<BoardInfo>,
-    socket: Option<UdpSocket>,
+    pub info: Arc<RwLock<BoardInfo>>,
+    socket: Option<Arc<UdpSocket>>,
+    listen_handler: Option<tokio::task::JoinHandle<()>>,
 }
 
 impl Board {
     pub fn new(info: BoardInfo) -> Self {
         Self {
-            info: RwLock::new(info),
+            info: Arc::new(RwLock::new(info)),
             socket: None,
+            listen_handler: None,
         }
     }
 
@@ -24,7 +26,33 @@ impl Board {
         let socket = UdpSocket::bind("0.0.0.0:0").await?;
 
         socket.connect((info.address, info.port)).await?;
-        self.socket = Some(socket);
+        let socket = Arc::new(socket);
+        self.socket = Some(socket.clone());
+
+        let info = self.info.clone();
+
+        let handler=tokio::spawn(async move {
+            let mut buf = [0u8; 128];
+            if let Err(err) = socket.readable().await {
+                error!("socket read error: {:?}", err);
+                return;
+            }
+            loop {
+                match socket.try_recv(&mut buf) {
+                    Ok(len) => {
+                        log::info!("recv: {:?}", &buf[..len]);
+                    }
+                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                        continue;
+                    }
+                    Err(e) => {
+                        error!("socket recv error: {:?}", e);
+                        break;
+                    }
+                }
+            }
+        });
+        self.listen_handler = Some(handler);
 
         Ok(())
     }
@@ -37,10 +65,7 @@ impl Board {
 
         let socket = self.socket.as_ref().unwrap();
 
-        socket
-            .send(buf)
-            .await
-            .unwrap();
+        socket.send(buf).await.unwrap();
     }
 
     pub async fn check(&self) -> anyhow::Result<()> {
@@ -97,5 +122,18 @@ impl Board {
         info.checked_at = Some(std::time::SystemTime::now());
 
         Ok(())
+    }
+}
+
+
+impl Drop for Board {
+    fn drop(&mut self) {
+        if let Some(handler) = self.listen_handler.take() {
+            info!("aborting listen handler");
+            tokio::task::block_in_place(move || {
+                handler.abort();
+            });
+            info!("listen handler aborted");
+        }
     }
 }
