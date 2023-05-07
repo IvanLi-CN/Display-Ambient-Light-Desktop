@@ -1,22 +1,15 @@
 use std::{
-    borrow::Borrow,
-    collections::HashMap,
-    ops::Sub,
     sync::Arc,
     time::{Duration, SystemTime},
 };
 
 use ddc_hi::Display;
 use paris::{error, info, warn};
-use tokio::sync::{OnceCell, OwnedMutexGuard, RwLock};
+use tokio::sync::{OnceCell, RwLock};
 
-use super::display_state::DisplayState;
-use ddc_hi::Ddc;
+use super::{display_state::DisplayState, display_handler::DisplayHandler};
 
-pub struct DisplayHandler {
-    pub state: Arc<RwLock<DisplayState>>,
-    pub controller: Arc<RwLock<Display>>,
-}
+
 
 pub struct DisplayManager {
     displays: Arc<RwLock<Vec<Arc<RwLock<DisplayHandler>>>>>,
@@ -46,7 +39,14 @@ impl DisplayManager {
         for display in controllers {
             let controller = Arc::new(RwLock::new(display));
             let state = Arc::new(RwLock::new(DisplayState::default()));
-            displays.push(Arc::new(RwLock::new(DisplayHandler { controller, state })));
+            let handler = DisplayHandler {
+                state: state.clone(),
+                controller: controller.clone(),
+            };
+
+            handler.fetch_state().await;
+
+            displays.push(Arc::new(RwLock::new(handler)));
         }
     }
 
