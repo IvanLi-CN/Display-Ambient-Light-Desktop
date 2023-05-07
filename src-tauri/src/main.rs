@@ -450,6 +450,20 @@ async fn main() {
                 }
             });
 
+            let app_handle = app.handle().clone();
+            tokio::spawn(async move {
+                let display_manager = DisplayManager::global().await;
+                let mut rx =display_manager.subscribe_displays_changed();
+
+                while rx.changed().await.is_ok() {
+                    let displays = rx.borrow().clone();
+
+                    log::info!("displays changed. emit displays_changed event.");
+
+                    app_handle.emit_all("displays_changed", displays).unwrap();
+                }
+            });
+
             Ok(())
         })
         .run(tauri::generate_context!())

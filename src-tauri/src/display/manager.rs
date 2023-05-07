@@ -5,14 +5,16 @@ use std::{
 
 use ddc_hi::Display;
 use paris::{error, info, warn};
-use tokio::sync::{OnceCell, RwLock};
+use tokio::{sync::{watch, OnceCell, RwLock}, task::yield_now};
 
-use super::{display_state::DisplayState, display_handler::DisplayHandler};
+use crate::rpc::{BoardMessageChannels, DisplaySetting};
 
-
+use super::{display_handler::DisplayHandler, display_state::DisplayState};
 
 pub struct DisplayManager {
     displays: Arc<RwLock<Vec<Arc<RwLock<DisplayHandler>>>>>,
+    setting_request_handler: Option<tokio::task::JoinHandle<()>>,
+    displays_changed_sender: Arc<watch::Sender<Vec<DisplayState>>>,
 }
 
 impl DisplayManager {
@@ -23,10 +25,16 @@ impl DisplayManager {
     }
 
     pub async fn create() -> Self {
-        let instance = Self {
+        let (displays_changed_sender, _) = watch::channel(Vec::new());
+        let displays_changed_sender = Arc::new(displays_changed_sender);
+
+        let mut instance = Self {
             displays: Arc::new(RwLock::new(Vec::new())),
+            setting_request_handler: None,
+            displays_changed_sender,
         };
         instance.fetch_displays().await;
+        instance.subscribe_setting_request();
         instance
     }
 
@@ -60,19 +68,57 @@ impl DisplayManager {
         states
     }
 
-    // pub async fn subscribe_display_brightness(&self) {
-    //     let rpc = rpc::Manager::global().await;
+    fn subscribe_setting_request(&mut self) {
+        let displays = self.displays.clone();
+        let displays_changed_sender = self.displays_changed_sender.clone();
+        log::info!("start display setting request handler");
+        let handler = tokio::spawn(async move {
+            let channels = BoardMessageChannels::global().await;
 
-    //     let mut rx = rpc.client().subscribe_change_display_brightness_rx();
+            let mut request_rx = channels.display_setting_request_sender.subscribe();
 
-    //     loop {
-    //         if let Ok(display_brightness) = rx.recv().await {
-    //             if let Err(err) = self.set_display_brightness(display_brightness).await {
-    //                 error!("set_display_brightness failed. {:?}", err);
-    //             }
-    //         }
-    //     }
-    // }
+            log::info!("display setting request handler started");
+
+            while let Ok(message) = request_rx.recv().await {
+                let displays = displays.write().await;
+
+                let display = displays.get(message.display_index);
+                if display.is_none() {
+                    warn!("display#{} not found", message.display_index);
+                    continue;
+                }
+
+                log::info!("display setting request received. {:?}", message);
+
+                let display = display.unwrap().write().await;
+                match message.setting {
+                    DisplaySetting::Brightness(value) => display.set_brightness(value as u16).await,
+                    DisplaySetting::Contrast(value) => display.set_contrast(value as u16).await,
+                    DisplaySetting::Mode(value) => display.set_mode(value as u16).await,
+                }
+                drop(display);
+
+                log::info!("display setting request handled. {:?}", message);
+
+                let mut states = Vec::new();
+                for display in displays.iter() {
+                    let state = display.read().await.state.read().await.clone();
+                    states.push(state);
+                }
+
+                if let Err(err) = displays_changed_sender.send(states) {
+                    error!("failed to send displays changed event: {}", err);
+                }
+                yield_now().await;
+            }
+        });
+
+        self.setting_request_handler = Some(handler);
+    }
+
+    pub fn subscribe_displays_changed(&self) -> watch::Receiver<Vec<DisplayState>> {
+        self.displays_changed_sender.subscribe()
+    }
 
     // fn read_display_config_by_ddc(index: usize) -> anyhow::Result<DisplayState> {
     //     let mut displays = Display::enumerate();
@@ -207,4 +253,12 @@ impl DisplayManager {
     //     }
     //     Ok(())
     // }
+}
+
+impl Drop for DisplayManager {
+    fn drop(&mut self) {
+        if let Some(handler) = self.setting_request_handler.take() {
+            handler.abort();
+        }
+    }
 }

@@ -1,14 +1,11 @@
-use std::{collections::HashMap, net::Ipv4Addr, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use futures::future::join_all;
 use mdns_sd::{ServiceDaemon, ServiceEvent};
 use paris::{error, info, warn};
-use tokio::{
-    net::UdpSocket,
-    sync::{watch, OnceCell, RwLock},
-};
+use tokio::sync::{watch, OnceCell, RwLock, broadcast};
 
-use super::{Board, BoardInfo};
+use super::{Board, BoardInfo, DisplaySettingRequest};
 
 #[derive(Debug, Clone)]
 pub struct UdpRpc {
@@ -212,7 +209,7 @@ impl UdpRpc {
             if let Err(err) = board_change_sender.send(tx_boards) {
                 error!("failed to send board change: {:?}", err);
             }
-            
+
             drop(board_change_sender);
         }
     }

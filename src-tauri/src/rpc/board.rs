@@ -1,9 +1,11 @@
 use std::{sync::Arc, time::Duration};
 
-use paris::{info, warn, error};
-use tokio::{net::UdpSocket, sync::RwLock, time::timeout, io};
+use paris::{error, info, warn};
+use tokio::{io, net::UdpSocket, sync::RwLock, time::timeout, task::yield_now};
 
-use super::{BoardConnectStatus, BoardInfo};
+use crate::rpc::DisplaySettingRequest;
+
+use super::{BoardConnectStatus, BoardInfo, UdpRpc};
 
 #[derive(Debug)]
 pub struct Board {
@@ -31,16 +33,34 @@ impl Board {
 
         let info = self.info.clone();
 
-        let handler=tokio::spawn(async move {
+        let handler = tokio::spawn(async move {
             let mut buf = [0u8; 128];
             if let Err(err) = socket.readable().await {
                 error!("socket read error: {:?}", err);
                 return;
             }
+
+            let board_message_channels = crate::rpc::channels::BoardMessageChannels::global().await;
+
+            let display_setting_request_sender = board_message_channels.display_setting_request_sender.clone();
+
             loop {
                 match socket.try_recv(&mut buf) {
                     Ok(len) => {
                         log::info!("recv: {:?}", &buf[..len]);
+                        if buf[0] == 3 {
+                            let result = display_setting_request_sender.send(DisplaySettingRequest {
+                                display_index: buf[1] as usize,
+                                setting: crate::rpc::DisplaySetting::Brightness(buf[2]),
+                            });
+
+                            if let Err(err) = result {
+                                error!("send display setting request to channel failed: {:?}", err);
+                            } else {
+                                info!("send display setting request to channel success");
+                                yield_now().await;
+                            }
+                        }
                     }
                     Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                         continue;
@@ -124,7 +144,6 @@ impl Board {
         Ok(())
     }
 }
-
 
 impl Drop for Board {
     fn drop(&mut self) {
