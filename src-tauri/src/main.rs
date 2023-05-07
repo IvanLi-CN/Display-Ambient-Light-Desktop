@@ -5,8 +5,9 @@ mod ambient_light;
 mod display;
 mod led_color;
 mod rpc;
-pub mod screenshot;
+mod screenshot;
 mod screenshot_manager;
+mod volume;
 
 use ambient_light::{Border, ColorCalibration, LedStripConfig, LedStripConfigGroup};
 use display::{DisplayManager, DisplayState};
@@ -18,6 +19,7 @@ use screenshot_manager::ScreenshotManager;
 use serde::{Deserialize, Serialize};
 use serde_json::to_string;
 use tauri::{http::ResponseBuilder, regex, Manager};
+use volume::VolumeManager;
 
 #[derive(Serialize, Deserialize)]
 #[serde(remote = "DisplayInfo")]
@@ -222,6 +224,8 @@ async fn main() {
     led_color_publisher.start();
 
     let _mqtt = MqttRpc::global().await;
+
+    let _volume = VolumeManager::global().await;
 
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![

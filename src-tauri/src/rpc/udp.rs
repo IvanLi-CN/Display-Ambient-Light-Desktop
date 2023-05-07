@@ -3,9 +3,9 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use futures::future::join_all;
 use mdns_sd::{ServiceDaemon, ServiceEvent};
 use paris::{error, info, warn};
-use tokio::sync::{watch, OnceCell, RwLock, broadcast};
+use tokio::sync::{watch, OnceCell, RwLock};
 
-use super::{Board, BoardInfo, DisplaySettingRequest};
+use super::{Board, BoardInfo};
 
 #[derive(Debug, Clone)]
 pub struct UdpRpc {

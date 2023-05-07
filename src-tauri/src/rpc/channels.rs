@@ -6,6 +6,7 @@ use super::DisplaySettingRequest;
 
 pub struct BoardMessageChannels {
     pub display_setting_request_sender: Arc<broadcast::Sender<DisplaySettingRequest>>,
+    pub volume_setting_request_sender: Arc<broadcast::Sender<f32>>,
 }
 
 impl BoardMessageChannels {
@@ -19,8 +20,12 @@ impl BoardMessageChannels {
         let (display_setting_request_sender, _) = broadcast::channel(16);
         let display_setting_request_sender = Arc::new(display_setting_request_sender);
 
+        let (volume_setting_request_sender, _) = broadcast::channel(16);
+        let volume_setting_request_sender = Arc::new(volume_setting_request_sender);
+
         Self {
             display_setting_request_sender,
+            volume_setting_request_sender,
         }
     }
 }

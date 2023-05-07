@@ -45,6 +45,8 @@ impl Board {
             let display_setting_request_sender = board_message_channels
                 .display_setting_request_sender
                 .clone();
+            let volume_setting_request_sender =
+                board_message_channels.volume_setting_request_sender.clone();
 
             loop {
                 match socket.try_recv(&mut buf) {
@@ -60,6 +62,8 @@ impl Board {
                             if let Err(err) = result {
                                 error!("send display setting request to channel failed: {:?}", err);
                             }
+                        } else if buf[0] == 4 {
+                            let result = volume_setting_request_sender.send(buf[1] as f32 / 100.0);
                         }
                     }
                     Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
