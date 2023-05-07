@@ -71,13 +71,9 @@ impl DisplayManager {
     fn subscribe_setting_request(&mut self) {
         let displays = self.displays.clone();
         let displays_changed_sender = self.displays_changed_sender.clone();
-        log::info!("start display setting request handler");
         let handler = tokio::spawn(async move {
             let channels = BoardMessageChannels::global().await;
-
             let mut request_rx = channels.display_setting_request_sender.subscribe();
-
-            log::info!("display setting request handler started");
 
             while let Ok(message) = request_rx.recv().await {
                 let displays = displays.write().await;
@@ -88,7 +84,6 @@ impl DisplayManager {
                     continue;
                 }
 
-                log::info!("display setting request received. {:?}", message);
 
                 let display = display.unwrap().write().await;
                 let result = match message.setting {
@@ -103,8 +98,6 @@ impl DisplayManager {
                 }
 
                 drop(display);
-
-                log::info!("display setting request handled. {:?}", message);
 
                 let mut states = Vec::new();
                 for display in displays.iter() {

@@ -1,11 +1,11 @@
 use std::{sync::Arc, time::Duration};
 
 use paris::{error, info, warn};
-use tokio::{io, net::UdpSocket, sync::RwLock, time::timeout, task::yield_now};
+use tokio::{io, net::UdpSocket, sync::RwLock, task::yield_now, time::timeout};
 
 use crate::rpc::DisplaySettingRequest;
 
-use super::{BoardConnectStatus, BoardInfo, UdpRpc};
+use super::{BoardConnectStatus, BoardInfo};
 
 #[derive(Debug)]
 pub struct Board {
@@ -42,27 +42,28 @@ impl Board {
 
             let board_message_channels = crate::rpc::channels::BoardMessageChannels::global().await;
 
-            let display_setting_request_sender = board_message_channels.display_setting_request_sender.clone();
+            let display_setting_request_sender = board_message_channels
+                .display_setting_request_sender
+                .clone();
 
             loop {
                 match socket.try_recv(&mut buf) {
                     Ok(len) => {
                         log::info!("recv: {:?}", &buf[..len]);
                         if buf[0] == 3 {
-                            let result = display_setting_request_sender.send(DisplaySettingRequest {
-                                display_index: buf[1] as usize,
-                                setting: crate::rpc::DisplaySetting::Brightness(buf[2]),
-                            });
+                            let result =
+                                display_setting_request_sender.send(DisplaySettingRequest {
+                                    display_index: buf[1] as usize,
+                                    setting: crate::rpc::DisplaySetting::Brightness(buf[2]),
+                                });
 
                             if let Err(err) = result {
                                 error!("send display setting request to channel failed: {:?}", err);
-                            } else {
-                                info!("send display setting request to channel success");
-                                yield_now().await;
                             }
                         }
                     }
                     Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                        yield_now().await;
                         continue;
                     }
                     Err(e) => {
