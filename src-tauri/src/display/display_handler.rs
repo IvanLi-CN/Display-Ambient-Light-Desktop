@@ -47,21 +47,50 @@ impl DisplayHandler {
         *state = temp_state;
     }
 
-    pub async fn set_brightness(&self, brightness: u16) {
+    pub async fn set_brightness(&self, brightness: u16) -> anyhow::Result<()> {
+        let mut controller = self.controller.write().await;
         let mut state = self.state.write().await;
+
+        controller
+            .handle
+            .set_vcp_feature(0x10, brightness)
+            .map_err(|err| anyhow::anyhow!("can not set brightness. {:?}", err))?;
+
+
         state.brightness = brightness;
+
         state.last_modified_at = SystemTime::now();
+
+        Ok(())
     }
 
-    pub async fn set_contrast(&self, contrast: u16) {
+    pub async fn set_contrast(&self, contrast: u16) -> anyhow::Result<()> {
+        let mut controller = self.controller.write().await;
         let mut state = self.state.write().await;
+
+        controller
+            .handle
+            .set_vcp_feature(0x12, contrast)
+            .map_err(|err| anyhow::anyhow!("can not set contrast. {:?}", err))?;
+
         state.contrast = contrast;
         state.last_modified_at = SystemTime::now();
+
+        Ok(())
     }
 
-    pub async fn set_mode(&self, mode: u16) {
+    pub async fn set_mode(&self, mode: u16) -> anyhow::Result<()> {
+        let mut controller = self.controller.write().await;
         let mut state = self.state.write().await;
+
+        controller
+            .handle
+            .set_vcp_feature(0xdc, mode)
+            .map_err(|err| anyhow::anyhow!("can not set mode. {:?}", err))?;
+
         state.mode = mode;
         state.last_modified_at = SystemTime::now();
+
+        Ok(())
     }
 }
