@@ -123,6 +123,7 @@ impl DisplayManager {
 impl Drop for DisplayManager {
     fn drop(&mut self) {
         if let Some(handler) = self.setting_request_handler.take() {
+            info!("abort display setting request handler");
             handler.abort();
         }
     }

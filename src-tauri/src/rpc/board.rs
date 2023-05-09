@@ -64,6 +64,9 @@ impl Board {
                             }
                         } else if buf[0] == 4 {
                             let result = volume_setting_request_sender.send(buf[1] as f32 / 100.0);
+                            if let Err(err) = result {
+                                error!("send volume setting request to channel failed: {:?}", err);
+                            }
                         }
                     }
                     Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
