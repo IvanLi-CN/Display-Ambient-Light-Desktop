@@ -5,7 +5,10 @@ use std::{
 
 use ddc_hi::Display;
 use paris::{error, info, warn};
-use tokio::{sync::{watch, OnceCell, RwLock}, task::yield_now};
+use tokio::{
+    sync::{broadcast, watch, OnceCell, RwLock},
+    task::yield_now,
+};
 
 use crate::rpc::{BoardMessageChannels, DisplaySetting};
 
@@ -75,7 +78,22 @@ impl DisplayManager {
             let channels = BoardMessageChannels::global().await;
             let mut request_rx = channels.display_setting_request_sender.subscribe();
 
-            while let Ok(message) = request_rx.recv().await {
+            loop {
+                if let Err(err) = request_rx.recv().await {
+                    match err {
+                        broadcast::error::RecvError::Closed => {
+                            info!("display setting request channel closed");
+                            break;
+                        }
+                        broadcast::error::RecvError::Lagged(_) => {
+                            warn!("display setting request channel lagged");
+                            continue;
+                        }
+                    }
+                }
+
+                let message = request_rx.recv().await.unwrap();
+
                 let displays = displays.write().await;
 
                 let display = displays.get(message.display_index);
@@ -83,7 +101,6 @@ impl DisplayManager {
                     warn!("display#{} not found", message.display_index);
                     continue;
                 }
-
 
                 let display = display.unwrap().write().await;
                 let result = match message.setting {
@@ -122,8 +139,8 @@ impl DisplayManager {
 
 impl Drop for DisplayManager {
     fn drop(&mut self) {
+        log::info!("dropping display manager=============");
         if let Some(handler) = self.setting_request_handler.take() {
-            info!("abort display setting request handler");
             handler.abort();
         }
     }
