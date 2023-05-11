@@ -34,3 +34,15 @@ impl DisplayState {
         }
     }
 }
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct DisplayStateWrapper {
+    pub version: u8,
+    pub states: Vec<DisplayState>,
+}
+
+impl DisplayStateWrapper {
+    pub fn new(states: Vec<DisplayState>) -> Self {
+        Self { version: 1, states }
+    }
+}

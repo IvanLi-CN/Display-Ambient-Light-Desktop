@@ -14,7 +14,7 @@ impl DisplayHandler {
     pub async fn fetch_state(&self) {
         let mut controller = self.controller.write().await;
 
-        let mut temp_state = DisplayState::default();
+        let mut temp_state = self.state.read().await.clone();
 
         match controller.handle.get_vcp_feature(0x10) {
             Ok(value) => {
