@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use paris::{error, info, warn};
 use tokio::{io, net::UdpSocket, sync::RwLock, task::yield_now, time::timeout};
 
-use crate::{rpc::DisplaySettingRequest, volume::VolumeManager};
+use crate::{rpc::DisplaySettingRequest, volume::{VolumeManager, self}};
 
 use super::{BoardConnectStatus, BoardInfo, BoardMessageChannels};
 
@@ -13,6 +13,7 @@ pub struct Board {
     socket: Option<Arc<UdpSocket>>,
     listen_handler: Option<tokio::task::JoinHandle<()>>,
     volume_changed_subscriber_handler: Option<tokio::task::JoinHandle<()>>,
+    state_of_displays_changed_subscriber_handler: Option<tokio::task::JoinHandle<()>>,
 }
 
 impl Board {
@@ -22,6 +23,7 @@ impl Board {
             socket: None,
             listen_handler: None,
             volume_changed_subscriber_handler: None,
+            state_of_displays_changed_subscriber_handler: None,
         }
     }
 
@@ -80,6 +82,7 @@ impl Board {
         self.listen_handler = Some(handler);
 
         self.subscribe_volume_changed().await;
+        self.state_of_displays_changed().await;
 
         Ok(())
     }
@@ -91,7 +94,23 @@ impl Board {
         let socket = self.socket.clone();
 
         let handler = tokio::spawn(async move {
-            while let Ok(volume) = volume_changed_rx.recv().await {
+            loop {
+                let volume: Result<f32, tokio::sync::broadcast::error::RecvError> = volume_changed_rx.recv().await;
+                if let Err(err) = volume {
+                    match err {
+                        tokio::sync::broadcast::error::RecvError::Closed => {
+                            log::error!("volume changed channel closed");
+                            break;
+                        },
+                        tokio::sync::broadcast::error::RecvError::Lagged(_) => {
+                            log::info!("volume changed channel lagged");
+                            continue;
+                        },
+                    }
+                }
+
+                let volume = volume.unwrap();
+
                 let info = info.read().await;
                 if socket.is_none() || info.connect_status != BoardConnectStatus::Connected {
                     log::info!("board is not connected, skip send volume changed");
@@ -123,6 +142,56 @@ impl Board {
         }
 
         self.volume_changed_subscriber_handler = Some(handler);
+    }
+
+    async fn state_of_displays_changed(&mut self) {
+        let channel: &BoardMessageChannels = BoardMessageChannels::global().await;
+        let mut state_of_displays_changed_rx = channel.displays_changed_sender.subscribe();
+        let info = self.info.clone();
+        let socket = self.socket.clone();
+
+        let handler = tokio::spawn(async move {
+           loop {
+                let states: Result<Vec<crate::display::DisplayState>, tokio::sync::broadcast::error::RecvError> = state_of_displays_changed_rx.recv().await;
+                if let Err(err) = states {
+                    match err {
+                        tokio::sync::broadcast::error::RecvError::Closed => {
+                            log::error!("state of displays changed channel closed");
+                            break;
+                        },
+                        tokio::sync::broadcast::error::RecvError::Lagged(_) => {
+                            log::info!("state of displays changed channel lagged");
+                            continue;
+                        },
+                    }
+                }
+
+                let info = info.read().await;
+                if socket.is_none() || info.connect_status != BoardConnectStatus::Connected {
+                    log::info!("board is not connected, skip send state of displays changed");
+                    continue;
+                }
+
+                let socket = socket.as_ref().unwrap();
+
+                let mut buf = [0u8; 3];
+                let states = states.unwrap();
+                for (index, state) in states.iter().enumerate() {
+                    buf[0] = 3;
+                    buf[1] = index as u8;
+                    buf[2] = state.brightness as u8;
+
+                    log::info!("send state of displays changed: {:?}", &buf[..]);
+
+                    if let Err(err) = socket.send(&buf).await {
+                        log::warn!("send state of displays changed failed: {:?}", err);
+                    }
+                }
+
+           }
+        });
+
+        self.state_of_displays_changed_subscriber_handler = Some(handler);
     }
 
     pub async fn send_colors(&self, buf: &[u8]) {
@@ -204,5 +273,10 @@ impl Drop for Board {
         if let Some(handler) = self.volume_changed_subscriber_handler.take() {
             handler.abort();
         }
+
+        if let Some(handler) = self.state_of_displays_changed_subscriber_handler.take() {
+            handler.abort();
+        }
+
     }
 }

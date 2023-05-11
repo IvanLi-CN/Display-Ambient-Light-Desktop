@@ -1,8 +1,4 @@
-use std::{
-    env::current_dir,
-    sync::Arc,
-    time::{Duration, SystemTime},
-};
+use std::{env::current_dir, sync::Arc, time::Duration};
 
 use ddc_hi::Display;
 use paris::{error, info, warn};
@@ -60,10 +56,26 @@ impl DisplayManager {
             loop {
                 tokio::time::sleep(Duration::from_secs(10)).await;
                 Self::save_states(displays.clone()).await;
+                Self::send_displays_changed(displays.clone()).await;
             }
         });
 
         self.auto_save_state_handler = Some(handler);
+    }
+
+    async fn send_displays_changed(displays: Arc<RwLock<Vec<Arc<RwLock<DisplayHandler>>>>>) {
+        let mut states = Vec::new();
+
+        for display in displays.read().await.iter() {
+            let state = display.read().await.state.read().await.clone();
+            states.push(state);
+        }
+
+        let channel = BoardMessageChannels::global().await;
+        let tx = channel.displays_changed_sender.clone();
+        if let Err(err) = tx.send(states) {
+            error!("Failed to send displays changed: {}", err);
+        }
     }
 
     async fn fetch_displays(&self) {
@@ -244,7 +256,7 @@ impl DisplayManager {
             return;
         }
 
-        log::info!(
+        log::debug!(
             "save display config. store displays: {}, online displays: {}",
             wrapper.states.len(),
             displays.len()
