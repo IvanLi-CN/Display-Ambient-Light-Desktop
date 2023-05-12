@@ -13,7 +13,7 @@ use ambient_light::{Border, ColorCalibration, LedStripConfig, LedStripConfigGrou
 use display::{DisplayManager, DisplayState};
 use display_info::DisplayInfo;
 use paris::{error, info, warn};
-use rpc::{BoardInfo, MqttRpc, UdpRpc};
+use rpc::{BoardInfo, UdpRpc};
 use screenshot::Screenshot;
 use screenshot_manager::ScreenshotManager;
 use serde::{Deserialize, Serialize};
@@ -223,8 +223,6 @@ async fn main() {
     let led_color_publisher = ambient_light::LedColorsPublisher::global().await;
     led_color_publisher.start();
 
-    let _mqtt = MqttRpc::global().await;
-
     let _volume = VolumeManager::global().await;
 
     tauri::Builder::default()
@@ -375,8 +373,7 @@ async fn main() {
             let app_handle = app.handle().clone();
             tokio::spawn(async move {
                 let config_manager = ambient_light::ConfigManager::global().await;
-                let config_update_receiver = config_manager.clone_config_update_receiver();
-                let mut config_update_receiver = config_update_receiver;
+                let mut config_update_receiver = config_manager.clone_config_update_receiver();
                 loop {
                     if let Err(err) = config_update_receiver.changed().await {
                         error!("config update receiver changed error: {}", err);

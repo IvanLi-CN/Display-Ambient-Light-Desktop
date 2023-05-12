@@ -1,7 +1,7 @@
 use std::{borrow::BorrowMut, sync::Arc};
 
 use tauri::async_runtime::RwLock;
-use tokio::sync::OnceCell;
+use tokio::{sync::OnceCell, task::yield_now};
 
 use crate::ambient_light::{config, LedStripConfigGroup};
 
@@ -9,7 +9,6 @@ use super::{Border, SamplePointMapper, ColorCalibration};
 
 pub struct ConfigManager {
     config: Arc<RwLock<LedStripConfigGroup>>,
-    config_update_receiver: tokio::sync::watch::Receiver<LedStripConfigGroup>,
     config_update_sender: tokio::sync::watch::Sender<LedStripConfigGroup>,
 }
 
@@ -22,10 +21,12 @@ impl ConfigManager {
                 let (config_update_sender, config_update_receiver) =
                     tokio::sync::watch::channel(configs.clone());
 
-                    config_update_sender.send(configs.clone()).unwrap();
+                    if let Err(err) = config_update_sender.send(configs.clone()) {
+                        log::error!("Failed to send config update when read config first time: {}", err);
+                    }
+                drop(config_update_receiver);
                 ConfigManager {
                     config: Arc::new(RwLock::new(configs)),
-                    config_update_receiver,
                     config_update_sender,
                 }
             })
@@ -46,8 +47,9 @@ impl ConfigManager {
         self.config_update_sender
             .send(configs.clone())
             .map_err(|e| anyhow::anyhow!("Failed to send config update: {}", e))?;
+        yield_now().await;
 
-        // log::info!("config updated: {:?}", configs);
+        log::debug!("config updated: {:?}", configs);
 
         Ok(())
     }
@@ -221,7 +223,7 @@ impl ConfigManager {
     pub fn clone_config_update_receiver(
         &self,
     ) -> tokio::sync::watch::Receiver<LedStripConfigGroup> {
-        self.config_update_receiver.clone()
+        self.config_update_sender.subscribe()
     }
 
     pub async fn set_color_calibration(&self, color_calibration: ColorCalibration) -> anyhow::Result<()> {
