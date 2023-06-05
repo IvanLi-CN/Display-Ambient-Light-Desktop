@@ -37,6 +37,7 @@ mdns-sd = "0.7.2"
 futures = "0.3.28"
 ddc-hi = "0.4.1"
 coreaudio-rs = "0.11.2"
+rust_swift_screencapture = { version = "0.1.1", path = "../../../../demo/rust-swift-screencapture" }
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem

@@ -1,5 +1,6 @@
 
-use std::iter;
+use std::fmt::Formatter;
+use std::{iter, fmt::Debug};
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
@@ -7,15 +8,28 @@ use tauri::async_runtime::RwLock;
 
 use crate::{ambient_light::LedStripConfig, led_color::LedColor};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Screenshot {
     pub display_id: u32,
     pub height: u32,
     pub width: u32,
     pub bytes_per_row: usize,
-    pub bytes: Arc<RwLock<Vec<u8>>>,
+    pub bytes: Arc<RwLock<Arc<Vec<u8>>>>,
     pub scale_factor: f32,
     pub bound_scale_factor: f32,
+}
+
+impl Debug for Screenshot {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Screenshot")
+            .field("display_id", &self.display_id)
+            .field("height", &self.height)
+            .field("width", &self.width)
+            .field("bytes_per_row", &self.bytes_per_row)
+            .field("scale_factor", &self.scale_factor)
+            .field("bound_scale_factor", &self.bound_scale_factor)
+            .finish()
+    }
 }
 
 static SINGLE_AXIS_POINTS: usize = 5;
@@ -26,7 +40,7 @@ impl Screenshot {
         height: u32,
         width: u32,
         bytes_per_row: usize,
-        bytes: Vec<u8>,
+        bytes: Arc<Vec<u8>>,
         scale_factor: f32,
         bound_scale_factor: f32,
     ) -> Self {

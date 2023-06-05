@@ -88,7 +88,7 @@ async fn get_led_strips_sample_points(
     let screenshot_manager = ScreenshotManager::global().await;
     let channels = screenshot_manager.channels.read().await;
     if let Some(rx) = channels.get(&config.display_id) {
-        let rx = rx.clone();
+        let rx = rx.read().await;
         let screenshot = rx.borrow().clone();
         let sample_points = screenshot.get_sample_points(&config);
         Ok(sample_points)
@@ -105,7 +105,7 @@ async fn get_one_edge_colors(
     let screenshot_manager = ScreenshotManager::global().await;
     let channels = screenshot_manager.channels.read().await;
     if let Some(rx) = channels.get(&display_id) {
-        let rx = rx.clone();
+        let rx = rx.read().await;
         let screenshot = rx.borrow().clone();
         let bytes = screenshot.bytes.read().await.to_owned();
         let colors =
@@ -217,8 +217,12 @@ async fn get_displays() -> Vec<DisplayState> {
 async fn main() {
     env_logger::init();
 
-    let screenshot_manager = ScreenshotManager::global().await;
-    screenshot_manager.start().unwrap();
+    tokio::spawn(async move {
+        let screenshot_manager = ScreenshotManager::global().await;
+        screenshot_manager.start().await.unwrap_or_else(|e| {
+            error!("can not start screenshot manager: {}", e);
+        })
+    });
 
     let led_color_publisher = ambient_light::LedColorsPublisher::global().await;
     led_color_publisher.start();
@@ -282,77 +286,86 @@ async fn main() {
             let bytes = tokio::task::block_in_place(move || {
                 tauri::async_runtime::block_on(async move {
                     let screenshot_manager = ScreenshotManager::global().await;
-                    let channels = screenshot_manager.channels.read().await;
-                    if let Some(rx) = channels.get(&display_id) {
-                        let rx = rx.clone();
-                        let screenshot = rx.borrow().clone();
-                        let bytes = screenshot.bytes.read().await;
+                    let rx: Result<tokio::sync::watch::Receiver<Screenshot>, anyhow::Error> = screenshot_manager.subscribe_by_display_id(display_id).await;
 
-                        let (scale_factor_x, scale_factor_y, width, height) = if url.query.is_some()
-                            && url.query.as_ref().unwrap().contains_key("height")
-                            && url.query.as_ref().unwrap().contains_key("width")
-                        {
-                            let width = url.query.as_ref().unwrap()["width"]
-                                .parse::<u32>()
-                                .map_err(|err| {
-                                    warn!("width parse error: {}", err);
-                                    err
-                                })?;
-                            let height = url.query.as_ref().unwrap()["height"]
-                                .parse::<u32>()
-                                .map_err(|err| {
-                                    warn!("height parse error: {}", err);
-                                    err
-                                })?;
-                            (
-                                screenshot.width as f32 / width as f32,
-                                screenshot.height as f32 / height as f32,
-                                width,
-                                height,
-                            )
-                        } else {
-                            log::debug!("scale by scale_factor");
-                            let scale_factor = screenshot.scale_factor;
-                            (
-                                scale_factor,
-                                scale_factor,
-                                (screenshot.width as f32 / scale_factor) as u32,
-                                (screenshot.height as f32 / scale_factor) as u32,
-                            )
-                        };
-                        log::debug!(
-                            "scale by query. width: {}, height: {}, scale_factor: {}, len: {}",
+                    if let Err(err) = rx {
+                        anyhow::bail!("Display#{}: not found. {}", display_id, err);
+                    }
+                    let mut rx = rx.unwrap();
+
+                    if rx.changed().await.is_err() {
+                        anyhow::bail!("Display#{}: no more screenshot.", display_id);
+                    }
+                    let screenshot = rx.borrow().clone();
+                    let bytes = screenshot.bytes.read().await;
+                    if bytes.len() == 0 {
+                        anyhow::bail!("Display#{}: no screenshot.", display_id);
+                    }
+
+                    log::debug!("Display#{}: screenshot size: {}", display_id, bytes.len());
+
+                    let (scale_factor_x, scale_factor_y, width, height) = if url.query.is_some()
+                        && url.query.as_ref().unwrap().contains_key("height")
+                        && url.query.as_ref().unwrap().contains_key("width")
+                    {
+                        let width = url.query.as_ref().unwrap()["width"]
+                            .parse::<u32>()
+                            .map_err(|err| {
+                                warn!("width parse error: {}", err);
+                                err
+                            })?;
+                        let height = url.query.as_ref().unwrap()["height"]
+                            .parse::<u32>()
+                            .map_err(|err| {
+                                warn!("height parse error: {}", err);
+                                err
+                            })?;
+                        (
+                            screenshot.width as f32 / width as f32,
+                            screenshot.height as f32 / height as f32,
                             width,
                             height,
-                            screenshot.width as f32 / width as f32,
-                            width * height * 4,
-                        );
-
-                        let bytes_per_row = screenshot.bytes_per_row as f32;
-
-                        let mut rgba_buffer = vec![0u8; (width * height * 4) as usize];
-
-                        for y in 0..height {
-                            for x in 0..width {
-                                let offset = ((y as f32) * scale_factor_y).floor() as usize
-                                    * bytes_per_row as usize
-                                    + ((x as f32) * scale_factor_x).floor() as usize * 4;
-                                let b = bytes[offset];
-                                let g = bytes[offset + 1];
-                                let r = bytes[offset + 2];
-                                let a = bytes[offset + 3];
-                                let offset_2 = (y * width + x) as usize * 4;
-                                rgba_buffer[offset_2] = r;
-                                rgba_buffer[offset_2 + 1] = g;
-                                rgba_buffer[offset_2 + 2] = b;
-                                rgba_buffer[offset_2 + 3] = a;
-                            }
-                        }
-
-                        Ok(rgba_buffer.clone())
+                        )
                     } else {
-                        anyhow::bail!("Display#{}: not found", display_id);
+                        log::debug!("scale by scale_factor");
+                        let scale_factor = screenshot.scale_factor;
+                        (
+                            scale_factor,
+                            scale_factor,
+                            (screenshot.width as f32 / scale_factor) as u32,
+                            (screenshot.height as f32 / scale_factor) as u32,
+                        )
+                    };
+                    log::debug!(
+                        "scale by query. width: {}, height: {}, scale_factor: {}, len: {}",
+                        width,
+                        height,
+                        screenshot.width as f32 / width as f32,
+                        width * height * 4,
+                    );
+
+                    let bytes_per_row = screenshot.bytes_per_row as f32;
+
+                    let mut rgba_buffer = vec![0u8; (width * height * 4) as usize];
+
+                    for y in 0..height {
+                        for x in 0..width {
+                            let offset = ((y as f32) * scale_factor_y).floor() as usize
+                                * bytes_per_row as usize
+                                + ((x as f32) * scale_factor_x).floor() as usize * 4;
+                            let b = bytes[offset];
+                            let g = bytes[offset + 1];
+                            let r = bytes[offset + 2];
+                            let a = bytes[offset + 3];
+                            let offset_2 = (y * width + x) as usize * 4;
+                            rgba_buffer[offset_2] = r;
+                            rgba_buffer[offset_2 + 1] = g;
+                            rgba_buffer[offset_2 + 2] = b;
+                            rgba_buffer[offset_2 + 3] = a;
+                        }
                     }
+
+                    Ok(rgba_buffer.clone())
                 })
             });
 
@@ -388,82 +401,82 @@ async fn main() {
                 }
             });
 
-            let app_handle = app.handle().clone();
-            tokio::spawn(async move {
-                let publisher = ambient_light::LedColorsPublisher::global().await;
-                let mut publisher_update_receiver = publisher.clone_sorted_colors_receiver().await;
-                loop {
-                    if let Err(err) = publisher_update_receiver.changed().await {
-                        error!("publisher update receiver changed error: {}", err);
-                        return;
-                    }
+            // let app_handle = app.handle().clone();
+            // tokio::spawn(async move {
+            //     let publisher = ambient_light::LedColorsPublisher::global().await;
+            //     let mut publisher_update_receiver = publisher.clone_sorted_colors_receiver().await;
+            //     loop {
+            //         if let Err(err) = publisher_update_receiver.changed().await {
+            //             error!("publisher update receiver changed error: {}", err);
+            //             return;
+            //         }
 
-                    let publisher = publisher_update_receiver.borrow().clone();
+            //         let publisher = publisher_update_receiver.borrow().clone();
 
-                    app_handle
-                        .emit_all("led_sorted_colors_changed", publisher)
-                        .unwrap();
-                }
-            });
+            //         app_handle
+            //             .emit_all("led_sorted_colors_changed", publisher)
+            //             .unwrap();
+            //     }
+            // });
 
-            let app_handle = app.handle().clone();
-            tokio::spawn(async move {
-                let publisher = ambient_light::LedColorsPublisher::global().await;
-                let mut publisher_update_receiver = publisher.clone_colors_receiver().await;
-                loop {
-                    if let Err(err) = publisher_update_receiver.changed().await {
-                        error!("publisher update receiver changed error: {}", err);
-                        return;
-                    }
+            // let app_handle = app.handle().clone();
+            // tokio::spawn(async move {
+            //     let publisher = ambient_light::LedColorsPublisher::global().await;
+            //     let mut publisher_update_receiver = publisher.clone_colors_receiver().await;
+            //     loop {
+            //         if let Err(err) = publisher_update_receiver.changed().await {
+            //             error!("publisher update receiver changed error: {}", err);
+            //             return;
+            //         }
 
-                    let publisher = publisher_update_receiver.borrow().clone();
+            //         let publisher = publisher_update_receiver.borrow().clone();
 
-                    app_handle
-                        .emit_all("led_colors_changed", publisher)
-                        .unwrap();
-                }
-            });
+            //         app_handle
+            //             .emit_all("led_colors_changed", publisher)
+            //             .unwrap();
+            //     }
+            // });
 
-            let app_handle = app.handle().clone();
-            tokio::spawn(async move {
-                loop {
-                    match UdpRpc::global().await {
-                        Ok(udp_rpc) => {
-                            let mut receiver = udp_rpc.subscribe_boards_change();
-                            loop {
-                                if let Err(err) = receiver.changed().await {
-                                    error!("boards change receiver changed error: {}", err);
-                                    return;
-                                }
+            // let app_handle = app.handle().clone();
+            // tokio::spawn(async move {
+            //     loop {
+            //         match UdpRpc::global().await {
+            //             Ok(udp_rpc) => {
+            //                 let mut receiver = udp_rpc.subscribe_boards_change();
+            //                 loop {
+            //                     if let Err(err) = receiver.changed().await {
+            //                         error!("boards change receiver changed error: {}", err);
+            //                         return;
+            //                     }
 
-                                let boards = receiver.borrow().clone();
+            //                     let boards = receiver.borrow().clone();
 
-                                let boards = boards.into_iter().collect::<Vec<_>>();
+            //                     let boards = boards.into_iter().collect::<Vec<_>>();
 
-                                app_handle.emit_all("boards_changed", boards).unwrap();
-                            }
-                        }
-                        Err(err) => {
-                            error!("udp rpc error: {}", err);
-                            return;
-                        }
-                    }
-                }
-            });
+            //                     app_handle.emit_all("boards_changed", boards).unwrap();
+            //                 }
+            //             }
+            //             Err(err) => {
+            //                 error!("udp rpc error: {}", err);
+            //                 return;
+            //             }
+            //         }
+            //     }
+            // });
 
-            let app_handle = app.handle().clone();
-            tokio::spawn(async move {
-                let display_manager = DisplayManager::global().await;
-                let mut rx =display_manager.subscribe_displays_changed();
+            // let app_handle = app.handle().clone();
+            // tokio::spawn(async move {
+            //     let display_manager = DisplayManager::global().await;
+            //     let mut rx = display_manager.subscribe_displays_changed();
 
-                while rx.changed().await.is_ok() {
-                    let displays = rx.borrow().clone();
+            //     while rx.changed().await.is_ok() {
+            //         let displays = rx.borrow().clone();
 
-                    log::info!("displays changed. emit displays_changed event.");
+            //         log::info!("displays changed. emit displays_changed event.");
 
-                    app_handle.emit_all("displays_changed", displays).unwrap();
-                }
-            });
+            //         app_handle.emit_all("displays_changed", displays).unwrap();
+            //     }
+            // });
 
             Ok(())
         })

@@ -28,7 +28,10 @@
         "icons/icon.ico"
       ],
       "identifier": "cc.ivanli.ambient-light.desktop",
-      "targets": "all"
+      "targets": "all",
+      "macOS": {
+        "minimumSystemVersion": "13"
+      }
     },
     "security": {
       "csp": null

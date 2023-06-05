@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration, borrow::Borrow};
 
 use paris::warn;
 use tauri::async_runtime::RwLock;
@@ -11,8 +11,9 @@ use tokio::{
 use crate::{
     ambient_light::{config, ConfigManager},
     led_color::LedColor,
-    screenshot::LedSamplePoints,
-    screenshot_manager::{self, ScreenshotManager}, rpc::UdpRpc,
+    rpc::UdpRpc,
+    screenshot::{self, LedSamplePoints},
+    screenshot_manager::{self, ScreenshotManager},
 };
 
 use itertools::Itertools;
@@ -48,60 +49,33 @@ impl LedColorsPublisher {
             .await
     }
 
-    fn start_one_display_colors_fetcher(
+    async fn start_one_display_colors_fetcher(
         &self,
         display_id: u32,
-        sample_points: Vec<Vec<LedSamplePoints>>,
+        sample_points: Vec<LedSamplePoints>,
         bound_scale_factor: f32,
         mappers: Vec<SamplePointMapper>,
         display_colors_tx: broadcast::Sender<(u32, Vec<u8>)>,
     ) {
         let internal_tasks_version = self.inner_tasks_version.clone();
+        let screenshot_manager = ScreenshotManager::global().await;
+
+        let screenshot_rx = screenshot_manager.subscribe_by_display_id(display_id).await;
+
+        if let Err(err) = screenshot_rx {
+            log::error!("{}", err);
+            return;
+        }
+        let mut screenshot_rx = screenshot_rx.unwrap();
 
         tokio::spawn(async move {
-            let colors = screenshot_manager::get_display_colors(
-                display_id,
-                &sample_points,
-                bound_scale_factor,
-            );
-
-            if let Err(err) = colors {
-                warn!("Failed to get colors: {}", err);
-                return;
-            }
-
-            let mut interval = tokio::time::interval(Duration::from_millis(33));
             let init_version = internal_tasks_version.read().await.clone();
 
-            loop {
-                interval.tick().await;
-                tokio::time::sleep(Duration::from_millis(1)).await;
-
-                let version = internal_tasks_version.read().await.clone();
-
-                if version != init_version {
-                    log::info!(
-                        "inner task version changed, stop.  {} != {}",
-                        internal_tasks_version.read().await.clone(),
-                        init_version
-                    );
-
-                    break;
-                }
-
-                let colors = screenshot_manager::get_display_colors(
-                    display_id,
-                    &sample_points,
-                    bound_scale_factor,
-                );
-
-                if let Err(err) = colors {
-                    warn!("Failed to get colors: {}", err);
-                    sleep(Duration::from_millis(100)).await;
-                    continue;
-                }
-
-                let colors: Vec<crate::led_color::LedColor> = colors.unwrap();
+            while screenshot_rx.changed().await.is_ok() {
+                let screenshot = screenshot_rx.borrow().clone();
+                let colors = screenshot
+                    .get_colors_by_sample_points(&sample_points)
+                    .await;
 
                 let colors_copy = colors.clone();
 
@@ -133,6 +107,18 @@ impl LedColorsPublisher {
                         warn!("Failed to send display_colors: {}", err);
                     }
                 };
+
+                // Check if the inner task version changed
+                let version = internal_tasks_version.read().await.clone();
+                if version != init_version {
+                    log::info!(
+                        "inner task version changed, stop.  {} != {}",
+                        internal_tasks_version.read().await.clone(),
+                        init_version
+                    );
+
+                    break;
+                }
             }
         });
     }
@@ -247,13 +233,15 @@ impl LedColorsPublisher {
                     let display_id = sample_point_group.display_id;
                     let sample_points = sample_point_group.points;
                     let bound_scale_factor = sample_point_group.bound_scale_factor;
-                    publisher.start_one_display_colors_fetcher(
-                        display_id,
-                        sample_points,
-                        bound_scale_factor,
-                        sample_point_group.mappers,
-                        display_colors_tx.clone(),
-                    );
+                    publisher
+                        .start_one_display_colors_fetcher(
+                            display_id,
+                            sample_points,
+                            bound_scale_factor,
+                            sample_point_group.mappers,
+                            display_colors_tx.clone(),
+                        )
+                        .await;
                 }
 
                 let display_ids = configs.sample_point_groups;
@@ -402,6 +390,7 @@ impl LedColorsPublisher {
                     let points: Vec<_> = led_strip_configs
                         .clone()
                         .map(|(_, config)| screenshot.get_sample_points(&config))
+                        .flatten()
                         .collect();
 
                     if points.len() == 0 {
@@ -451,7 +440,7 @@ pub struct AllColorConfig {
 #[derive(Debug, Clone)]
 pub struct DisplaySamplePointGroup {
     pub display_id: u32,
-    pub points: Vec<Vec<LedSamplePoints>>,
+    pub points: Vec<LedSamplePoints>,
     pub bound_scale_factor: f32,
     pub mappers: Vec<config::SamplePointMapper>,
 }
