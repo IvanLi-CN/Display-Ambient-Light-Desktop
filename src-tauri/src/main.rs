@@ -224,8 +224,10 @@ async fn main() {
         })
     });
 
-    let led_color_publisher = ambient_light::LedColorsPublisher::global().await;
-    led_color_publisher.start();
+    tokio::spawn(async move {
+        let led_color_publisher = ambient_light::LedColorsPublisher::global().await;
+        led_color_publisher.start().await;
+    });
 
     let _volume = VolumeManager::global().await;
 
@@ -286,7 +288,8 @@ async fn main() {
             let bytes = tokio::task::block_in_place(move || {
                 tauri::async_runtime::block_on(async move {
                     let screenshot_manager = ScreenshotManager::global().await;
-                    let rx: Result<tokio::sync::watch::Receiver<Screenshot>, anyhow::Error> = screenshot_manager.subscribe_by_display_id(display_id).await;
+                    let rx: Result<tokio::sync::watch::Receiver<Screenshot>, anyhow::Error> =
+                        screenshot_manager.subscribe_by_display_id(display_id).await;
 
                     if let Err(err) = rx {
                         anyhow::bail!("Display#{}: not found. {}", display_id, err);
@@ -401,82 +404,82 @@ async fn main() {
                 }
             });
 
-            // let app_handle = app.handle().clone();
-            // tokio::spawn(async move {
-            //     let publisher = ambient_light::LedColorsPublisher::global().await;
-            //     let mut publisher_update_receiver = publisher.clone_sorted_colors_receiver().await;
-            //     loop {
-            //         if let Err(err) = publisher_update_receiver.changed().await {
-            //             error!("publisher update receiver changed error: {}", err);
-            //             return;
-            //         }
+            let app_handle = app.handle().clone();
+            tokio::spawn(async move {
+                let publisher = ambient_light::LedColorsPublisher::global().await;
+                let mut publisher_update_receiver = publisher.clone_sorted_colors_receiver().await;
+                loop {
+                    if let Err(err) = publisher_update_receiver.changed().await {
+                        error!("publisher update receiver changed error: {}", err);
+                        return;
+                    }
 
-            //         let publisher = publisher_update_receiver.borrow().clone();
+                    let publisher = publisher_update_receiver.borrow().clone();
 
-            //         app_handle
-            //             .emit_all("led_sorted_colors_changed", publisher)
-            //             .unwrap();
-            //     }
-            // });
+                    app_handle
+                        .emit_all("led_sorted_colors_changed", publisher)
+                        .unwrap();
+                }
+            });
 
-            // let app_handle = app.handle().clone();
-            // tokio::spawn(async move {
-            //     let publisher = ambient_light::LedColorsPublisher::global().await;
-            //     let mut publisher_update_receiver = publisher.clone_colors_receiver().await;
-            //     loop {
-            //         if let Err(err) = publisher_update_receiver.changed().await {
-            //             error!("publisher update receiver changed error: {}", err);
-            //             return;
-            //         }
+            let app_handle = app.handle().clone();
+            tokio::spawn(async move {
+                let publisher = ambient_light::LedColorsPublisher::global().await;
+                let mut publisher_update_receiver = publisher.clone_colors_receiver().await;
+                loop {
+                    if let Err(err) = publisher_update_receiver.changed().await {
+                        error!("publisher update receiver changed error: {}", err);
+                        return;
+                    }
 
-            //         let publisher = publisher_update_receiver.borrow().clone();
+                    let publisher = publisher_update_receiver.borrow().clone();
 
-            //         app_handle
-            //             .emit_all("led_colors_changed", publisher)
-            //             .unwrap();
-            //     }
-            // });
+                    app_handle
+                        .emit_all("led_colors_changed", publisher)
+                        .unwrap();
+                }
+            });
 
-            // let app_handle = app.handle().clone();
-            // tokio::spawn(async move {
-            //     loop {
-            //         match UdpRpc::global().await {
-            //             Ok(udp_rpc) => {
-            //                 let mut receiver = udp_rpc.subscribe_boards_change();
-            //                 loop {
-            //                     if let Err(err) = receiver.changed().await {
-            //                         error!("boards change receiver changed error: {}", err);
-            //                         return;
-            //                     }
+            let app_handle = app.handle().clone();
+            tokio::spawn(async move {
+                loop {
+                    match UdpRpc::global().await {
+                        Ok(udp_rpc) => {
+                            let mut receiver = udp_rpc.subscribe_boards_change();
+                            loop {
+                                if let Err(err) = receiver.changed().await {
+                                    error!("boards change receiver changed error: {}", err);
+                                    return;
+                                }
 
-            //                     let boards = receiver.borrow().clone();
+                                let boards = receiver.borrow().clone();
 
-            //                     let boards = boards.into_iter().collect::<Vec<_>>();
+                                let boards = boards.into_iter().collect::<Vec<_>>();
 
-            //                     app_handle.emit_all("boards_changed", boards).unwrap();
-            //                 }
-            //             }
-            //             Err(err) => {
-            //                 error!("udp rpc error: {}", err);
-            //                 return;
-            //             }
-            //         }
-            //     }
-            // });
+                                app_handle.emit_all("boards_changed", boards).unwrap();
+                            }
+                        }
+                        Err(err) => {
+                            error!("udp rpc error: {}", err);
+                            return;
+                        }
+                    }
+                }
+            });
 
-            // let app_handle = app.handle().clone();
-            // tokio::spawn(async move {
-            //     let display_manager = DisplayManager::global().await;
-            //     let mut rx = display_manager.subscribe_displays_changed();
+            let app_handle = app.handle().clone();
+            tokio::spawn(async move {
+                let display_manager = DisplayManager::global().await;
+                let mut rx = display_manager.subscribe_displays_changed();
 
-            //     while rx.changed().await.is_ok() {
-            //         let displays = rx.borrow().clone();
+                while rx.changed().await.is_ok() {
+                    let displays = rx.borrow().clone();
 
-            //         log::info!("displays changed. emit displays_changed event.");
+                    log::info!("displays changed. emit displays_changed event.");
 
-            //         app_handle.emit_all("displays_changed", displays).unwrap();
-            //     }
-            // });
+                    app_handle.emit_all("displays_changed", displays).unwrap();
+                }
+            });
 
             Ok(())
         })

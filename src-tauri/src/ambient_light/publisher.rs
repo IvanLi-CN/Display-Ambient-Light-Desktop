@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc, time::Duration, borrow::Borrow};
+use std::{borrow::Borrow, collections::HashMap, sync::Arc, time::Duration};
 
 use paris::warn;
 use tauri::async_runtime::RwLock;
@@ -73,40 +73,36 @@ impl LedColorsPublisher {
 
             while screenshot_rx.changed().await.is_ok() {
                 let screenshot = screenshot_rx.borrow().clone();
-                let colors = screenshot
-                    .get_colors_by_sample_points(&sample_points)
-                    .await;
+                let colors = screenshot.get_colors_by_sample_points(&sample_points).await;
 
                 let colors_copy = colors.clone();
 
                 let mappers = mappers.clone();
 
-                tokio::spawn(async move {
-                    match Self::send_colors_by_display(colors, mappers).await {
-                        Ok(_) => {
-                            // log::info!("sent colors: #{: >15}", display_id);
-                        }
-                        Err(err) => {
-                            warn!("Failed to send colors:  #{: >15}\t{}", display_id, err);
-                        }
-                    }
-                });
-
-                match display_colors_tx.send((
-                    display_id,
-                    colors_copy
-                        .into_iter()
-                        .map(|color| color.get_rgb())
-                        .flatten()
-                        .collect::<Vec<_>>(),
-                )) {
+                match Self::send_colors_by_display(colors, mappers).await {
                     Ok(_) => {
-                        // log::info!("sent colors: {:?}", color_len);
+                        // log::info!("sent colors: #{: >15}", display_id);
                     }
                     Err(err) => {
-                        warn!("Failed to send display_colors: {}", err);
+                        warn!("Failed to send colors:  #{: >15}\t{}", display_id, err);
                     }
-                };
+                }
+
+                // match display_colors_tx.send((
+                //     display_id,
+                //     colors_copy
+                //         .into_iter()
+                //         .map(|color| color.get_rgb())
+                //         .flatten()
+                //         .collect::<Vec<_>>(),
+                // )) {
+                //     Ok(_) => {
+                //         // log::info!("sent colors: {:?}", color_len);
+                //     }
+                //     Err(err) => {
+                //         warn!("Failed to send display_colors: {}", err);
+                //     }
+                // };
 
                 // Check if the inner task version changed
                 let version = internal_tasks_version.read().await.clone();
@@ -198,60 +194,61 @@ impl LedColorsPublisher {
         });
     }
 
-    pub fn start(&self) {
+    pub async fn start(&self) {
+        log::info!("start colors worker");
+
+        let config_manager = ConfigManager::global().await;
+        let mut config_receiver = config_manager.clone_config_update_receiver();
+        let configs = config_receiver.borrow().clone();
+
+        self.handle_config_change(configs).await;
+
+        log::info!("waiting for config update...");
+        while config_receiver.changed().await.is_ok() {
+            log::info!("config updated, restart inner tasks...");
+            let configs = config_receiver.borrow().clone();
+            self.handle_config_change(configs).await;
+        }
+    }
+
+    async fn handle_config_change(&self, configs: LedStripConfigGroup) {
         let inner_tasks_version = self.inner_tasks_version.clone();
+        let configs = Self::get_colors_configs(&configs).await;
 
-        tokio::spawn(async move {
-            let publisher = Self::global().await;
+        if let Err(err) = configs {
+            warn!("Failed to get configs: {}", err);
+            sleep(Duration::from_millis(100)).await;
+            return;
+        }
 
-            let config_manager = ConfigManager::global().await;
-            let mut config_receiver = config_manager.clone_config_update_receiver();
+        let configs = configs.unwrap();
 
-            log::info!("waiting for config update...");
+        let mut inner_tasks_version = inner_tasks_version.write().await;
+        *inner_tasks_version = inner_tasks_version.overflowing_add(1).0;
+        drop(inner_tasks_version);
 
-            while config_receiver.changed().await.is_ok() {
-                log::info!("config updated, restart inner tasks...");
-                let configs = config_receiver.borrow().clone();
-                let configs = Self::get_colors_configs(&configs).await;
+        let (display_colors_tx, display_colors_rx) = broadcast::channel::<(u32, Vec<u8>)>(8);
 
-                if let Err(err) = configs {
-                    warn!("Failed to get configs: {}", err);
-                    sleep(Duration::from_millis(100)).await;
-                    continue;
-                }
+        for sample_point_group in configs.sample_point_groups.clone() {
+            let display_id = sample_point_group.display_id;
+            let sample_points = sample_point_group.points;
+            let bound_scale_factor = sample_point_group.bound_scale_factor;
+            self.start_one_display_colors_fetcher(
+                display_id,
+                sample_points,
+                bound_scale_factor,
+                sample_point_group.mappers,
+                display_colors_tx.clone(),
+            )
+            .await;
+        }
 
-                let configs = configs.unwrap();
-
-                let mut inner_tasks_version = inner_tasks_version.write().await;
-                *inner_tasks_version = inner_tasks_version.overflowing_add(1).0;
-                drop(inner_tasks_version);
-
-                let (display_colors_tx, display_colors_rx) =
-                    broadcast::channel::<(u32, Vec<u8>)>(8);
-
-                for sample_point_group in configs.sample_point_groups.clone() {
-                    let display_id = sample_point_group.display_id;
-                    let sample_points = sample_point_group.points;
-                    let bound_scale_factor = sample_point_group.bound_scale_factor;
-                    publisher
-                        .start_one_display_colors_fetcher(
-                            display_id,
-                            sample_points,
-                            bound_scale_factor,
-                            sample_point_group.mappers,
-                            display_colors_tx.clone(),
-                        )
-                        .await;
-                }
-
-                let display_ids = configs.sample_point_groups;
-                publisher.start_all_colors_worker(
-                    display_ids.iter().map(|c| c.display_id).collect(),
-                    configs.mappers,
-                    display_colors_rx,
-                );
-            }
-        });
+        let display_ids = configs.sample_point_groups;
+        self.start_all_colors_worker(
+            display_ids.iter().map(|c| c.display_id).collect(),
+            configs.mappers,
+            display_colors_rx,
+        );
     }
 
     pub async fn send_colors(offset: u16, mut payload: Vec<u8>) -> anyhow::Result<()> {

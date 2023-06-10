@@ -54,7 +54,7 @@ impl Board {
                 board_message_channels.volume_setting_request_sender.clone();
 
             loop {
-                match socket.try_recv(&mut buf) {
+                match socket.recv(&mut buf).await {
                     Ok(len) => {
                         log::info!("recv: {:?}", &buf[..len]);
                         if buf[0] == 3 {

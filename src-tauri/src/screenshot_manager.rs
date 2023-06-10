@@ -121,7 +121,7 @@ impl ScreenshotManager {
         let merged_screenshot_tx = self.merged_screenshot_tx.clone();
         let display = rust_swift_screencapture::display::Display::new(display_id);
 
-        display.start_capture().await;
+        display.start_capture(30).await;
 
         let mut frame_rx = display.subscribe_frame().await;
 
@@ -156,7 +156,7 @@ impl ScreenshotManager {
                 // log::warn!("merged_screenshot_tx.send failed: {}", err);
             }
             if let Err(err) = tx_for_send.send(screenshot.clone()) {
-                log::warn!("display {} screenshot_tx.send failed: {}", display_id, err);
+                // log::warn!("display {} screenshot_tx.send failed: {}", display_id, err);
             } else {
                 log::debug!("screenshot: {:?}", screenshot);
             }
