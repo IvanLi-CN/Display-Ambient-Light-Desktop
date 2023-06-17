@@ -1,14 +1,16 @@
+use std::time::Duration;
 use std::{collections::HashMap, sync::Arc};
 
 use core_graphics::display::{
     kCGNullWindowID, kCGWindowImageDefault, kCGWindowListOptionOnScreenOnly, CGDisplay,
 };
 use core_graphics::geometry::{CGPoint, CGRect, CGSize};
-use paris::warn;
+use paris::{info, warn};
 use rust_swift_screencapture::display::CGDisplayId;
 use tauri::async_runtime::RwLock;
 use tokio::sync::{broadcast, watch, Mutex, OnceCell};
 use tokio::task::yield_now;
+use tokio::time::sleep;
 
 use crate::screenshot::LedSamplePoints;
 use crate::{ambient_light::SamplePointMapper, led_color::LedColor, screenshot::Screenshot};
@@ -81,7 +83,7 @@ pub fn get_display_colors(
 }
 
 pub struct ScreenshotManager {
-    pub channels: Arc<RwLock<HashMap<u32, Arc::<RwLock<watch::Sender<Screenshot>>>>>>,
+    pub channels: Arc<RwLock<HashMap<u32, Arc<RwLock<watch::Sender<Screenshot>>>>>>,
     merged_screenshot_tx: Arc<RwLock<broadcast::Sender<Screenshot>>>,
 }
 
@@ -110,6 +112,7 @@ impl ScreenshotManager {
                 .unwrap_or_else(|err| {
                     warn!("start_one failed: display_id: {}, err: {}", display.id, err);
                 });
+            info!("start_one finished: display_id: {}", display.id);
         });
 
         futures::future::join_all(futures).await;
@@ -117,13 +120,7 @@ impl ScreenshotManager {
     }
 
     async fn start_one(&self, display_id: u32, scale_factor: f32) -> anyhow::Result<()> {
-        let mut channels = self.channels.write().await;
         let merged_screenshot_tx = self.merged_screenshot_tx.clone();
-        let display = rust_swift_screencapture::display::Display::new(display_id);
-
-        display.start_capture(30).await;
-
-        let mut frame_rx = display.subscribe_frame().await;
 
         let (tx, _) = watch::channel(Screenshot::new(
             display_id,
@@ -135,36 +132,49 @@ impl ScreenshotManager {
             scale_factor,
         ));
         let tx = Arc::new(RwLock::new(tx));
+
+        let mut channels = self.channels.write().await;
         channels.insert(display_id, tx.clone());
+
         drop(channels);
 
-        let tx_for_send = tx.read().await;
+        loop {
+            let display = rust_swift_screencapture::display::Display::new(display_id);
+            let mut frame_rx = display.subscribe_frame().await;
 
-        while frame_rx.changed().await.is_ok() {
-            let frame = frame_rx.borrow().clone();
-            let screenshot = Screenshot::new(
-                display_id,
-                frame.height as u32,
-                frame.width as u32,
-                frame.bytes_per_row as usize,
-                frame.bytes,
-                scale_factor,
-                scale_factor,
+            display.start_capture(30).await;
+
+            let tx_for_send = tx.read().await;
+
+            while frame_rx.changed().await.is_ok() {
+                let frame = frame_rx.borrow().clone();
+                let screenshot = Screenshot::new(
+                    display_id,
+                    frame.height as u32,
+                    frame.width as u32,
+                    frame.bytes_per_row as usize,
+                    frame.bytes,
+                    scale_factor,
+                    scale_factor,
+                );
+                let merged_screenshot_tx = merged_screenshot_tx.write().await;
+                if let Err(err) = merged_screenshot_tx.send(screenshot.clone()) {
+                    // log::warn!("merged_screenshot_tx.send failed: {}", err);
+                }
+                if let Err(err) = tx_for_send.send(screenshot.clone()) {
+                    log::warn!("display {} screenshot_tx.send failed: {}", display_id, err);
+                } else {
+                    log::debug!("screenshot: {:?}", screenshot);
+                }
+
+                yield_now().await;
+            }
+            sleep(Duration::from_secs(5)).await;
+            info!(
+                "display {} frame_rx.changed() failed, try to restart",
+                display_id
             );
-            let merged_screenshot_tx = merged_screenshot_tx.write().await;
-            if let Err(err) = merged_screenshot_tx.send(screenshot.clone()) {
-                // log::warn!("merged_screenshot_tx.send failed: {}", err);
-            }
-            if let Err(err) = tx_for_send.send(screenshot.clone()) {
-                // log::warn!("display {} screenshot_tx.send failed: {}", display_id, err);
-            } else {
-                log::debug!("screenshot: {:?}", screenshot);
-            }
-
-            yield_now().await;
         }
-
-        Ok(())
     }
 
     pub fn get_sorted_colors(colors: &Vec<u8>, mappers: &Vec<SamplePointMapper>) -> Vec<u8> {
