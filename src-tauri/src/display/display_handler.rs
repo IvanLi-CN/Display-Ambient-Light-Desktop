@@ -5,9 +5,27 @@ use tokio::sync::RwLock;
 
 use super::DisplayState;
 
+// Safe wrapper for Display that implements Send + Sync
+pub struct SafeDisplay {
+    display: Display,
+}
+
+unsafe impl Send for SafeDisplay {}
+unsafe impl Sync for SafeDisplay {}
+
+impl SafeDisplay {
+    pub fn new(display: Display) -> Self {
+        Self { display }
+    }
+
+    pub fn get_mut(&mut self) -> &mut Display {
+        &mut self.display
+    }
+}
+
 pub struct DisplayHandler {
     pub state: Arc<RwLock<DisplayState>>,
-    pub controller: Arc<RwLock<Display>>,
+    pub controller: Arc<RwLock<SafeDisplay>>,
 }
 
 impl DisplayHandler {
@@ -16,7 +34,7 @@ impl DisplayHandler {
 
         let mut temp_state = self.state.read().await.clone();
 
-        match controller.handle.get_vcp_feature(0x10) {
+        match controller.get_mut().handle.get_vcp_feature(0x10) {
             Ok(value) => {
                 temp_state.max_brightness = value.maximum();
                 temp_state.min_brightness = 0;
@@ -24,7 +42,7 @@ impl DisplayHandler {
             }
             Err(_) => {}
         };
-        match controller.handle.get_vcp_feature(0x12) {
+        match controller.get_mut().handle.get_vcp_feature(0x12) {
             Ok(value) => {
                 temp_state.max_contrast = value.maximum();
                 temp_state.min_contrast = 0;
@@ -32,7 +50,7 @@ impl DisplayHandler {
             }
             Err(_) => {}
         };
-        match controller.handle.get_vcp_feature(0xdc) {
+        match controller.get_mut().handle.get_vcp_feature(0xdc) {
             Ok(value) => {
                 temp_state.max_mode = value.maximum();
                 temp_state.min_mode = 0;
@@ -52,6 +70,7 @@ impl DisplayHandler {
         let mut state = self.state.write().await;
 
         controller
+            .get_mut()
             .handle
             .set_vcp_feature(0x10, brightness)
             .map_err(|err| anyhow::anyhow!("can not set brightness. {:?}", err))?;
@@ -69,6 +88,7 @@ impl DisplayHandler {
         let mut state = self.state.write().await;
 
         controller
+            .get_mut()
             .handle
             .set_vcp_feature(0x12, contrast)
             .map_err(|err| anyhow::anyhow!("can not set contrast. {:?}", err))?;
@@ -84,6 +104,7 @@ impl DisplayHandler {
         let mut state = self.state.write().await;
 
         controller
+            .get_mut()
             .handle
             .set_vcp_feature(0xdc, mode)
             .map_err(|err| anyhow::anyhow!("can not set mode. {:?}", err))?;

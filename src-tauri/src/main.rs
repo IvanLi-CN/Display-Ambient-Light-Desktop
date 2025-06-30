@@ -20,7 +20,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::to_string;
 use tauri::{http::ResponseBuilder, regex, Manager};
 use volume::VolumeManager;
-
 #[derive(Serialize, Deserialize)]
 #[serde(remote = "DisplayInfo")]
 struct DisplayInfoDef {

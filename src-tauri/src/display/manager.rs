@@ -13,7 +13,7 @@ use crate::{
     rpc::{BoardMessageChannels, DisplaySetting},
 };
 
-use super::{display_handler::DisplayHandler, display_state::DisplayState};
+use super::{display_handler::{DisplayHandler, SafeDisplay}, display_state::DisplayState};
 
 const CONFIG_FILE_NAME: &str = "cc.ivanli.ambient_light/displays.toml";
 
@@ -85,7 +85,8 @@ impl DisplayManager {
         let controllers = Display::enumerate();
 
         for display in controllers {
-            let controller = Arc::new(RwLock::new(display));
+            let safe_display = SafeDisplay::new(display);
+            let controller = Arc::new(RwLock::new(safe_display));
             let state = Arc::new(RwLock::new(DisplayState::default()));
             let handler = DisplayHandler {
                 state: state.clone(),
