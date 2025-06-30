@@ -13,6 +13,7 @@ import {
   LedStripConfigurationContextType,
 } from '../../contexts/led-strip-configuration.context';
 
+
 export const LedStripConfiguration = () => {
   createEffect(() => {
     invoke<string>('list_display_info').then((displays) => {
@@ -45,11 +46,17 @@ export const LedStripConfiguration = () => {
   // listen to led_colors_changed event
   createEffect(() => {
     const unlisten = listen<Uint8ClampedArray>('led_colors_changed', (event) => {
+      console.log('Received led_colors_changed event:', {
+        hidden: window.document.hidden,
+        colorsLength: event.payload.length,
+        firstFewColors: Array.from(event.payload.slice(0, 12))
+      });
       if (!window.document.hidden) {
         const colors = event.payload;
         setLedStripStore({
           colors,
         });
+        console.log('Updated ledStripStore.colors with length:', colors.length);
       }
     });
 
@@ -61,11 +68,17 @@ export const LedStripConfiguration = () => {
   // listen to led_sorted_colors_changed event
   createEffect(() => {
     const unlisten = listen<Uint8ClampedArray>('led_sorted_colors_changed', (event) => {
+      console.log('Received led_sorted_colors_changed event:', {
+        hidden: window.document.hidden,
+        sortedColorsLength: event.payload.length,
+        firstFewSortedColors: Array.from(event.payload.slice(0, 12))
+      });
       if (!window.document.hidden) {
         const sortedColors = event.payload;
         setLedStripStore({
           sortedColors,
         });
+        console.log('Updated ledStripStore.sortedColors with length:', sortedColors.length);
       }
     });
 

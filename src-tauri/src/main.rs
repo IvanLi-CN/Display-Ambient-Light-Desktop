@@ -269,7 +269,7 @@ async fn main() {
 
             let url = url.unwrap();
 
-            let re = regex::Regex::new(r"^/displays/(\d+)$").unwrap();
+            let re = regex::Regex::new(r"^/(\d+)$").unwrap();
             let path = url.path;
             let captures = re.captures(path.as_str());
 
@@ -287,6 +287,7 @@ async fn main() {
 
             let bytes = tokio::task::block_in_place(move || {
                 tauri::async_runtime::block_on(async move {
+
                     let screenshot_manager = ScreenshotManager::global().await;
                     let rx: Result<tokio::sync::watch::Receiver<Screenshot>, anyhow::Error> =
                         screenshot_manager.subscribe_by_display_id(display_id).await;
@@ -305,7 +306,7 @@ async fn main() {
                         anyhow::bail!("Display#{}: no screenshot.", display_id);
                     }
 
-                    log::debug!("Display#{}: screenshot size: {}", display_id, bytes.len());
+
 
                     let (scale_factor_x, scale_factor_y, width, height) = if url.query.is_some()
                         && url.query.as_ref().unwrap().contains_key("height")
@@ -367,6 +368,7 @@ async fn main() {
                             rgba_buffer[offset_2 + 3] = a;
                         }
                     }
+
 
                     Ok(rgba_buffer.clone())
                 })

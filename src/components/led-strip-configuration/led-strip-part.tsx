@@ -60,15 +60,18 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
     );
 
     if (index === -1) {
+      console.log(`LED strip not found for display ${localProps.config.display_id}, border ${localProps.config.border}`);
       return;
     }
 
     const mapper = ledStripStore.mappers[index];
     if (!mapper) {
+      console.log(`Mapper not found for index ${index}`);
       return;
     }
 
     const offset = mapper.pos * 3;
+    console.log(`Updating LED strip colors for ${localProps.config.border}, offset: ${offset}, colors length: ${ledStripStore.colors.length}`);
 
     const colors = new Array(localProps.config.len).fill(null).map((_, i) => {
       const index = offset + i * 3;
@@ -77,6 +80,7 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
       })`;
     });
 
+    console.log(`Generated ${colors.length} colors for ${localProps.config.border}:`, colors.slice(0, 3));
     setColors(colors);
   });
 

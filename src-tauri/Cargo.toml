@@ -13,7 +13,7 @@ edition = "2021"
 tauri-build = { version = "1.2", features = [] }
 
 [dependencies]
-tauri = { version = "1.2", features = ["shell-open"] }
+tauri = { version = "1.2", features = [ "protocol-all", "shell-open"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 core-graphics = "0.22.3"
@@ -28,8 +28,8 @@ url-build-parse = "9.0.0"
 color_space = "0.5.3"
 hex = "0.4.3"
 toml = "0.7.3"
-paho-mqtt = "0.12.1"
-time = {version="0.3.20", features= ["formatting"] }
+# paho-mqtt = "0.12.1"  # Temporarily disabled due to CMake issues
+time = {version="0.3.35", features= ["formatting"] }
 itertools = "0.10.5"
 core-foundation = "0.9.3"
 tokio-stream = "0.1.14"
@@ -37,7 +37,7 @@ mdns-sd = "0.7.2"
 futures = "0.3.28"
 ddc-hi = "0.4.1"
 coreaudio-rs = "0.11.2"
-rust_swift_screencapture = { version = "0.1.1", path = "../../../../demo/rust-swift-screencapture" }
+screen-capture-kit = "0.3.1"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem

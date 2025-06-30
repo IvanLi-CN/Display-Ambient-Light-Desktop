@@ -88,21 +88,21 @@ impl LedColorsPublisher {
                     }
                 }
 
-                // match display_colors_tx.send((
-                //     display_id,
-                //     colors_copy
-                //         .into_iter()
-                //         .map(|color| color.get_rgb())
-                //         .flatten()
-                //         .collect::<Vec<_>>(),
-                // )) {
-                //     Ok(_) => {
-                //         // log::info!("sent colors: {:?}", color_len);
-                //     }
-                //     Err(err) => {
-                //         warn!("Failed to send display_colors: {}", err);
-                //     }
-                // };
+                match display_colors_tx.send((
+                    display_id,
+                    colors_copy
+                        .into_iter()
+                        .map(|color| color.get_rgb())
+                        .flatten()
+                        .collect::<Vec<_>>(),
+                )) {
+                    Ok(_) => {
+                        // log::info!("sent colors: {:?}", color_len);
+                    }
+                    Err(err) => {
+                        warn!("Failed to send display_colors: {}", err);
+                    }
+                };
 
                 // Check if the inner task version changed
                 let version = internal_tasks_version.read().await.clone();
@@ -127,7 +127,7 @@ impl LedColorsPublisher {
     ) {
         let sorted_colors_tx = self.sorted_colors_tx.clone();
         let colors_tx = self.colors_tx.clone();
-        log::debug!("start all_colors_worker");
+
 
         tokio::spawn(async move {
             for _ in 0..10 {
@@ -137,7 +137,7 @@ impl LedColorsPublisher {
                 let mut all_colors: Vec<Option<Vec<u8>>> = vec![None; display_ids.len()];
                 let mut start: tokio::time::Instant = tokio::time::Instant::now();
 
-                log::debug!("start all_colors_worker task");
+
                 loop {
                     let color_info = display_colors_rx.recv().await;
 
@@ -186,7 +186,7 @@ impl LedColorsPublisher {
                                 warn!("Failed to send sorted colors: {}", err);
                             }
                         };
-                        log::debug!("tick: {}ms", start.elapsed().as_millis());
+
                         start = tokio::time::Instant::now();
                     }
                 }
@@ -195,7 +195,7 @@ impl LedColorsPublisher {
     }
 
     pub async fn start(&self) {
-        log::info!("start colors worker");
+
 
         let config_manager = ConfigManager::global().await;
         let mut config_receiver = config_manager.clone_config_update_receiver();
@@ -203,9 +203,7 @@ impl LedColorsPublisher {
 
         self.handle_config_change(configs).await;
 
-        log::info!("waiting for config update...");
         while config_receiver.changed().await.is_ok() {
-            log::info!("config updated, restart inner tasks...");
             let configs = config_receiver.borrow().clone();
             self.handle_config_change(configs).await;
         }
@@ -300,16 +298,28 @@ impl LedColorsPublisher {
             if group.end > group.start {
                 for i in group.pos - display_led_offset..group_size + group.pos - display_led_offset
                 {
-                    let bytes = colors[i].as_bytes();
-                    buffer.append(&mut bytes.to_vec());
+                    if i < colors.len() {
+                        let bytes = colors[i].as_bytes();
+                        buffer.append(&mut bytes.to_vec());
+                    } else {
+                        log::warn!("Index {} out of bounds for colors array of length {}", i, colors.len());
+                        // Add black color as fallback
+                        buffer.append(&mut vec![0, 0, 0]);
+                    }
                 }
             } else {
                 for i in (group.pos - display_led_offset
                     ..group_size + group.pos - display_led_offset)
                     .rev()
                 {
-                    let bytes = colors[i].as_bytes();
-                    buffer.append(&mut bytes.to_vec());
+                    if i < colors.len() {
+                        let bytes = colors[i].as_bytes();
+                        buffer.append(&mut bytes.to_vec());
+                    } else {
+                        log::warn!("Index {} out of bounds for colors array of length {}", i, colors.len());
+                        // Add black color as fallback
+                        buffer.append(&mut vec![0, 0, 0]);
+                    }
                 }
             }
 
@@ -350,7 +360,7 @@ impl LedColorsPublisher {
         let mut screenshots = HashMap::new();
 
         loop {
-            log::info!("waiting merged screenshot...");
+
             let screenshot = merged_screenshot_receiver.recv().await;
 
             if let Err(err) = screenshot {
@@ -382,7 +392,7 @@ impl LedColorsPublisher {
                         .filter(|(_, c)| c.display_id == display_id);
 
                     let screenshot = screenshots.get(&display_id).unwrap();
-                    log::debug!("screenshot updated: {:?}", display_id);
+
 
                     let points: Vec<_> = led_strip_configs
                         .clone()
@@ -412,7 +422,7 @@ impl LedColorsPublisher {
                     led_start = led_end;
                 }
 
-                log::debug!("got all colors configs: {:?}", colors_configs.len());
+
 
                 return Ok(AllColorConfig {
                     sample_point_groups: colors_configs,

@@ -1,4 +1,3 @@
-import { convertFileSrc } from '@tauri-apps/api/tauri';
 import {
   Component,
   createEffect,
@@ -79,26 +78,43 @@ export const ScreenView: Component<ScreenViewProps> = (props) => {
     let stopped = false;
     const frame = async () => {
       const { drawWidth, drawHeight } = drawInfo();
-      const url = convertFileSrc(
-        `displays/${localProps.displayId}?width=${drawWidth}&height=${drawHeight}`,
-        'ambient-light',
-      );
-      await fetch(url, {
-        mode: 'cors',
-      })
-        .then((res) => res.body?.getReader().read())
-        .then((buffer) => {
-          if (buffer?.value) {
-            setImageData({
-              buffer: new Uint8ClampedArray(buffer?.value),
-              width: drawWidth,
-              height: drawHeight,
-            });
-          } else {
-            setImageData(null);
-          }
-          draw();
+
+      // Skip if dimensions are not ready
+      if (drawWidth <= 0 || drawHeight <= 0) {
+        console.log('Skipping frame: invalid dimensions', { drawWidth, drawHeight });
+        return;
+      }
+
+      const url = `ambient-light://displays/${localProps.displayId}?width=${drawWidth}&height=${drawHeight}`;
+
+      console.log('Fetching screenshot:', url);
+
+      try {
+        const response = await fetch(url, {
+          mode: 'cors',
         });
+
+        if (!response.ok) {
+          console.error('Screenshot fetch failed:', response.status, response.statusText);
+          return;
+        }
+
+        const buffer = await response.body?.getReader().read();
+        if (buffer?.value) {
+          console.log('Screenshot received, size:', buffer.value.length);
+          setImageData({
+            buffer: new Uint8ClampedArray(buffer?.value),
+            width: drawWidth,
+            height: drawHeight,
+          });
+        } else {
+          console.log('No screenshot data received');
+          setImageData(null);
+        }
+        draw();
+      } catch (error) {
+        console.error('Screenshot fetch error:', error);
+      }
     };
 
     (async () => {
@@ -107,7 +123,11 @@ export const ScreenView: Component<ScreenViewProps> = (props) => {
           await new Promise((resolve) => setTimeout(resolve, 1000));
           continue;
         }
+
         await frame();
+
+        // Add a small delay to prevent overwhelming the backend
+        await new Promise((resolve) => setTimeout(resolve, 33)); // ~30 FPS
       }
     })();
 
@@ -122,9 +142,14 @@ export const ScreenView: Component<ScreenViewProps> = (props) => {
 
     onMount(() => {
       setCtx(canvas.getContext('2d'));
-      new ResizeObserver(() => {
+
+      // Initial size setup
+      resetSize();
+
+      resizeObserver = new ResizeObserver(() => {
         resetSize();
-      }).observe(root);
+      });
+      resizeObserver.observe(root);
     });
 
     onCleanup(() => {
