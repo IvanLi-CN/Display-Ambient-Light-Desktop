@@ -145,9 +145,16 @@ impl Screenshot {
             for (x, y) in led_points {
                 // log::info!("x: {}, y: {}, bytes_per_row: {}", x, y, bytes_per_row);
                 let position = x * 4 + y * bytes_per_row;
-                b += bitmap[position] as f64;
-                g += bitmap[position + 1] as f64;
-                r += bitmap[position + 2] as f64;
+
+                // Add bounds checking to prevent index out of bounds
+                if position + 2 < bitmap.len() {
+                    b += bitmap[position] as f64;
+                    g += bitmap[position + 1] as f64;
+                    r += bitmap[position + 2] as f64;
+                } else {
+                    // Skip invalid positions or use default values
+                    log::warn!("Invalid pixel position: x={}, y={}, position={}, bitmap_len={}", x, y, position, bitmap.len());
+                }
             }
             let color = LedColor::new((r / len) as u8, (g / len) as u8, (b / len) as u8);
             colors.push(color);
@@ -169,9 +176,16 @@ impl Screenshot {
             for (x, y) in led_points {
                 // log::info!("x: {}, y: {}, bytes_per_row: {}", x, y, bytes_per_row);
                 let position = x * 4 + y * bytes_per_row;
-                b += bitmap[position] as f64;
-                g += bitmap[position + 1] as f64;
-                r += bitmap[position + 2] as f64;
+
+                // Add bounds checking to prevent index out of bounds
+                if position + 2 < bitmap.len() as usize {
+                    b += bitmap[position] as f64;
+                    g += bitmap[position + 1] as f64;
+                    r += bitmap[position + 2] as f64;
+                } else {
+                    // Skip invalid positions or use default values
+                    log::warn!("Invalid pixel position in CG image: x={}, y={}, position={}, bitmap_len={}", x, y, position, bitmap.len());
+                }
                 // log::info!("position: {}, total: {}", position, bitmap.len());
             }
             let color = LedColor::new((r / len) as u8, (g / len) as u8, (b / len) as u8);

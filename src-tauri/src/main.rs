@@ -18,7 +18,9 @@ use screenshot::Screenshot;
 use screenshot_manager::ScreenshotManager;
 use serde::{Deserialize, Serialize};
 use serde_json::to_string;
-use tauri::{http::ResponseBuilder, regex, Manager};
+use tauri::{Manager, Emitter, Runtime};
+use regex;
+use tauri::http::{Request, Response};
 use volume::VolumeManager;
 #[derive(Serialize, Deserialize)]
 #[serde(remote = "DisplayInfo")]
@@ -212,6 +214,123 @@ async fn get_displays() -> Vec<DisplayState> {
     display_manager.get_displays().await
 }
 
+// Protocol handler for ambient-light://
+fn handle_ambient_light_protocol<R: Runtime>(
+    _ctx: tauri::UriSchemeContext<R>,
+    request: Request<Vec<u8>>
+) -> Response<Vec<u8>> {
+    let url = request.uri();
+    // info!("Handling ambient-light protocol request: {}", url);
+
+    // Parse the URL to extract parameters
+    let url_str = url.to_string();
+    let re = regex::Regex::new(r"ambient-light://displays/(\d+)\?width=(\d+)&height=(\d+)").unwrap();
+
+    if let Some(captures) = re.captures(&url_str) {
+        let display_id: u32 = captures[1].parse().unwrap_or(0);
+        let width: u32 = captures[2].parse().unwrap_or(400);
+        let height: u32 = captures[3].parse().unwrap_or(300);
+
+        // info!("Efficient screenshot request for display {}, {}x{}", display_id, width, height);
+
+        // Optimized screenshot processing with much smaller intermediate size
+        // info!("Screenshot request received: display_id={}, width={}, height={}", display_id, width, height);
+
+        let screenshot_data = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                let screenshot_manager = ScreenshotManager::global().await;
+                let channels = screenshot_manager.channels.read().await;
+
+                if let Some(rx) = channels.get(&display_id) {
+                    let rx = rx.read().await;
+                    let screenshot = rx.borrow().clone();
+                    let bytes = screenshot.bytes.read().await.to_owned();
+
+                    // Use much smaller intermediate resolution for performance
+                    let intermediate_width = 800;  // Much smaller than original 5120
+                    let intermediate_height = 450; // Much smaller than original 2880
+
+                    // Convert BGRA to RGBA format
+                    let mut rgba_bytes = bytes.as_ref().clone();
+                    for chunk in rgba_bytes.chunks_exact_mut(4) {
+                        chunk.swap(0, 2); // Swap B and R channels
+                    }
+
+                    let image_result = image::RgbaImage::from_raw(
+                        screenshot.width as u32,
+                        screenshot.height as u32,
+                        rgba_bytes,
+                    );
+
+                    if let Some(img) = image_result {
+                        // Step 1: Fast downscale to intermediate size
+                        let intermediate_image = image::imageops::resize(
+                            &img,
+                            intermediate_width,
+                            intermediate_height,
+                            image::imageops::FilterType::Nearest, // Fastest possible
+                        );
+
+                        // Step 2: Scale to final target size
+                        let final_image = if width == intermediate_width && height == intermediate_height {
+                            intermediate_image
+                        } else {
+                            image::imageops::resize(
+                                &intermediate_image,
+                                width,
+                                height,
+                                image::imageops::FilterType::Triangle,
+                            )
+                        };
+
+                        let raw_data = final_image.into_raw();
+                        // info!("Efficient resize completed: {}x{}, {} bytes", width, height, raw_data.len());
+                        Ok(raw_data)
+                    } else {
+                        error!("Failed to create image from raw bytes");
+                        Err("Failed to create image from raw bytes".to_string())
+                    }
+                } else {
+                    error!("Display {} not found", display_id);
+                    Err(format!("Display {} not found", display_id))
+                }
+            })
+        });
+
+        match screenshot_data {
+            Ok(data) => {
+                Response::builder()
+                    .header("Content-Type", "application/octet-stream")
+                    .header("Access-Control-Allow-Origin", "*")
+                    .header("X-Image-Width", width.to_string())
+                    .header("X-Image-Height", height.to_string())
+                    .body(data)
+                    .unwrap_or_else(|_| {
+                        Response::builder()
+                            .status(500)
+                            .body("Failed to build response".as_bytes().to_vec())
+                            .unwrap()
+                    })
+            }
+            Err(e) => {
+                error!("Failed to get screenshot: {}", e);
+                Response::builder()
+                    .status(500)
+                    .body(format!("Error: {}", e).into_bytes())
+                    .unwrap()
+            }
+        }
+    } else {
+        warn!("Invalid ambient-light URL format: {}", url_str);
+        Response::builder()
+            .status(400)
+            .body("Invalid URL format".as_bytes().to_vec())
+            .unwrap()
+    }
+}
+
+
+
 #[tokio::main]
 async fn main() {
     env_logger::init();
@@ -231,6 +350,7 @@ async fn main() {
     let _volume = VolumeManager::global().await;
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
             greet,
             list_display_info,
@@ -247,145 +367,9 @@ async fn main() {
             get_boards,
             get_displays
         ])
-        .register_uri_scheme_protocol("ambient-light", move |_app, request| {
-            let response = ResponseBuilder::new().header("Access-Control-Allow-Origin", "*");
-
-            let uri = request.uri();
-            let uri = percent_encoding::percent_decode_str(uri)
-                .decode_utf8()
-                .unwrap()
-                .to_string();
-
-            let url = url_build_parse::parse_url(uri.as_str());
-
-            if let Err(err) = url {
-                error!("url parse error: {}", err);
-                return response
-                    .status(500)
-                    .mimetype("text/plain")
-                    .body("Parse uri failed.".as_bytes().to_vec());
-            }
-
-            let url = url.unwrap();
-
-            let re = regex::Regex::new(r"^/(\d+)$").unwrap();
-            let path = url.path;
-            let captures = re.captures(path.as_str());
-
-            if let None = captures {
-                error!("path not matched: {:?}", path);
-                return response
-                    .status(404)
-                    .mimetype("text/plain")
-                    .body("Path Not Found.".as_bytes().to_vec());
-            }
-
-            let captures = captures.unwrap();
-
-            let display_id = captures[1].parse::<u32>().unwrap();
-
-            let bytes = tokio::task::block_in_place(move || {
-                tauri::async_runtime::block_on(async move {
-
-                    let screenshot_manager = ScreenshotManager::global().await;
-                    let rx: Result<tokio::sync::watch::Receiver<Screenshot>, anyhow::Error> =
-                        screenshot_manager.subscribe_by_display_id(display_id).await;
-
-                    if let Err(err) = rx {
-                        anyhow::bail!("Display#{}: not found. {}", display_id, err);
-                    }
-                    let mut rx = rx.unwrap();
-
-                    if rx.changed().await.is_err() {
-                        anyhow::bail!("Display#{}: no more screenshot.", display_id);
-                    }
-                    let screenshot = rx.borrow().clone();
-                    let bytes = screenshot.bytes.read().await;
-                    if bytes.len() == 0 {
-                        anyhow::bail!("Display#{}: no screenshot.", display_id);
-                    }
+        .register_uri_scheme_protocol("ambient-light", handle_ambient_light_protocol)
 
 
-
-                    let (scale_factor_x, scale_factor_y, width, height) = if url.query.is_some()
-                        && url.query.as_ref().unwrap().contains_key("height")
-                        && url.query.as_ref().unwrap().contains_key("width")
-                    {
-                        let width = url.query.as_ref().unwrap()["width"]
-                            .parse::<u32>()
-                            .map_err(|err| {
-                                warn!("width parse error: {}", err);
-                                err
-                            })?;
-                        let height = url.query.as_ref().unwrap()["height"]
-                            .parse::<u32>()
-                            .map_err(|err| {
-                                warn!("height parse error: {}", err);
-                                err
-                            })?;
-                        (
-                            screenshot.width as f32 / width as f32,
-                            screenshot.height as f32 / height as f32,
-                            width,
-                            height,
-                        )
-                    } else {
-                        log::debug!("scale by scale_factor");
-                        let scale_factor = screenshot.scale_factor;
-                        (
-                            scale_factor,
-                            scale_factor,
-                            (screenshot.width as f32 / scale_factor) as u32,
-                            (screenshot.height as f32 / scale_factor) as u32,
-                        )
-                    };
-                    log::debug!(
-                        "scale by query. width: {}, height: {}, scale_factor: {}, len: {}",
-                        width,
-                        height,
-                        screenshot.width as f32 / width as f32,
-                        width * height * 4,
-                    );
-
-                    let bytes_per_row = screenshot.bytes_per_row as f32;
-
-                    let mut rgba_buffer = vec![0u8; (width * height * 4) as usize];
-
-                    for y in 0..height {
-                        for x in 0..width {
-                            let offset = ((y as f32) * scale_factor_y).floor() as usize
-                                * bytes_per_row as usize
-                                + ((x as f32) * scale_factor_x).floor() as usize * 4;
-                            let b = bytes[offset];
-                            let g = bytes[offset + 1];
-                            let r = bytes[offset + 2];
-                            let a = bytes[offset + 3];
-                            let offset_2 = (y * width + x) as usize * 4;
-                            rgba_buffer[offset_2] = r;
-                            rgba_buffer[offset_2 + 1] = g;
-                            rgba_buffer[offset_2 + 2] = b;
-                            rgba_buffer[offset_2 + 3] = a;
-                        }
-                    }
-
-
-                    Ok(rgba_buffer.clone())
-                })
-            });
-
-            if let Ok(bytes) = bytes {
-                return response
-                    .mimetype("octet/stream")
-                    .status(200)
-                    .body(bytes.to_vec());
-            }
-            let err = bytes.unwrap_err();
-            error!("request screenshot bin data failed: {}", err);
-            return response
-                .mimetype("text/plain")
-                .status(500)
-                .body(err.to_string().into_bytes());
-        })
         .setup(move |app| {
             let app_handle = app.handle().clone();
             tokio::spawn(async move {
@@ -401,7 +385,7 @@ async fn main() {
 
                     let config = config_update_receiver.borrow().clone();
 
-                    app_handle.emit_all("config_changed", config).unwrap();
+                    app_handle.emit("config_changed", config).unwrap();
                 }
             });
 
@@ -418,7 +402,7 @@ async fn main() {
                     let publisher = publisher_update_receiver.borrow().clone();
 
                     app_handle
-                        .emit_all("led_sorted_colors_changed", publisher)
+                        .emit("led_sorted_colors_changed", publisher)
                         .unwrap();
                 }
             });
@@ -436,7 +420,7 @@ async fn main() {
                     let publisher = publisher_update_receiver.borrow().clone();
 
                     app_handle
-                        .emit_all("led_colors_changed", publisher)
+                        .emit("led_colors_changed", publisher)
                         .unwrap();
                 }
             });
@@ -457,7 +441,7 @@ async fn main() {
 
                                 let boards = boards.into_iter().collect::<Vec<_>>();
 
-                                app_handle.emit_all("boards_changed", boards).unwrap();
+                                app_handle.emit("boards_changed", boards).unwrap();
                             }
                         }
                         Err(err) => {
@@ -478,7 +462,7 @@ async fn main() {
 
                     log::info!("displays changed. emit displays_changed event.");
 
-                    app_handle.emit_all("displays_changed", displays).unwrap();
+                    app_handle.emit("displays_changed", displays).unwrap();
                 }
             });
 

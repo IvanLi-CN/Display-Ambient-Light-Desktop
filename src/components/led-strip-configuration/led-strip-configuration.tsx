@@ -1,5 +1,5 @@
 import { createEffect, onCleanup } from 'solid-js';
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
 import { DisplayView } from './display-view';
 import { DisplayListContainer } from './display-list-container';
 import { displayStore, setDisplayStore } from '../../stores/display.store';
@@ -22,7 +22,6 @@ export const LedStripConfiguration = () => {
       });
     });
     invoke<LedStripConfigContainer>('read_led_strip_configs').then((configs) => {
-      console.log(configs);
       setLedStripStore(configs);
     });
   });
@@ -31,7 +30,6 @@ export const LedStripConfiguration = () => {
   createEffect(() => {
     const unlisten = listen('config_changed', (event) => {
       const { strips, mappers } = event.payload as LedStripConfigContainer;
-      console.log(event.payload);
       setLedStripStore({
         strips,
         mappers,
@@ -46,17 +44,11 @@ export const LedStripConfiguration = () => {
   // listen to led_colors_changed event
   createEffect(() => {
     const unlisten = listen<Uint8ClampedArray>('led_colors_changed', (event) => {
-      console.log('Received led_colors_changed event:', {
-        hidden: window.document.hidden,
-        colorsLength: event.payload.length,
-        firstFewColors: Array.from(event.payload.slice(0, 12))
-      });
       if (!window.document.hidden) {
         const colors = event.payload;
         setLedStripStore({
           colors,
         });
-        console.log('Updated ledStripStore.colors with length:', colors.length);
       }
     });
 
@@ -68,17 +60,11 @@ export const LedStripConfiguration = () => {
   // listen to led_sorted_colors_changed event
   createEffect(() => {
     const unlisten = listen<Uint8ClampedArray>('led_sorted_colors_changed', (event) => {
-      console.log('Received led_sorted_colors_changed event:', {
-        hidden: window.document.hidden,
-        sortedColorsLength: event.payload.length,
-        firstFewSortedColors: Array.from(event.payload.slice(0, 12))
-      });
       if (!window.document.hidden) {
         const sortedColors = event.payload;
         setLedStripStore({
           sortedColors,
         });
-        console.log('Updated ledStripStore.sortedColors with length:', sortedColors.length);
       }
     });
 

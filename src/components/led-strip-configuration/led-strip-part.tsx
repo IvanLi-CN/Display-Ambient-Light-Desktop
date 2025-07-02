@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api';
+import { invoke } from '@tauri-apps/api/core';
 import {
   Component,
   createEffect,
@@ -34,7 +34,7 @@ export const Pixel: Component<PixelProps> = (props) => {
       title={props.color}
     >
       <div
-        class="absolute top-1/2 -translate-y-1/2 h-2.5 w-2.5 rounded-full ring-1 ring-stone-300"
+        class="absolute top-1/2 -translate-y-1/2 h-2 w-2 rounded-full ring-1 ring-stone-300/30"
         style={style()}
       />
     </div>
@@ -60,27 +60,46 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
     );
 
     if (index === -1) {
-      console.log(`LED strip not found for display ${localProps.config.display_id}, border ${localProps.config.border}`);
+      console.log('🔍 LED: Strip config not found', {
+        displayId: localProps.config.display_id,
+        border: localProps.config.border,
+        availableStrips: ledStripStore.strips.length
+      });
       return;
     }
 
     const mapper = ledStripStore.mappers[index];
     if (!mapper) {
-      console.log(`Mapper not found for index ${index}`);
+      console.log('🔍 LED: Mapper not found', { index, mappersCount: ledStripStore.mappers.length });
       return;
     }
 
-    const offset = mapper.pos * 3;
-    console.log(`Updating LED strip colors for ${localProps.config.border}, offset: ${offset}, colors length: ${ledStripStore.colors.length}`);
+    const offset = mapper.start * 3;
+
+    console.log('🎨 LED: Updating colors', {
+      displayId: localProps.config.display_id,
+      border: localProps.config.border,
+      stripLength: localProps.config.len,
+      mapperPos: mapper.pos,
+      offset,
+      colorsArrayLength: ledStripStore.colors.length,
+      firstFewColors: Array.from(ledStripStore.colors.slice(offset, offset + 9))
+    });
 
     const colors = new Array(localProps.config.len).fill(null).map((_, i) => {
       const index = offset + i * 3;
-      return `rgb(${ledStripStore.colors[index]}, ${ledStripStore.colors[index + 1]}, ${
-        ledStripStore.colors[index + 2]
-      })`;
+      const r = ledStripStore.colors[index] || 0;
+      const g = ledStripStore.colors[index + 1] || 0;
+      const b = ledStripStore.colors[index + 2] || 0;
+      return `rgb(${r}, ${g}, ${b})`;
     });
 
-    console.log(`Generated ${colors.length} colors for ${localProps.config.border}:`, colors.slice(0, 3));
+    console.log('🎨 LED: Generated colors', {
+      border: localProps.config.border,
+      colorsCount: colors.length,
+      sampleColors: colors.slice(0, 3)
+    });
+
     setColors(colors);
   });
 
@@ -124,7 +143,7 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
       {...rootProps}
       ref={setAnchor}
       class={
-        'flex rounded-full flex-nowrap justify-around items-center overflow-hidden ' +
+        'flex rounded-full flex-nowrap justify-around items-center overflow-hidden bg-gray-800/20 border border-gray-600/30 min-h-[16px] min-w-[16px] ' +
         rootProps.class
       }
       classList={{

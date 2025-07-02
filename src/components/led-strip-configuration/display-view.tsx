@@ -23,7 +23,6 @@ export const DisplayView: Component<DisplayViewProps> = (props) => {
   }));
 
   const ledStripConfigs = createMemo(() => {
-    console.log('ledStripConfigs', ledStripStore.strips);
     return ledStripStore.strips.filter((c) => c.display_id === props.display.id);
   });
 

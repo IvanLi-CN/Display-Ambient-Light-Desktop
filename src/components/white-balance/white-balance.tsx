@@ -4,7 +4,7 @@ import { ColorCalibration, LedStripConfigContainer } from '../../models/led-stri
 import { ledStripStore, setLedStripStore } from '../../stores/led-strip.store';
 import { ColorSlider } from './color-slider';
 import { TestColorsBg } from './test-colors-bg';
-import { invoke } from '@tauri-apps/api';
+import { invoke } from '@tauri-apps/api/core';
 import { VsClose } from 'solid-icons/vs';
 import { BiRegularReset } from 'solid-icons/bi';
 import transparentBg from '../../assets/transparent-grid-background.svg?url';

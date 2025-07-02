@@ -2,7 +2,7 @@ import { Routes, Route } from '@solidjs/router';
 import { LedStripConfiguration } from './components/led-strip-configuration/led-strip-configuration';
 import { WhiteBalance } from './components/white-balance/white-balance';
 import { createEffect } from 'solid-js';
-import { invoke } from '@tauri-apps/api';
+import { invoke } from '@tauri-apps/api/core';
 import { setLedStripStore } from './stores/led-strip.store';
 import { LedStripConfigContainer } from './models/led-strip-config';
 import { InfoIndex } from './components/info/info-index';

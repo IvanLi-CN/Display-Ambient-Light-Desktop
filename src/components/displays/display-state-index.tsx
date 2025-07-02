@@ -1,7 +1,7 @@
 import { Component, For, createEffect, createSignal } from 'solid-js';
 import { listen } from '@tauri-apps/api/event';
 import debug from 'debug';
-import { invoke } from '@tauri-apps/api';
+import { invoke } from '@tauri-apps/api/core';
 import { DisplayState, RawDisplayState } from '../../models/display-state.model';
 import { DisplayStateCard } from './display-state-card';
 

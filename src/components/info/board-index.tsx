@@ -2,7 +2,7 @@ import { Component, For, createEffect, createSignal } from 'solid-js';
 import { BoardInfo } from '../../models/board-info.model';
 import { listen } from '@tauri-apps/api/event';
 import debug from 'debug';
-import { invoke } from '@tauri-apps/api';
+import { invoke } from '@tauri-apps/api/core';
 import { BoardInfoPanel } from './board-info-panel';
 
 const logger = debug('app:components:info:board-index');

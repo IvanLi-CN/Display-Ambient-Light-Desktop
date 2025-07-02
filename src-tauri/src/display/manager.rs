@@ -2,7 +2,7 @@ use std::{env::current_dir, sync::Arc, time::Duration};
 
 use ddc_hi::Display;
 use paris::{error, info, warn};
-use tauri::api::path::config_dir;
+use dirs::config_dir;
 use tokio::{
     sync::{broadcast, watch, OnceCell, RwLock},
     task::yield_now,

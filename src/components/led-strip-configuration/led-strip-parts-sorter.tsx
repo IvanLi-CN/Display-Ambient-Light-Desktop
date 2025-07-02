@@ -16,7 +16,7 @@ import {
 } from 'solid-js';
 import { LedStripConfig, LedStripPixelMapper } from '../../models/led-strip-config';
 import { ledStripStore } from '../../stores/led-strip.store';
-import { invoke } from '@tauri-apps/api';
+import { invoke } from '@tauri-apps/api/core';
 import { LedStripConfigurationContext } from '../../contexts/led-strip-configuration.context';
 import background from '../../assets/transparent-grid-background.svg?url';
 

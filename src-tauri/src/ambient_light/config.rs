@@ -3,7 +3,6 @@ use std::env::current_dir;
 use display_info::DisplayInfo;
 use paris::{error, info};
 use serde::{Deserialize, Serialize};
-use tauri::api::path::config_dir;
 
 use crate::screenshot::LedSamplePoints;
 
@@ -55,7 +54,7 @@ impl LedStripConfigGroup {
         let displays = DisplayInfo::all()?;
 
         // config path
-        let path = config_dir()
+        let path = dirs::config_dir()
             .unwrap_or(current_dir().unwrap())
             .join(CONFIG_FILE_NAME);
 
@@ -83,7 +82,7 @@ impl LedStripConfigGroup {
     }
 
     pub async fn write_config(configs: &Self) -> anyhow::Result<()> {
-        let path = config_dir()
+        let path = dirs::config_dir()
             .unwrap_or(current_dir().unwrap())
             .join(CONFIG_FILE_NAME);
 
