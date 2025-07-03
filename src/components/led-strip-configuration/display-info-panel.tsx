@@ -7,10 +7,10 @@ type DisplayInfoItemProps = {
 
 export const DisplayInfoItem: ParentComponent<DisplayInfoItemProps> = (props) => {
   return (
-    <dl class="px-3 py-1 flex hover:bg-slate-900/50 gap-2 text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] rounded">
-      <dt class="uppercase w-1/2 select-all whitespace-nowrap">{props.label}</dt>
-      <dd class="select-all w-1/2 whitespace-nowrap">{props.children}</dd>
-    </dl>
+    <div class="flex justify-between items-center py-1 px-2 hover:bg-base-300/50 rounded transition-colors">
+      <dt class="text-sm font-medium text-base-content/80 uppercase">{props.label}</dt>
+      <dd class="text-sm font-mono text-base-content select-all">{props.children}</dd>
+    </div>
   );
 };
 
@@ -21,22 +21,29 @@ type DisplayInfoPanelProps = {
 export const DisplayInfoPanel: Component<DisplayInfoPanelProps> = (props) => {
   const [localProps, rootProps] = splitProps(props, ['display']);
   return (
-    <section {...rootProps} class={'m-2 flex flex-col gap-1 py-2 ' + rootProps.class}>
-      <DisplayInfoItem label="ID">
-        <code>{localProps.display.id}</code>
-      </DisplayInfoItem>
-      <DisplayInfoItem label="Position">
-        ({localProps.display.x}, {localProps.display.y})
-      </DisplayInfoItem>
-      <DisplayInfoItem label="Size">
-        {localProps.display.width} x {localProps.display.height}
-      </DisplayInfoItem>
-      <DisplayInfoItem label="Scale Factor">
-        {localProps.display.scale_factor}
-      </DisplayInfoItem>
-      <DisplayInfoItem label="is Primary">
-        {localProps.display.is_primary ? 'True' : 'False'}
-      </DisplayInfoItem>
-    </section>
+    <div {...rootProps} class={'card bg-base-100/95 backdrop-blur shadow-lg border border-base-300 ' + rootProps.class}>
+      <div class="card-body p-4">
+        <div class="card-title text-sm mb-3 flex items-center justify-between">
+          <span>显示器信息</span>
+          {localProps.display.is_primary && (
+            <div class="badge badge-primary badge-sm">主显示器</div>
+          )}
+        </div>
+        <div class="space-y-1">
+          <DisplayInfoItem label="ID">
+            <code class="bg-base-200 px-1 rounded text-xs">{localProps.display.id}</code>
+          </DisplayInfoItem>
+          <DisplayInfoItem label="位置">
+            ({localProps.display.x}, {localProps.display.y})
+          </DisplayInfoItem>
+          <DisplayInfoItem label="尺寸">
+            {localProps.display.width} × {localProps.display.height}
+          </DisplayInfoItem>
+          <DisplayInfoItem label="缩放">
+            {localProps.display.scale_factor}×
+          </DisplayInfoItem>
+        </div>
+      </div>
+    </div>
   );
 };

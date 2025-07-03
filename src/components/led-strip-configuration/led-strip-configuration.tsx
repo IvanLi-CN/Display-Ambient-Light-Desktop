@@ -91,14 +91,49 @@ export const LedStripConfiguration = () => {
   ];
 
   return (
-    <div>
+    <div class="space-y-6">
+      <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-base-content">灯条配置</h1>
+        <div class="stats shadow">
+          <div class="stat">
+            <div class="stat-title">显示器数量</div>
+            <div class="stat-value text-primary">{displayStore.displays.length}</div>
+          </div>
+        </div>
+      </div>
+
       <LedStripConfigurationContext.Provider value={ledStripConfigurationContextValue}>
-        <LedStripPartsSorter />
-        <DisplayListContainer>
-          {displayStore.displays.map((display) => {
-            return <DisplayView display={display} />;
-          })}
-        </DisplayListContainer>
+        {/* LED Strip Sorter Panel */}
+        <div class="card bg-base-200 shadow-lg">
+          <div class="card-body p-4">
+            <div class="card-title text-base mb-3">
+              <span>灯条排序</span>
+              <div class="badge badge-info badge-outline">实时预览</div>
+            </div>
+            <LedStripPartsSorter />
+            <div class="text-xs text-base-content/50 mt-2">
+              💡 提示：拖拽灯条段落来调整顺序，双击可反转方向
+            </div>
+          </div>
+        </div>
+
+        {/* Display Configuration Panel */}
+        <div class="card bg-base-200 shadow-lg">
+          <div class="card-body p-4">
+            <div class="card-title text-base mb-3">
+              <span>显示器配置</span>
+              <div class="badge badge-secondary badge-outline">可视化编辑</div>
+            </div>
+            <DisplayListContainer>
+              {displayStore.displays.map((display) => {
+                return <DisplayView display={display} />;
+              })}
+            </DisplayListContainer>
+            <div class="text-xs text-base-content/50 mt-2">
+              💡 提示：鼠标滚轮调整灯条长度，悬停查看详细信息
+            </div>
+          </div>
+        </div>
       </LedStripConfigurationContext.Provider>
     </div>
   );

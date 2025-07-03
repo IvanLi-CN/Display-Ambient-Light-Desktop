@@ -36,18 +36,10 @@ export const ScreenView: Component<ScreenViewProps> = (props) => {
   const [isLoading, setIsLoading] = createSignal(false);
   let isMounted = true;
 
-  // Fetch screenshot data from backend
+  // Fetch screenshot data from backend with frame-based rendering
   const fetchScreenshot = async () => {
-    console.log('📸 FETCH: Starting screenshot fetch', {
-      isLoading: isLoading(),
-      isMounted,
-      hidden: hidden(),
-      timestamp: new Date().toLocaleTimeString()
-    });
-
     if (isLoading()) {
-      console.log('⏳ FETCH: Already loading, skipping');
-      return; // Skip if already loading
+      return; // Skip if already loading - frame-based approach
     }
 
     try {
@@ -57,9 +49,7 @@ export const ScreenView: Component<ScreenViewProps> = (props) => {
       const response = await fetch(`ambient-light://displays/${localProps.displayId}?width=400&height=225&t=${timestamp}`);
 
       if (!response.ok) {
-        console.error('❌ FETCH: Screenshot fetch failed', response.status, response.statusText);
-        const errorText = await response.text();
-        console.error('❌ FETCH: Error response body:', errorText);
+        console.error('Screenshot fetch failed:', response.status);
         return;
       }
 
@@ -69,19 +59,11 @@ export const ScreenView: Component<ScreenViewProps> = (props) => {
       const buffer = new Uint8ClampedArray(arrayBuffer);
       const expectedSize = width * height * 4;
 
-
-
       // Validate buffer size
       if (buffer.length !== expectedSize) {
-        console.error('❌ FETCH: Invalid buffer size!', {
-          received: buffer.length,
-          expected: expectedSize,
-          ratio: buffer.length / expectedSize
-        });
+        console.error('Invalid buffer size:', buffer.length, 'expected:', expectedSize);
         return;
       }
-
-      console.log('📊 FETCH: Setting image data', { width, height, bufferSize: buffer.length });
 
       setImageData({
         buffer,
@@ -89,51 +71,31 @@ export const ScreenView: Component<ScreenViewProps> = (props) => {
         height
       });
 
-      // Use setTimeout to ensure the signal update has been processed
+      // Draw immediately after data is set
       setTimeout(() => {
-        console.log('🖼️ FETCH: Triggering draw after data set');
         draw(false);
       }, 0);
 
-      // Schedule next frame after rendering is complete
+      // Frame-based rendering: wait for current frame to complete before scheduling next
       const shouldContinue = !hidden() && isMounted;
-      console.log('🔄 FETCH: Scheduling next frame', {
-        hidden: hidden(),
-        isMounted,
-        shouldContinue,
-        nextFrameDelay: '1000ms'
-      });
-
       if (shouldContinue) {
         setTimeout(() => {
           if (isMounted) {
-            console.log('🔄 FETCH: Starting next frame');
-            fetchScreenshot();
-          } else {
-            console.log('❌ FETCH: Component unmounted, stopping loop');
+            fetchScreenshot(); // Start next frame only after current one completes
           }
-        }, 1000); // Wait 1 second before next frame
-      } else {
-        console.log('❌ FETCH: Loop stopped - component hidden or unmounted');
+        }, 500); // Reduced frequency to 500ms for better performance
       }
 
     } catch (error) {
-      console.error('❌ FETCH: Error fetching screenshot:', error);
-      // Even on error, schedule next frame
+      console.error('Error fetching screenshot:', error);
+      // On error, wait longer before retry
       const shouldContinueOnError = !hidden() && isMounted;
-      console.log('🔄 FETCH: Error recovery - scheduling next frame', {
-        error: error.message,
-        shouldContinue: shouldContinueOnError,
-        nextFrameDelay: '2000ms'
-      });
-
       if (shouldContinueOnError) {
         setTimeout(() => {
           if (isMounted) {
-            console.log('🔄 FETCH: Retrying after error');
             fetchScreenshot();
           }
-        }, 2000); // Wait longer on error
+        }, 2000);
       }
     } finally {
       setIsLoading(false);
@@ -141,21 +103,9 @@ export const ScreenView: Component<ScreenViewProps> = (props) => {
   };
 
   const resetSize = () => {
-    console.log('📏 CANVAS: Resizing', {
-      rootClientWidth: root.clientWidth,
-      rootClientHeight: root.clientHeight,
-      oldCanvasWidth: canvas.width,
-      oldCanvasHeight: canvas.height
-    });
-
     // Set canvas size first
     canvas.width = root.clientWidth;
     canvas.height = root.clientHeight;
-
-    console.log('📏 CANVAS: Size set', {
-      newCanvasWidth: canvas.width,
-      newCanvasHeight: canvas.height
-    });
 
     // Use a default aspect ratio if canvas dimensions are invalid
     const aspectRatio = (canvas.width > 0 && canvas.height > 0)
@@ -179,30 +129,15 @@ export const ScreenView: Component<ScreenViewProps> = (props) => {
       drawHeight,
     });
 
-
-
     draw(true);
   };
 
   const draw = (cached: boolean = false) => {
     const { drawX, drawY, drawWidth, drawHeight } = drawInfo();
-
     let _ctx = ctx();
     let raw = imageData();
 
-    console.log('🖼️ DRAW: Called with', {
-      cached,
-      hasContext: !!_ctx,
-      hasImageData: !!raw,
-      imageDataSize: raw ? `${raw.width}x${raw.height}` : 'none',
-      drawInfo: { drawX, drawY, drawWidth, drawHeight },
-      canvasSize: `${canvas.width}x${canvas.height}`,
-      contextType: _ctx ? 'valid' : 'null',
-      rawBufferSize: raw ? raw.buffer.length : 0
-    });
-
     if (_ctx && raw) {
-      console.log('🖼️ DRAW: Starting to draw image');
       _ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       // Apply transparency effect for cached images if needed
@@ -220,34 +155,24 @@ export const ScreenView: Component<ScreenViewProps> = (props) => {
 
         // If the image size matches the draw size, use putImageData directly
         if (raw.width === drawWidth && raw.height === drawHeight) {
-          console.log('🖼️ DRAW: Using putImageData directly');
           _ctx.putImageData(img, drawX, drawY);
-          console.log('✅ DRAW: putImageData completed');
         } else {
-          console.log('🖼️ DRAW: Using scaling with temp canvas');
           // Otherwise, use cached temporary canvas for scaling
           if (!tempCanvas || tempCanvas.width !== raw.width || tempCanvas.height !== raw.height) {
             tempCanvas = document.createElement('canvas');
             tempCanvas.width = raw.width;
             tempCanvas.height = raw.height;
             tempCtx = tempCanvas.getContext('2d');
-            console.log('🖼️ DRAW: Created new temp canvas');
           }
 
           if (tempCtx) {
             tempCtx.putImageData(img, 0, 0);
             _ctx.drawImage(tempCanvas, drawX, drawY, drawWidth, drawHeight);
-            console.log('✅ DRAW: Scaled drawing completed');
           }
         }
       } catch (error) {
-        console.error('❌ DRAW: Error in draw():', error);
+        console.error('Error in draw():', error);
       }
-    } else {
-      console.log('❌ DRAW: Cannot draw - missing context or image data', {
-        hasContext: !!_ctx,
-        hasImageData: !!raw
-      });
     }
   };
 
@@ -255,11 +180,8 @@ export const ScreenView: Component<ScreenViewProps> = (props) => {
 
   // Initialize canvas and resize observer
   onMount(() => {
-    console.log('🚀 CANVAS: Component mounted');
     const context = canvas.getContext('2d');
-    console.log('🚀 CANVAS: Context obtained', !!context);
     setCtx(context);
-    console.log('🚀 CANVAS: Context signal set');
 
     // Initial size setup
     resetSize();
@@ -270,16 +192,13 @@ export const ScreenView: Component<ScreenViewProps> = (props) => {
     resizeObserver.observe(root);
 
     // Start screenshot fetching after context is ready
-    console.log('🚀 SCREENSHOT: Starting screenshot fetching');
     setTimeout(() => {
-      console.log('🚀 SCREENSHOT: Context ready, starting fetch');
       fetchScreenshot(); // Initial fetch - will self-schedule subsequent frames
     }, 100); // Small delay to ensure context is ready
 
     onCleanup(() => {
       isMounted = false; // Stop scheduling new frames
       resizeObserver?.unobserve(root);
-      console.log('🧹 CLEANUP: Component unmounted');
     });
   });
 

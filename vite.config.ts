@@ -6,8 +6,14 @@ const mobile =
   process.env.TAURI_PLATFORM === "ios";
 
 // https://vitejs.dev/config/
-export default defineConfig(async () => ({
-  plugins: [solidPlugin()],
+export default defineConfig(async () => {
+  const tailwindcss = (await import("@tailwindcss/vite")).default;
+
+  return {
+    plugins: [
+      solidPlugin(),
+      tailwindcss(),
+    ],
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   // prevent vite from obscuring rust errors
@@ -28,4 +34,5 @@ export default defineConfig(async () => ({
     // produce sourcemaps for debug builds
     sourcemap: !!process.env.TAURI_DEBUG,
   },
-}));
+  };
+});

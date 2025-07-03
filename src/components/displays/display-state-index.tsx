@@ -36,17 +36,37 @@ export const DisplayStateIndex: Component = () => {
     };
   });
   return (
-    <ol class="grid sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 p-2 gap-2">
-      <For each={states()}>
-        {(state, index) => (
-          <li class="bg-slate-50 text-gray-800 relative border-2 border-slate-50 hover:border-sky-300 focus:border-sky-300 transition">
-            <DisplayStateCard state={state} />
-            <span class="absolute left-2 -top-3 bg-sky-300 text-white px-1 py-0.5 text-xs rounded-sm font-mono">
-              #{index() + 1}
-            </span>
-          </li>
-        )}
-      </For>
-    </ol>
+    <div class="space-y-6">
+      <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-base-content">显示器状态</h1>
+        <div class="stats shadow">
+          <div class="stat">
+            <div class="stat-title">显示器数量</div>
+            <div class="stat-value text-primary">{states().length}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+        <For each={states()}>
+          {(state, index) => (
+            <div class="relative">
+              <DisplayStateCard state={state} />
+              <div class="absolute -top-2 -left-2 w-6 h-6 bg-primary text-primary-content rounded-full flex items-center justify-center text-xs font-bold">
+                {index() + 1}
+              </div>
+            </div>
+          )}
+        </For>
+      </div>
+
+      {states().length === 0 && (
+        <div class="text-center py-12">
+          <div class="text-6xl mb-4">🖥️</div>
+          <h3 class="text-lg font-semibold text-base-content mb-2">未检测到显示器</h3>
+          <p class="text-base-content/70">请检查显示器连接状态</p>
+        </div>
+      )}
+    </div>
   );
 };
