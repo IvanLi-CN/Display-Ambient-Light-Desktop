@@ -1,5 +1,6 @@
 
-use std::iter;
+use std::fmt::Formatter;
+use std::{iter, fmt::Debug};
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
@@ -7,15 +8,28 @@ use tauri::async_runtime::RwLock;
 
 use crate::{ambient_light::LedStripConfig, led_color::LedColor};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Screenshot {
     pub display_id: u32,
     pub height: u32,
     pub width: u32,
     pub bytes_per_row: usize,
-    pub bytes: Arc<RwLock<Vec<u8>>>,
+    pub bytes: Arc<RwLock<Arc<Vec<u8>>>>,
     pub scale_factor: f32,
     pub bound_scale_factor: f32,
+}
+
+impl Debug for Screenshot {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Screenshot")
+            .field("display_id", &self.display_id)
+            .field("height", &self.height)
+            .field("width", &self.width)
+            .field("bytes_per_row", &self.bytes_per_row)
+            .field("scale_factor", &self.scale_factor)
+            .field("bound_scale_factor", &self.bound_scale_factor)
+            .finish()
+    }
 }
 
 static SINGLE_AXIS_POINTS: usize = 5;
@@ -26,7 +40,7 @@ impl Screenshot {
         height: u32,
         width: u32,
         bytes_per_row: usize,
-        bytes: Vec<u8>,
+        bytes: Arc<Vec<u8>>,
         scale_factor: f32,
         bound_scale_factor: f32,
     ) -> Self {
@@ -131,9 +145,16 @@ impl Screenshot {
             for (x, y) in led_points {
                 // log::info!("x: {}, y: {}, bytes_per_row: {}", x, y, bytes_per_row);
                 let position = x * 4 + y * bytes_per_row;
-                b += bitmap[position] as f64;
-                g += bitmap[position + 1] as f64;
-                r += bitmap[position + 2] as f64;
+
+                // Add bounds checking to prevent index out of bounds
+                if position + 2 < bitmap.len() {
+                    b += bitmap[position] as f64;
+                    g += bitmap[position + 1] as f64;
+                    r += bitmap[position + 2] as f64;
+                } else {
+                    // Skip invalid positions or use default values
+                    log::warn!("Invalid pixel position: x={}, y={}, position={}, bitmap_len={}", x, y, position, bitmap.len());
+                }
             }
             let color = LedColor::new((r / len) as u8, (g / len) as u8, (b / len) as u8);
             colors.push(color);
@@ -155,9 +176,16 @@ impl Screenshot {
             for (x, y) in led_points {
                 // log::info!("x: {}, y: {}, bytes_per_row: {}", x, y, bytes_per_row);
                 let position = x * 4 + y * bytes_per_row;
-                b += bitmap[position] as f64;
-                g += bitmap[position + 1] as f64;
-                r += bitmap[position + 2] as f64;
+
+                // Add bounds checking to prevent index out of bounds
+                if position + 2 < bitmap.len() as usize {
+                    b += bitmap[position] as f64;
+                    g += bitmap[position + 1] as f64;
+                    r += bitmap[position + 2] as f64;
+                } else {
+                    // Skip invalid positions or use default values
+                    log::warn!("Invalid pixel position in CG image: x={}, y={}, position={}, bitmap_len={}", x, y, position, bitmap.len());
+                }
                 // log::info!("position: {}, total: {}", position, bitmap.len());
             }
             let color = LedColor::new((r / len) as u8, (g / len) as u8, (b / len) as u8);

@@ -7,10 +7,10 @@ type ItemProps = {
 
 const Item: ParentComponent<ItemProps> = (props) => {
   return (
-    <dl class="flex">
-      <dt class="w-20">{props.label}</dt>
-      <dd class="flex-auto">{props.children}</dd>
-    </dl>
+    <div class="flex justify-between items-center py-1">
+      <dt class="text-sm font-medium text-base-content/70">{props.label}</dt>
+      <dd class="text-sm font-mono text-base-content">{props.children}</dd>
+    </div>
   );
 };
 
@@ -41,20 +41,31 @@ export const BoardInfoPanel: Component<{ board: BoardInfo }> = (props) => {
     }
   });
 
+  const statusBadgeClass = createMemo(() => {
+    const status = connectStatus();
+    if (status === 'Connected') {
+      return 'badge badge-success badge-sm';
+    } else if (status?.startsWith('Connecting')) {
+      return 'badge badge-warning badge-sm';
+    } else {
+      return 'badge badge-error badge-sm';
+    }
+  });
+
   return (
-    <section class="p-2 rounded shadow">
-      <Item label="Host">{props.board.fullname}</Item>
-      <Item label="Host">{props.board.host}</Item>
-      <Item label="Ip Addr">
-        <span class="font-mono">{props.board.address}</span>
-      </Item>
-      <Item label="Port">
-        <span class="font-mono">{props.board.port}</span>
-      </Item>
-      <Item label="Status">
-        <span class="font-mono">{connectStatus()}</span>
-      </Item>
-      <Item label="TTL">{ttl()}</Item>
-    </section>
+    <div class="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow duration-200">
+      <div class="card-body p-4">
+        <div class="card-title text-base mb-3 flex items-center justify-between">
+          <span class="truncate">{props.board.fullname}</span>
+          <div class={statusBadgeClass()}>{connectStatus()}</div>
+        </div>
+        <div class="space-y-2">
+          <Item label="主机名">{props.board.host}</Item>
+          <Item label="IP地址">{props.board.address}</Item>
+          <Item label="端口">{props.board.port}</Item>
+          <Item label="延迟">{ttl()}</Item>
+        </div>
+      </div>
+    </div>
   );
 };

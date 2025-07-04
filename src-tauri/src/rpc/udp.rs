@@ -54,7 +54,7 @@ impl UdpRpc {
                 }
             }
         });
-
+                
         let shared_self_for_check = shared_self.clone();
         tokio::spawn(async move {
             shared_self_for_check.check_boards().await;
@@ -99,7 +99,9 @@ impl UdpRpc {
                     }
 
                     if boards.insert(board_info.fullname.clone(), board).is_some() {
-                        info!("added board {:?}", board_info);
+                        info!("replace board {:?}", board_info);
+                    } else {
+                        info!("add board {:?}", board_info);
                     }
 
                     let tx_boards = boards

@@ -6,6 +6,7 @@ import { DisplayInfoPanel } from './display-info-panel';
 import { LedStripPart } from './led-strip-part';
 import { ScreenView } from './screen-view';
 
+
 type DisplayViewProps = {
   display: DisplayInfo;
 };
@@ -23,7 +24,6 @@ export const DisplayView: Component<DisplayViewProps> = (props) => {
   }));
 
   const ledStripConfigs = createMemo(() => {
-    console.log('ledStripConfigs', ledStripStore.strips);
     return ledStripStore.strips.filter((c) => c.display_id === props.display.id);
   });
 

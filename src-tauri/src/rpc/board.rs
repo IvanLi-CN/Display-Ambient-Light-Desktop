@@ -3,15 +3,22 @@ use std::{sync::Arc, time::Duration};
 use paris::{error, info, warn};
 use tokio::{io, net::UdpSocket, sync::RwLock, task::yield_now, time::timeout};
 
-use crate::rpc::DisplaySettingRequest;
+use crate::{
+    ambient_light::{ConfigManager, LedStripConfig},
+    rpc::DisplaySettingRequest,
+    volume::{self, VolumeManager},
+};
 
-use super::{BoardConnectStatus, BoardInfo};
+use super::{BoardConnectStatus, BoardInfo, BoardMessageChannels};
 
 #[derive(Debug)]
 pub struct Board {
     pub info: Arc<RwLock<BoardInfo>>,
     socket: Option<Arc<UdpSocket>>,
     listen_handler: Option<tokio::task::JoinHandle<()>>,
+    volume_changed_subscriber_handler: Option<tokio::task::JoinHandle<()>>,
+    state_of_displays_changed_subscriber_handler: Option<tokio::task::JoinHandle<()>>,
+    led_strip_config_changed_subscriber_handler: Option<tokio::task::JoinHandle<()>>,
 }
 
 impl Board {
@@ -20,25 +27,23 @@ impl Board {
             info: Arc::new(RwLock::new(info)),
             socket: None,
             listen_handler: None,
+            volume_changed_subscriber_handler: None,
+            state_of_displays_changed_subscriber_handler: None,
+            led_strip_config_changed_subscriber_handler: None,
         }
     }
 
     pub async fn init_socket(&mut self) -> anyhow::Result<()> {
-        let info = self.info.read().await;
+        let info = self.info.clone();
+        let info = info.read().await;
         let socket = UdpSocket::bind("0.0.0.0:0").await?;
 
         socket.connect((info.address, info.port)).await?;
         let socket = Arc::new(socket);
         self.socket = Some(socket.clone());
 
-        let info = self.info.clone();
-
         let handler = tokio::spawn(async move {
             let mut buf = [0u8; 128];
-            if let Err(err) = socket.readable().await {
-                error!("socket read error: {:?}", err);
-                return;
-            }
 
             let board_message_channels = crate::rpc::channels::BoardMessageChannels::global().await;
 
@@ -49,7 +54,7 @@ impl Board {
                 board_message_channels.volume_setting_request_sender.clone();
 
             loop {
-                match socket.try_recv(&mut buf) {
+                match socket.recv(&mut buf).await {
                     Ok(len) => {
                         log::info!("recv: {:?}", &buf[..len]);
                         if buf[0] == 3 {
@@ -64,6 +69,9 @@ impl Board {
                             }
                         } else if buf[0] == 4 {
                             let result = volume_setting_request_sender.send(buf[1] as f32 / 100.0);
+                            if let Err(err) = result {
+                                error!("send volume setting request to channel failed: {:?}", err);
+                            }
                         }
                     }
                     Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
@@ -79,7 +87,154 @@ impl Board {
         });
         self.listen_handler = Some(handler);
 
+        self.subscribe_volume_changed().await;
+        self.subscribe_state_of_displays_changed().await;
+        self.subscribe_led_strip_config_changed().await;
+
         Ok(())
+    }
+
+    async fn subscribe_volume_changed(&mut self) {
+        let channel = BoardMessageChannels::global().await;
+        let mut volume_changed_rx = channel.volume_changed_sender.subscribe();
+        let info = self.info.clone();
+        let socket = self.socket.clone();
+
+        let handler = tokio::spawn(async move {
+            loop {
+                let volume: Result<f32, tokio::sync::broadcast::error::RecvError> =
+                    volume_changed_rx.recv().await;
+                if let Err(err) = volume {
+                    match err {
+                        tokio::sync::broadcast::error::RecvError::Closed => {
+                            log::error!("volume changed channel closed");
+                            break;
+                        }
+                        tokio::sync::broadcast::error::RecvError::Lagged(_) => {
+                            log::info!("volume changed channel lagged");
+                            continue;
+                        }
+                    }
+                }
+
+                let volume = volume.unwrap();
+
+                let info = info.read().await;
+                if socket.is_none() || info.connect_status != BoardConnectStatus::Connected {
+                    log::info!("board is not connected, skip send volume changed");
+                    continue;
+                }
+
+                let socket = socket.as_ref().unwrap();
+
+                let mut buf = [0u8; 2];
+                buf[0] = 4;
+                buf[1] = (volume * 100.0) as u8;
+
+                if let Err(err) = socket.send(&buf).await {
+                    log::warn!("send volume changed failed: {:?}", err);
+                }
+            }
+        });
+
+        let volume_manager = VolumeManager::global().await;
+        let volume = volume_manager.get_volume().await;
+
+        if let Some(socket) = self.socket.as_ref() {
+            let buf = [4, (volume * 100.0) as u8];
+            if let Err(err) = socket.send(&buf).await {
+                log::warn!("send volume failed: {:?}", err);
+            }
+        } else {
+            log::warn!("socket is none, skip send volume");
+        }
+
+        self.volume_changed_subscriber_handler = Some(handler);
+    }
+
+    async fn subscribe_state_of_displays_changed(&mut self) {
+        let channel: &BoardMessageChannels = BoardMessageChannels::global().await;
+        let mut state_of_displays_changed_rx = channel.displays_changed_sender.subscribe();
+        let info = self.info.clone();
+        let socket = self.socket.clone();
+
+        let handler = tokio::spawn(async move {
+            loop {
+                let states: Result<
+                    Vec<crate::display::DisplayState>,
+                    tokio::sync::broadcast::error::RecvError,
+                > = state_of_displays_changed_rx.recv().await;
+                if let Err(err) = states {
+                    match err {
+                        tokio::sync::broadcast::error::RecvError::Closed => {
+                            log::error!("state of displays changed channel closed");
+                            break;
+                        }
+                        tokio::sync::broadcast::error::RecvError::Lagged(_) => {
+                            log::info!("state of displays changed channel lagged");
+                            continue;
+                        }
+                    }
+                }
+
+                let info = info.read().await;
+                if socket.is_none() || info.connect_status != BoardConnectStatus::Connected {
+                    log::info!("board is not connected, skip send state of displays changed");
+                    continue;
+                }
+
+                let socket = socket.as_ref().unwrap();
+
+                let mut buf = [0u8; 3];
+                let states = states.unwrap();
+                for (index, state) in states.iter().enumerate() {
+                    buf[0] = 3;
+                    buf[1] = index as u8;
+                    buf[2] = state.brightness as u8;
+
+                    log::info!("send state of displays changed: {:?}", &buf[..]);
+
+                    if let Err(err) = socket.send(&buf).await {
+                        log::warn!("send state of displays changed failed: {:?}", err);
+                    }
+                }
+            }
+        });
+
+        self.state_of_displays_changed_subscriber_handler = Some(handler);
+    }
+
+    async fn subscribe_led_strip_config_changed(&mut self) {
+        let config_manager = ConfigManager::global().await;
+        let mut led_strip_config_changed_rx = config_manager.clone_config_update_receiver();
+        let info = self.info.clone();
+        let socket = self.socket.clone();
+
+        let handler = tokio::spawn(async move {
+            while led_strip_config_changed_rx.changed().await.is_ok() {
+                let config = led_strip_config_changed_rx.borrow().clone();
+
+                let info = info.read().await;
+                if socket.is_none() || info.connect_status != BoardConnectStatus::Connected {
+                    log::info!("board is not connected, skip send led strip config changed");
+                    continue;
+                }
+
+                let socket = socket.as_ref().unwrap();
+
+                let mut buf = [0u8; 4];
+                buf[0] = 5;
+                buf[1..].copy_from_slice(&config.color_calibration.to_bytes());
+
+                log::info!("send led strip config changed: {:?}", &buf[..]);
+
+                if let Err(err) = socket.send(&buf).await {
+                    log::warn!("send led strip config changed failed: {:?}", err);
+                }
+            }
+        });
+
+        self.led_strip_config_changed_subscriber_handler = Some(handler);
     }
 
     pub async fn send_colors(&self, buf: &[u8]) {
@@ -152,12 +307,22 @@ impl Board {
 
 impl Drop for Board {
     fn drop(&mut self) {
+        info!("board drop");
+
         if let Some(handler) = self.listen_handler.take() {
-            info!("aborting listen handler");
-            tokio::task::block_in_place(move || {
-                handler.abort();
-            });
-            info!("listen handler aborted");
+            handler.abort();
+        }
+
+        if let Some(handler) = self.volume_changed_subscriber_handler.take() {
+            handler.abort();
+        }
+
+        if let Some(handler) = self.state_of_displays_changed_subscriber_handler.take() {
+            handler.abort();
+        }
+
+        if let Some(handler) = self.led_strip_config_changed_subscriber_handler.take() {
+            handler.abort();
         }
     }
 }

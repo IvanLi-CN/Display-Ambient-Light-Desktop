@@ -1,57 +1,28 @@
+use std::time::Duration;
 use std::{collections::HashMap, sync::Arc};
 
 use core_graphics::display::{
     kCGNullWindowID, kCGWindowImageDefault, kCGWindowListOptionOnScreenOnly, CGDisplay,
 };
 use core_graphics::geometry::{CGPoint, CGRect, CGSize};
-use paris::warn;
+use paris::{info, warn};
+use screen_capture_kit::shareable_content::{SCDisplay, SCShareableContent};
+use screen_capture_kit::stream::{SCStream, SCStreamConfiguration, SCContentFilter, SCStreamOutput};
+use screen_capture_kit::stream::SCStreamDelegate;
 use tauri::async_runtime::RwLock;
 use tokio::sync::{broadcast, watch, OnceCell};
-use tokio::time::{self, Duration};
+use tokio::task::yield_now;
+use tokio::time::sleep;
 
 use crate::screenshot::LedSamplePoints;
 use crate::{ambient_light::SamplePointMapper, led_color::LedColor, screenshot::Screenshot};
-
-pub fn take_screenshot(display_id: u32, scale_factor: f32) -> anyhow::Result<Screenshot> {
-    log::debug!("take_screenshot");
-
-    let cg_display = CGDisplay::new(display_id);
-    let cg_image = CGDisplay::screenshot(
-        cg_display.bounds(),
-        kCGWindowListOptionOnScreenOnly,
-        kCGNullWindowID,
-        kCGWindowImageDefault,
-    )
-    .ok_or_else(|| anyhow::anyhow!("Display#{}: take screenshot failed", display_id))?;
-
-    let buffer = cg_image.data();
-    let bytes_per_row = cg_image.bytes_per_row();
-
-    let height = cg_image.height();
-    let width = cg_image.width();
-
-    let bytes = buffer.bytes().to_owned();
-
-    let cg_display = CGDisplay::new(display_id);
-    let bound_scale_factor = (cg_display.bounds().size.width / width as f64) as f32;
-
-    Ok(Screenshot::new(
-        display_id,
-        height as u32,
-        width as u32,
-        bytes_per_row,
-        bytes,
-        scale_factor,
-        bound_scale_factor,
-    ))
-}
 
 pub fn get_display_colors(
     display_id: u32,
     sample_points: &Vec<Vec<LedSamplePoints>>,
     bound_scale_factor: f32,
 ) -> anyhow::Result<Vec<LedColor>> {
-    log::debug!("take_screenshot");
+
     let cg_display = CGDisplay::new(display_id);
 
     let mut colors = vec![];
@@ -114,7 +85,7 @@ pub fn get_display_colors(
 }
 
 pub struct ScreenshotManager {
-    pub channels: Arc<RwLock<HashMap<u32, watch::Receiver<Screenshot>>>>,
+    pub channels: Arc<RwLock<HashMap<u32, Arc<RwLock<watch::Sender<Screenshot>>>>>>,
     merged_screenshot_tx: Arc<RwLock<broadcast::Sender<Screenshot>>>,
 }
 
@@ -134,75 +105,139 @@ impl ScreenshotManager {
             .await
     }
 
-    pub fn start(&self) -> anyhow::Result<()> {
+    pub async fn start(&self) -> anyhow::Result<()> {
         let displays = display_info::DisplayInfo::all()?;
-        for display in displays {
-            self.start_one(display.id, display.scale_factor)?;
+
+        log::info!("ScreenshotManager starting with {} displays:", displays.len());
+        for display in &displays {
+            log::info!("  Display ID: {}, Scale: {}", display.id, display.scale_factor);
         }
-        Ok(())
-    }
 
-    fn start_one(&self, display_id: u32, scale_factor: f32) -> anyhow::Result<()> {
-        let channels = self.channels.to_owned();
-        let merged_screenshot_tx = self.merged_screenshot_tx.clone();
-        tokio::spawn(async move {
-            let screenshot = take_screenshot(display_id, scale_factor);
+        let futures = displays.iter().map(|display| async {
+            self.start_one(display.id, display.scale_factor)
+                .await
+                .unwrap_or_else(|err| {
+                    warn!("start_one failed: display_id: {}, err: {}", display.id, err);
+                });
 
-            if screenshot.is_err() {
-                warn!("take_screenshot_loop: {}", screenshot.err().unwrap());
-                return;
-            }
-            let mut interval = time::interval(Duration::from_millis(1000));
-
-            let screenshot = screenshot.unwrap();
-            let (screenshot_tx, screenshot_rx) = watch::channel(screenshot);
-            {
-                let channels = channels.clone();
-                let mut channels = channels.write().await;
-                channels.insert(display_id, screenshot_rx.clone());
-            }
-
-            let merged_screenshot_tx = merged_screenshot_tx.read().await.clone();
-
-            loop {
-                Self::take_screenshot_loop(
-                    display_id,
-                    scale_factor,
-                    &screenshot_tx,
-                    &merged_screenshot_tx,
-                )
-                .await;
-                interval.tick().await;
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
         });
 
+        futures::future::join_all(futures).await;
+        log::info!("ScreenshotManager started successfully");
         Ok(())
     }
 
-    async fn take_screenshot_loop(
-        display_id: u32,
-        scale_factor: f32,
-        screenshot_tx: &watch::Sender<Screenshot>,
-        merged_screenshot_tx: &broadcast::Sender<Screenshot>,
-    ) {
-        let screenshot = take_screenshot(display_id, scale_factor);
-        if let Ok(screenshot) = screenshot {
-            match merged_screenshot_tx.send(screenshot.clone()) {
-                Ok(_) => {
-                    log::info!(
-                        "take_screenshot_loop: merged_screenshot_tx.send success. display#{}",
-                        display_id
-                    );
+    async fn start_one(&self, display_id: u32, scale_factor: f32) -> anyhow::Result<()> {
+        log::info!("Starting screenshot capture for display_id: {}", display_id);
+
+        let merged_screenshot_tx = self.merged_screenshot_tx.clone();
+
+        let (tx, _) = watch::channel(Screenshot::new(
+            display_id,
+            0,
+            0,
+            0,
+            Arc::new(vec![]),
+            scale_factor,
+            scale_factor,
+        ));
+        let tx = Arc::new(RwLock::new(tx));
+
+        let mut channels = self.channels.write().await;
+        channels.insert(display_id, tx.clone());
+
+        drop(channels);
+
+
+
+        // Implement screen capture using screen-capture-kit
+        loop {
+            match Self::capture_display_screenshot(display_id, scale_factor).await {
+                Ok(screenshot) => {
+                    let tx_for_send = tx.read().await;
+                    let merged_screenshot_tx = merged_screenshot_tx.write().await;
+
+                    if let Err(err) = merged_screenshot_tx.send(screenshot.clone()) {
+                        // log::warn!("merged_screenshot_tx.send failed: {}", err);
+                    }
+                    if let Err(err) = tx_for_send.send(screenshot.clone()) {
+                        log::warn!("display {} screenshot_tx.send failed: {}", display_id, err);
+                    }
                 }
-                Err(_) => {
+                Err(err) => {
+                    warn!("Failed to capture screenshot for display {}: {}", display_id, err);
+                    // Create a fallback empty screenshot to maintain the interface
+                    let screenshot = Screenshot::new(
+                        display_id,
+                        1080,
+                        1920,
+                        1920 * 4, // Assuming RGBA format
+                        Arc::new(vec![0u8; 1920 * 1080 * 4]),
+                        scale_factor,
+                        scale_factor,
+                    );
+
+                    let tx_for_send = tx.read().await;
+                    let merged_screenshot_tx = merged_screenshot_tx.write().await;
+
+                    if let Err(err) = merged_screenshot_tx.send(screenshot.clone()) {
+                        // log::warn!("merged_screenshot_tx.send failed: {}", err);
+                    }
+                    if let Err(err) = tx_for_send.send(screenshot.clone()) {
+                        log::warn!("display {} screenshot_tx.send failed: {}", display_id, err);
+                    }
                 }
             }
-            screenshot_tx.send(screenshot).unwrap();
-            // log::info!("take_screenshot_loop: send success. display#{}", display_id)
-        } else {
-            warn!("take_screenshot_loop: {}", screenshot.err().unwrap());
+
+            // Sleep for a frame duration (5 FPS for much better CPU performance)
+            sleep(Duration::from_millis(200)).await;
+            yield_now().await;
         }
+    }
+
+    async fn capture_display_screenshot(display_id: u32, scale_factor: f32) -> anyhow::Result<Screenshot> {
+        // For now, use the existing CGDisplay approach as a fallback
+        // TODO: Implement proper screen-capture-kit integration
+
+
+        let cg_display = CGDisplay::new(display_id);
+        let bounds = cg_display.bounds();
+
+
+
+        let cg_image = CGDisplay::screenshot(
+            bounds,
+            kCGWindowListOptionOnScreenOnly,
+            kCGNullWindowID,
+            kCGWindowImageDefault,
+        )
+        .ok_or_else(|| anyhow::anyhow!("Display#{}: take screenshot failed - possibly no screen recording permission", display_id))?;
+
+        let bitmap = cg_image.data();
+        let width = cg_image.width() as u32;
+        let height = cg_image.height() as u32;
+        let bytes_per_row = cg_image.bytes_per_row();
+
+
+
+        // Convert CFData to Vec<u8>
+        let data_ptr = bitmap.bytes().as_ptr();
+        let data_len = bitmap.len() as usize;
+        let screenshot_data = unsafe {
+            std::slice::from_raw_parts(data_ptr, data_len).to_vec()
+        };
+
+
+
+        Ok(Screenshot::new(
+            display_id,
+            height,
+            width,
+            bytes_per_row,
+            Arc::new(screenshot_data),
+            scale_factor,
+            scale_factor,
+        ))
     }
 
     pub fn get_sorted_colors(colors: &Vec<u8>, mappers: &Vec<SamplePointMapper>) -> Vec<u8> {
@@ -256,5 +291,17 @@ impl ScreenshotManager {
 
     pub async fn clone_merged_screenshot_rx(&self) -> broadcast::Receiver<Screenshot> {
         self.merged_screenshot_tx.read().await.subscribe()
+    }
+
+    pub async fn subscribe_by_display_id(
+        &self,
+        display_id: u32,
+    ) -> anyhow::Result<watch::Receiver<Screenshot>> {
+        let channels = self.channels.read().await;
+        if let Some(tx) = channels.get(&display_id) {
+            Ok(tx.read().await.subscribe())
+        } else {
+            Err(anyhow::anyhow!("display_id: {} not found", display_id))
+        }
     }
 }
