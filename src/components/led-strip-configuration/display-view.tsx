@@ -6,6 +6,7 @@ import { DisplayInfoPanel } from './display-info-panel';
 import { LedStripPart } from './led-strip-part';
 import { ScreenView } from './screen-view';
 
+
 type DisplayViewProps = {
   display: DisplayInfo;
 };

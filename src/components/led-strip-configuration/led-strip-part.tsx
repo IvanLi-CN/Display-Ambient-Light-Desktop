@@ -34,7 +34,7 @@ export const Pixel: Component<PixelProps> = (props) => {
       title={props.color}
     >
       <div
-        class="absolute top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full ring-1 ring-stone-300/30"
+        class="absolute top-1/2 -translate-y-1/2 h-2.5 w-2.5 rounded-full ring-1 ring-stone-300/50"
         style={style()}
       />
     </div>
@@ -60,15 +60,31 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
     );
 
     if (index === -1) {
+      console.log('🔍 LED: Strip config not found', {
+        displayId: localProps.config.display_id,
+        border: localProps.config.border,
+        availableStrips: ledStripStore.strips.length
+      });
       return;
     }
 
     const mapper = ledStripStore.mappers[index];
     if (!mapper) {
+      console.log('🔍 LED: Mapper not found', { index, mappersCount: ledStripStore.mappers.length });
       return;
     }
 
     const offset = mapper.start * 3;
+
+    console.log('🎨 LED: Updating colors', {
+      displayId: localProps.config.display_id,
+      border: localProps.config.border,
+      stripLength: localProps.config.len,
+      mapperPos: mapper.pos,
+      offset,
+      colorsArrayLength: ledStripStore.colors.length,
+      firstFewColors: Array.from(ledStripStore.colors.slice(offset, offset + 9))
+    });
 
     const colors = new Array(localProps.config.len).fill(null).map((_, i) => {
       const index = offset + i * 3;
@@ -76,6 +92,12 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
       const g = ledStripStore.colors[index + 1] || 0;
       const b = ledStripStore.colors[index + 2] || 0;
       return `rgb(${r}, ${g}, ${b})`;
+    });
+
+    console.log('🎨 LED: Generated colors', {
+      border: localProps.config.border,
+      colorsCount: colors.length,
+      sampleColors: colors.slice(0, 3)
     });
 
     setColors(colors);
@@ -102,19 +124,7 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
     },
   });
 
-  const onWheel = (e: WheelEvent) => {
-    if (localProps.config) {
-      invoke('patch_led_strip_len', {
-        displayId: localProps.config.display_id,
-        border: localProps.config.border,
-        deltaLen: e.deltaY > 0 ? 1 : -1,
-      })
-        .then(() => {})
-        .catch((e) => {
-          console.error(e);
-        });
-    }
-  };
+
 
   return (
     <section
@@ -130,7 +140,7 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
           stripConfiguration.selectedStripPart?.displayId ===
             localProps.config?.display_id,
       }}
-      onWheel={onWheel}
+
     >
       <For each={colors()}>{(item) => <Pixel color={item} />}</For>
     </section>

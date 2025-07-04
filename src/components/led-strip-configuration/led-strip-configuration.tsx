@@ -7,6 +7,7 @@ import { LedStripConfigContainer } from '../../models/led-strip-config';
 import { setLedStripStore } from '../../stores/led-strip.store';
 import { listen } from '@tauri-apps/api/event';
 import { LedStripPartsSorter } from './led-strip-parts-sorter';
+import { LedCountControlPanel } from './led-count-control-panel';
 import { createStore } from 'solid-js/store';
 import {
   LedStripConfigurationContext,
@@ -132,15 +133,30 @@ export const LedStripConfiguration = () => {
               <span>显示器配置</span>
               <div class="badge badge-secondary badge-outline">可视化编辑</div>
             </div>
-            <DisplayListContainer>
-              {displayStore.displays.map((display) => {
-                console.log('LedStripConfiguration: Rendering DisplayView for display:', display);
-                return <DisplayView display={display} />;
-              })}
-            </DisplayListContainer>
-            <div class="text-xs text-base-content/50 mt-2">
-              💡 提示：鼠标滚轮调整灯条长度，悬停查看详细信息
+            <div class="h-96 mb-4">
+              <DisplayListContainer>
+                {displayStore.displays.map((display) => {
+                  console.log('LedStripConfiguration: Rendering DisplayView for display:', display);
+                  return <DisplayView display={display} />;
+                })}
+              </DisplayListContainer>
             </div>
+            <div class="text-xs text-base-content/50">
+              💡 提示：悬停显示器查看详细信息，使用下方控制面板调整LED数量
+            </div>
+          </div>
+        </div>
+
+        {/* LED Count Control Panels */}
+        <div class="space-y-4">
+          <div class="flex items-center gap-2 mb-3">
+            <h2 class="text-lg font-semibold text-base-content">LED数量控制</h2>
+            <div class="badge badge-info badge-outline">实时调整</div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {displayStore.displays.map((display) => (
+              <LedCountControlPanel display={display} />
+            ))}
           </div>
         </div>
       </LedStripConfigurationContext.Provider>
