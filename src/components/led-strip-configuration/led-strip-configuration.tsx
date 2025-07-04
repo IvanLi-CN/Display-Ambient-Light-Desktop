@@ -17,12 +17,20 @@ import {
 export const LedStripConfiguration = () => {
   createEffect(() => {
     invoke<string>('list_display_info').then((displays) => {
+      const parsedDisplays = JSON.parse(displays);
+      console.log('LedStripConfiguration: Loaded displays:', parsedDisplays);
       setDisplayStore({
-        displays: JSON.parse(displays),
+        displays: parsedDisplays,
       });
+    }).catch((error) => {
+      console.error('LedStripConfiguration: Failed to load displays:', error);
     });
+
     invoke<LedStripConfigContainer>('read_led_strip_configs').then((configs) => {
+      console.log('LedStripConfiguration: Loaded LED strip configs:', configs);
       setLedStripStore(configs);
+    }).catch((error) => {
+      console.error('LedStripConfiguration: Failed to load LED strip configs:', error);
     });
   });
 
@@ -126,6 +134,7 @@ export const LedStripConfiguration = () => {
             </div>
             <DisplayListContainer>
               {displayStore.displays.map((display) => {
+                console.log('LedStripConfiguration: Rendering DisplayView for display:', display);
                 return <DisplayView display={display} />;
               })}
             </DisplayListContainer>

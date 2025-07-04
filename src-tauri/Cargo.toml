@@ -42,6 +42,9 @@ ddc-hi = "0.4.1"
 coreaudio-rs = "0.11.2"
 screen-capture-kit = "0.3.1"
 image = { version = "0.24", features = ["jpeg"] }
+tokio-tungstenite = "0.20"
+futures-util = "0.3"
+sha1 = "0.10"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem

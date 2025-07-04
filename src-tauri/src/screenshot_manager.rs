@@ -108,6 +108,11 @@ impl ScreenshotManager {
     pub async fn start(&self) -> anyhow::Result<()> {
         let displays = display_info::DisplayInfo::all()?;
 
+        log::info!("ScreenshotManager starting with {} displays:", displays.len());
+        for display in &displays {
+            log::info!("  Display ID: {}, Scale: {}", display.id, display.scale_factor);
+        }
+
         let futures = displays.iter().map(|display| async {
             self.start_one(display.id, display.scale_factor)
                 .await
@@ -118,11 +123,12 @@ impl ScreenshotManager {
         });
 
         futures::future::join_all(futures).await;
+        log::info!("ScreenshotManager started successfully");
         Ok(())
     }
 
     async fn start_one(&self, display_id: u32, scale_factor: f32) -> anyhow::Result<()> {
-
+        log::info!("Starting screenshot capture for display_id: {}", display_id);
 
         let merged_screenshot_tx = self.merged_screenshot_tx.clone();
 
@@ -183,8 +189,8 @@ impl ScreenshotManager {
                 }
             }
 
-            // Sleep for a frame duration (30 FPS)
-            sleep(Duration::from_millis(33)).await;
+            // Sleep for a frame duration (15 FPS for better performance)
+            sleep(Duration::from_millis(67)).await;
             yield_now().await;
         }
     }

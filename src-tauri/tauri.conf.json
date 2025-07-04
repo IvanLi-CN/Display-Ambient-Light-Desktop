@@ -1,8 +1,8 @@
 {
+  "$schema": "https://schema.tauri.app/config/2.0.0",
   "productName": "test-demo",
   "version": "0.0.1",
   "identifier": "cc.ivanli.ambient-light.desktop",
-  "mainBinaryName": "test-demo",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "beforeBuildCommand": "pnpm build",
@@ -10,7 +10,7 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "withGlobalTauri": false,
+    "withGlobalTauri": true,
     "security": {
       "csp": null,
       "assetProtocol": {

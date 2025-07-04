@@ -7,6 +7,7 @@ mod led_color;
 mod rpc;
 mod screenshot;
 mod screenshot_manager;
+mod screen_stream;
 mod volume;
 
 use ambient_light::{Border, ColorCalibration, LedStripConfig, LedStripConfigGroup};
@@ -16,6 +17,7 @@ use paris::{error, info, warn};
 use rpc::{BoardInfo, UdpRpc};
 use screenshot::Screenshot;
 use screenshot_manager::ScreenshotManager;
+
 use serde::{Deserialize, Serialize};
 use serde_json::to_string;
 use tauri::{Manager, Emitter, Runtime};
@@ -335,6 +337,21 @@ fn handle_ambient_light_protocol<R: Runtime>(
 async fn main() {
     env_logger::init();
 
+    // Debug: Print available displays
+    match display_info::DisplayInfo::all() {
+        Ok(displays) => {
+            println!("=== AVAILABLE DISPLAYS ===");
+            for (index, display) in displays.iter().enumerate() {
+                println!("  Display {}: ID={}, Scale={}, Width={}, Height={}",
+                    index, display.id, display.scale_factor, display.width, display.height);
+            }
+            println!("=== END DISPLAYS ===");
+        }
+        Err(e) => {
+            println!("Error getting display info: {}", e);
+        }
+    }
+
     tokio::spawn(async move {
         let screenshot_manager = ScreenshotManager::global().await;
         screenshot_manager.start().await.unwrap_or_else(|e| {
@@ -345,6 +362,13 @@ async fn main() {
     tokio::spawn(async move {
         let led_color_publisher = ambient_light::LedColorsPublisher::global().await;
         led_color_publisher.start().await;
+    });
+
+    // Start WebSocket server for screen streaming
+    tokio::spawn(async move {
+        if let Err(e) = start_websocket_server().await {
+            error!("Failed to start WebSocket server: {}", e);
+        }
     });
 
     let _volume = VolumeManager::global().await;
@@ -470,4 +494,31 @@ async fn main() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+// WebSocket server for screen streaming
+async fn start_websocket_server() -> anyhow::Result<()> {
+    use tokio::net::TcpListener;
+
+    let listener = TcpListener::bind("127.0.0.1:8765").await?;
+    info!("WebSocket server listening on ws://127.0.0.1:8765");
+
+    while let Ok((stream, addr)) = listener.accept().await {
+        info!("New WebSocket connection from: {}", addr);
+
+        tokio::spawn(async move {
+            info!("Starting WebSocket handler for connection from: {}", addr);
+            match screen_stream::handle_websocket_connection(stream).await {
+                Ok(_) => {
+                    info!("WebSocket connection from {} completed successfully", addr);
+                }
+                Err(e) => {
+                    warn!("WebSocket connection error from {}: {}", addr, e);
+                }
+            }
+            info!("WebSocket handler task completed for: {}", addr);
+        });
+    }
+
+    Ok(())
 }

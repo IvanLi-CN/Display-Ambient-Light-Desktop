@@ -7,13 +7,22 @@ import {
   onMount,
   splitProps,
 } from 'solid-js';
+import { ScreenViewWebSocket } from './screen-view-websocket';
 
 type ScreenViewProps = {
   displayId: number;
+  useWebSocket?: boolean;
 } & JSX.HTMLAttributes<HTMLDivElement>;
 
 export const ScreenView: Component<ScreenViewProps> = (props) => {
-  const [localProps, rootProps] = splitProps(props, ['displayId']);
+  const [localProps, rootProps] = splitProps(props, ['displayId', 'useWebSocket']);
+
+  // Use WebSocket by default for better performance
+  if (localProps.useWebSocket !== false) {
+    return <ScreenViewWebSocket displayId={localProps.displayId} {...rootProps} />;
+  }
+
+  // Fallback to HTTP polling (legacy mode)
   let canvas: HTMLCanvasElement;
   let root: HTMLDivElement;
   const [ctx, setCtx] = createSignal<CanvasRenderingContext2D | null>(null);
