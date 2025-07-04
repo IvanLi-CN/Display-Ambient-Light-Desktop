@@ -189,8 +189,8 @@ impl ScreenshotManager {
                 }
             }
 
-            // Sleep for a frame duration (15 FPS for better performance)
-            sleep(Duration::from_millis(67)).await;
+            // Sleep for a frame duration (5 FPS for much better CPU performance)
+            sleep(Duration::from_millis(200)).await;
             yield_now().await;
         }
     }

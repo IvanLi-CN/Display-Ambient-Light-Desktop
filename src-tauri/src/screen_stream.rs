@@ -143,12 +143,12 @@ impl ScreenStreamManager {
         let mut last_process_time = Instant::now();
 
         loop {
-            // Check if stream still has subscribers
+            // Check if stream still has subscribers and is still running
             let should_continue = {
                 let streams_lock = streams.read().await;
                 if let Some(stream_state) = streams_lock.get(&display_id) {
                     let state = stream_state.read().await;
-                    !state.subscribers.is_empty()
+                    !state.subscribers.is_empty() && state.is_running
                 } else {
                     false
                 }
@@ -191,7 +191,7 @@ impl ScreenStreamManager {
                             let mut state = stream_state.write().await;
                             let changed = state.last_screenshot_hash.map_or(true, |hash| hash != frame_hash);
                             let elapsed_ms = state.last_force_send.elapsed().as_millis();
-                            let force_send = elapsed_ms > 200; // Force send every 200ms for higher FPS
+                            let force_send = elapsed_ms > 500; // Force send every 500ms for better CPU performance
 
                             if changed || force_send {
                                 state.last_screenshot_hash = Some(frame_hash);
@@ -338,8 +338,19 @@ impl ScreenStreamManager {
     }
 
     pub async fn stop_stream(&self, display_id: u32) {
+        log::info!("Stopping stream for display_id: {}", display_id);
         let mut streams = self.streams.write().await;
+
+        if let Some(stream_state) = streams.get(&display_id) {
+            // Mark stream as not running to stop the processing task
+            let mut state = stream_state.write().await;
+            state.is_running = false;
+            log::info!("Marked stream as not running for display_id: {}", display_id);
+        }
+
+        // Remove the stream from the map
         streams.remove(&display_id);
+        log::info!("Removed stream from manager for display_id: {}", display_id);
     }
 }
 
@@ -440,6 +451,7 @@ pub async fn handle_websocket_connection(
     log::info!("Starting stream with config: display_id={}, width={}, height={}",
                config.display_id, config.target_width, config.target_height);
     let stream_manager = ScreenStreamManager::global().await;
+    let display_id_for_cleanup = config.display_id;
     let mut frame_rx = match stream_manager.start_stream(config).await {
         Ok(rx) => {
             log::info!("Screen stream started successfully");
@@ -497,6 +509,11 @@ pub async fn handle_websocket_connection(
         _ = frame_task => {},
         _ = control_task => {},
     }
+
+    // Clean up resources when connection ends
+    log::info!("WebSocket connection ending, cleaning up resources for display_id: {}", display_id_for_cleanup);
+    let stream_manager = ScreenStreamManager::global().await;
+    stream_manager.stop_stream(display_id_for_cleanup).await;
 
     log::info!("WebSocket connection handler completed");
     Ok(())

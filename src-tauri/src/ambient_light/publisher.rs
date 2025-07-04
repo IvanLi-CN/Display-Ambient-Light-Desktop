@@ -296,8 +296,19 @@ impl LedColorsPublisher {
             let mut buffer = Vec::<u8>::with_capacity(group_size * 3);
 
             if group.end > group.start {
-                for i in group.pos - display_led_offset..group_size + group.pos - display_led_offset
-                {
+                // Prevent integer underflow by using saturating subtraction
+                let start_index = if group.pos >= display_led_offset {
+                    group.pos - display_led_offset
+                } else {
+                    0
+                };
+                let end_index = if group.pos + group_size >= display_led_offset {
+                    group_size + group.pos - display_led_offset
+                } else {
+                    0
+                };
+
+                for i in start_index..end_index {
                     if i < colors.len() {
                         let bytes = colors[i].as_bytes();
                         buffer.append(&mut bytes.to_vec());
@@ -308,10 +319,19 @@ impl LedColorsPublisher {
                     }
                 }
             } else {
-                for i in (group.pos - display_led_offset
-                    ..group_size + group.pos - display_led_offset)
-                    .rev()
-                {
+                // Prevent integer underflow by using saturating subtraction
+                let start_index = if group.pos >= display_led_offset {
+                    group.pos - display_led_offset
+                } else {
+                    0
+                };
+                let end_index = if group.pos + group_size >= display_led_offset {
+                    group_size + group.pos - display_led_offset
+                } else {
+                    0
+                };
+
+                for i in (start_index..end_index).rev() {
                     if i < colors.len() {
                         let bytes = colors[i].as_bytes();
                         buffer.append(&mut bytes.to_vec());
