@@ -266,10 +266,19 @@ export const WhiteBalance = () => {
 
                   <div class="form-control">
                     <label class="label">
-                      <span class="label-text font-semibold text-base-content/70">白色 (W)</span>
-                      <div class="badge badge-outline badge-sm">暂未启用</div>
+                      <span class="label-text font-semibold text-amber-500">白色 (W)</span>
+                      <Value value={ledStripStore.colorCalibration.w} />
                     </label>
-                    <ColorSlider class="from-yellow-50 to-cyan-50" disabled />
+                    <ColorSlider
+                      class="from-amber-100 to-amber-50"
+                      value={ledStripStore.colorCalibration.w}
+                      onInput={(ev) =>
+                        updateColorCalibration(
+                          'w',
+                          (ev.target as HTMLInputElement).valueAsNumber ?? 1,
+                        )
+                      }
+                    />
                   </div>
                 </div>
 
@@ -394,6 +403,23 @@ export const WhiteBalance = () => {
                     onInput={(ev) =>
                       updateColorCalibration(
                         'b',
+                        (ev.target as HTMLInputElement).valueAsNumber ?? 1,
+                      )
+                    }
+                  />
+                </div>
+
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text font-semibold text-amber-500">白色 (W)</span>
+                    <Value value={ledStripStore.colorCalibration.w} />
+                  </label>
+                  <ColorSlider
+                    class="from-amber-100 to-amber-50"
+                    value={ledStripStore.colorCalibration.w}
+                    onInput={(ev) =>
+                      updateColorCalibration(
+                        'w',
                         (ev.target as HTMLInputElement).valueAsNumber ?? 1,
                       )
                     }

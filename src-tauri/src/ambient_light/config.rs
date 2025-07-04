@@ -16,6 +16,18 @@ pub enum Border {
     Right,
 }
 
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq)]
+pub enum LedType {
+    RGB,
+    RGBW,
+}
+
+impl Default for LedType {
+    fn default() -> Self {
+        LedType::RGB
+    }
+}
+
 #[derive(Clone, Copy, Serialize, Deserialize, Debug)]
 pub struct LedStripConfig {
     pub index: usize,
@@ -23,6 +35,8 @@ pub struct LedStripConfig {
     pub display_id: u32,
     pub start_pos: usize,
     pub len: usize,
+    #[serde(default)]
+    pub led_type: LedType,
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug)]
@@ -30,6 +44,12 @@ pub struct ColorCalibration {
     r: f32,
     g: f32,
     b: f32,
+    #[serde(default = "default_w_value")]
+    w: f32,
+}
+
+fn default_w_value() -> f32 {
+    1.0
 }
 
 impl ColorCalibration {
@@ -38,6 +58,15 @@ impl ColorCalibration {
             (self.r * 255.0) as u8,
             (self.g * 255.0) as u8,
             (self.b * 255.0) as u8,
+        ]
+    }
+
+    pub fn to_bytes_rgbw(&self) -> [u8; 4] {
+        [
+            (self.r * 255.0) as u8,
+            (self.g * 255.0) as u8,
+            (self.b * 255.0) as u8,
+            (self.w * 255.0) as u8,
         ]
     }
 }
@@ -122,6 +151,7 @@ impl LedStripConfigGroup {
                     },
                     start_pos: j + i * 4 * 30,
                     len: 30,
+                    led_type: LedType::RGB,
                 };
                 configs.push(item);
                 strips.push(item);
@@ -136,6 +166,7 @@ impl LedStripConfigGroup {
             r: 1.0,
             g: 1.0,
             b: 1.0,
+            w: 1.0,
         };
 
         Ok(Self {

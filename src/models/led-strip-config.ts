@@ -1,5 +1,10 @@
 import { Borders } from '../constants/border';
 
+export enum LedType {
+  RGB = 'RGB',
+  RGBW = 'RGBW',
+}
+
 export type LedStripPixelMapper = {
   start: number;
   end: number;
@@ -10,6 +15,7 @@ export class ColorCalibration {
   r: number = 1;
   g: number = 1;
   b: number = 1;
+  w: number = 1;
 }
 
 export type LedStripConfigContainer = {
@@ -23,5 +29,6 @@ export class LedStripConfig {
     public readonly display_id: number,
     public readonly border: Borders,
     public len: number,
+    public led_type: LedType = LedType.RGB,
   ) {}
 }

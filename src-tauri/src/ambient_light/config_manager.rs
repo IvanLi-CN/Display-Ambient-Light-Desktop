@@ -5,7 +5,7 @@ use tokio::{sync::OnceCell, task::yield_now};
 
 use crate::ambient_light::{config, LedStripConfigGroup};
 
-use super::{Border, SamplePointMapper, ColorCalibration};
+use super::{Border, SamplePointMapper, ColorCalibration, LedType};
 
 pub struct ConfigManager {
     config: Arc<RwLock<LedStripConfigGroup>>,
@@ -80,6 +80,33 @@ impl ConfigManager {
         }
 
         Self::rebuild_mappers(&mut config);
+
+        let cloned_config = config.clone();
+
+        drop(config);
+
+        self.update(&cloned_config).await?;
+
+        self.config_update_sender
+            .send(cloned_config)
+            .map_err(|e| anyhow::anyhow!("Failed to send config update: {}", e))?;
+
+        Ok(())
+    }
+
+    pub async fn patch_led_strip_type(
+        &self,
+        display_id: u32,
+        border: Border,
+        led_type: LedType,
+    ) -> anyhow::Result<()> {
+        let mut config = self.config.write().await;
+
+        for strip in config.strips.iter_mut() {
+            if strip.display_id == display_id && strip.border == border {
+                strip.led_type = led_type;
+            }
+        }
 
         let cloned_config = config.clone();
 

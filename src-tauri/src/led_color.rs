@@ -43,6 +43,10 @@ impl LedColor {
     pub fn as_bytes (&self) -> [u8; 3] {
         self.0
     }
+
+    pub fn as_bytes_rgbw(&self, w: u8) -> [u8; 4] {
+        [self.0[0], self.0[1], self.0[2], w]
+    }
 }
 
 impl Serialize for LedColor {

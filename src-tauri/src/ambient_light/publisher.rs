@@ -18,7 +18,7 @@ use crate::{
 
 use itertools::Itertools;
 
-use super::{LedStripConfigGroup, SamplePointMapper};
+use super::{LedStripConfigGroup, SamplePointMapper, LedStripConfig, ColorCalibration, LedType};
 
 pub struct LedColorsPublisher {
     sorted_colors_rx: Arc<RwLock<watch::Receiver<Vec<u8>>>>,
@@ -56,6 +56,8 @@ impl LedColorsPublisher {
         bound_scale_factor: f32,
         mappers: Vec<SamplePointMapper>,
         display_colors_tx: broadcast::Sender<(u32, Vec<u8>)>,
+        strips: Vec<LedStripConfig>,
+        color_calibration: ColorCalibration,
     ) {
         let internal_tasks_version = self.inner_tasks_version.clone();
         let screenshot_manager = ScreenshotManager::global().await;
@@ -79,7 +81,7 @@ impl LedColorsPublisher {
 
                 let mappers = mappers.clone();
 
-                match Self::send_colors_by_display(colors, mappers).await {
+                match Self::send_colors_by_display(colors, mappers, &strips, &color_calibration).await {
                     Ok(_) => {
                         // log::info!("sent colors: #{: >15}", display_id);
                     }
@@ -209,9 +211,9 @@ impl LedColorsPublisher {
         }
     }
 
-    async fn handle_config_change(&self, configs: LedStripConfigGroup) {
+    async fn handle_config_change(&self, original_configs: LedStripConfigGroup) {
         let inner_tasks_version = self.inner_tasks_version.clone();
-        let configs = Self::get_colors_configs(&configs).await;
+        let configs = Self::get_colors_configs(&original_configs).await;
 
         if let Err(err) = configs {
             warn!("Failed to get configs: {}", err);
@@ -231,12 +233,22 @@ impl LedColorsPublisher {
             let display_id = sample_point_group.display_id;
             let sample_points = sample_point_group.points;
             let bound_scale_factor = sample_point_group.bound_scale_factor;
+
+            // Get strips for this display
+            let display_strips: Vec<LedStripConfig> = original_configs.strips
+                .iter()
+                .filter(|strip| strip.display_id == display_id)
+                .cloned()
+                .collect();
+
             self.start_one_display_colors_fetcher(
                 display_id,
                 sample_points,
                 bound_scale_factor,
                 sample_point_group.mappers,
                 display_colors_tx.clone(),
+                display_strips,
+                original_configs.color_calibration,
             )
             .await;
         }
@@ -266,6 +278,8 @@ impl LedColorsPublisher {
     pub async fn send_colors_by_display(
         colors: Vec<LedColor>,
         mappers: Vec<SamplePointMapper>,
+        strips: &[LedStripConfig],
+        color_calibration: &ColorCalibration,
     ) -> anyhow::Result<()> {
         // let color_len = colors.len();
         let display_led_offset = mappers
@@ -282,7 +296,7 @@ impl LedColorsPublisher {
         let udp_rpc = udp_rpc.as_ref().unwrap();
 
         // let socket = UdpSocket::bind("0.0.0.0:0").await?;
-        for group in mappers.clone() {
+        for (group_index, group) in mappers.clone().iter().enumerate() {
             if (group.start.abs_diff(group.end)) > colors.len() {
                 return Err(anyhow::anyhow!(
                     "get_sorted_colors: color_index out of range. color_index: {}, strip len: {}, colors.len(): {}",
@@ -293,7 +307,20 @@ impl LedColorsPublisher {
             }
 
             let group_size = group.start.abs_diff(group.end);
-            let mut buffer = Vec::<u8>::with_capacity(group_size * 3);
+
+            // Find the corresponding LED strip config to get LED type
+            let led_type = if group_index < strips.len() {
+                strips[group_index].led_type
+            } else {
+                LedType::RGB // fallback to RGB
+            };
+
+            let bytes_per_led = match led_type {
+                LedType::RGB => 3,
+                LedType::RGBW => 4,
+            };
+
+            let mut buffer = Vec::<u8>::with_capacity(group_size * bytes_per_led);
 
             if group.end > group.start {
                 // Prevent integer underflow by using saturating subtraction
@@ -310,12 +337,37 @@ impl LedColorsPublisher {
 
                 for i in start_index..end_index {
                     if i < colors.len() {
-                        let bytes = colors[i].as_bytes();
-                        buffer.append(&mut bytes.to_vec());
+                        let bytes = match led_type {
+                            LedType::RGB => {
+                                let calibration_bytes = color_calibration.to_bytes();
+                                let color_bytes = colors[i].as_bytes();
+                                // Apply calibration to RGB values
+                                vec![
+                                    ((color_bytes[0] as f32 * calibration_bytes[0] as f32 / 255.0) as u8),
+                                    ((color_bytes[1] as f32 * calibration_bytes[1] as f32 / 255.0) as u8),
+                                    ((color_bytes[2] as f32 * calibration_bytes[2] as f32 / 255.0) as u8),
+                                ]
+                            }
+                            LedType::RGBW => {
+                                let calibration_bytes = color_calibration.to_bytes_rgbw();
+                                let color_bytes = colors[i].as_bytes();
+                                // Apply calibration to RGB values and use calibrated W
+                                vec![
+                                    ((color_bytes[0] as f32 * calibration_bytes[0] as f32 / 255.0) as u8),
+                                    ((color_bytes[1] as f32 * calibration_bytes[1] as f32 / 255.0) as u8),
+                                    ((color_bytes[2] as f32 * calibration_bytes[2] as f32 / 255.0) as u8),
+                                    calibration_bytes[3], // W channel
+                                ]
+                            }
+                        };
+                        buffer.extend_from_slice(&bytes);
                     } else {
                         log::warn!("Index {} out of bounds for colors array of length {}", i, colors.len());
                         // Add black color as fallback
-                        buffer.append(&mut vec![0, 0, 0]);
+                        match led_type {
+                            LedType::RGB => buffer.extend_from_slice(&[0, 0, 0]),
+                            LedType::RGBW => buffer.extend_from_slice(&[0, 0, 0, 0]),
+                        }
                     }
                 }
             } else {
@@ -333,12 +385,37 @@ impl LedColorsPublisher {
 
                 for i in (start_index..end_index).rev() {
                     if i < colors.len() {
-                        let bytes = colors[i].as_bytes();
-                        buffer.append(&mut bytes.to_vec());
+                        let bytes = match led_type {
+                            LedType::RGB => {
+                                let calibration_bytes = color_calibration.to_bytes();
+                                let color_bytes = colors[i].as_bytes();
+                                // Apply calibration to RGB values
+                                vec![
+                                    ((color_bytes[0] as f32 * calibration_bytes[0] as f32 / 255.0) as u8),
+                                    ((color_bytes[1] as f32 * calibration_bytes[1] as f32 / 255.0) as u8),
+                                    ((color_bytes[2] as f32 * calibration_bytes[2] as f32 / 255.0) as u8),
+                                ]
+                            }
+                            LedType::RGBW => {
+                                let calibration_bytes = color_calibration.to_bytes_rgbw();
+                                let color_bytes = colors[i].as_bytes();
+                                // Apply calibration to RGB values and use calibrated W
+                                vec![
+                                    ((color_bytes[0] as f32 * calibration_bytes[0] as f32 / 255.0) as u8),
+                                    ((color_bytes[1] as f32 * calibration_bytes[1] as f32 / 255.0) as u8),
+                                    ((color_bytes[2] as f32 * calibration_bytes[2] as f32 / 255.0) as u8),
+                                    calibration_bytes[3], // W channel
+                                ]
+                            }
+                        };
+                        buffer.extend_from_slice(&bytes);
                     } else {
                         log::warn!("Index {} out of bounds for colors array of length {}", i, colors.len());
                         // Add black color as fallback
-                        buffer.append(&mut vec![0, 0, 0]);
+                        match led_type {
+                            LedType::RGB => buffer.extend_from_slice(&[0, 0, 0]),
+                            LedType::RGBW => buffer.extend_from_slice(&[0, 0, 0, 0]),
+                        }
                     }
                 }
             }

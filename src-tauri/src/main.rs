@@ -10,7 +10,7 @@ mod screenshot_manager;
 mod screen_stream;
 mod volume;
 
-use ambient_light::{Border, ColorCalibration, LedStripConfig, LedStripConfigGroup};
+use ambient_light::{Border, ColorCalibration, LedStripConfig, LedStripConfigGroup, LedType};
 use display::{DisplayManager, DisplayState};
 use display_info::DisplayInfo;
 use paris::{error, info, warn};
@@ -135,6 +135,25 @@ async fn patch_led_strip_len(display_id: u32, border: Border, delta_len: i8) -> 
         })?;
 
     info!("patch_led_strip_len: ok");
+    Ok(())
+}
+
+#[tauri::command]
+async fn patch_led_strip_type(display_id: u32, border: Border, led_type: LedType) -> Result<(), String> {
+    info!(
+        "patch_led_strip_type: {} {:?} {:?}",
+        display_id, border, led_type
+    );
+    let config_manager = ambient_light::ConfigManager::global().await;
+    config_manager
+        .patch_led_strip_type(display_id, border, led_type)
+        .await
+        .map_err(|e| {
+            error!("can not patch led strip type: {}", e);
+            e.to_string()
+        })?;
+
+    info!("patch_led_strip_type: ok");
     Ok(())
 }
 
@@ -383,6 +402,7 @@ async fn main() {
             get_led_strips_sample_points,
             get_one_edge_colors,
             patch_led_strip_len,
+            patch_led_strip_type,
             send_colors,
             move_strip_part,
             reverse_led_strip_part,

@@ -3,6 +3,7 @@ import { Component, createMemo, For, JSX, splitProps } from 'solid-js';
 import { DisplayInfo } from '../../models/display-info.model';
 import { ledStripStore } from '../../stores/led-strip.store';
 import { Borders } from '../../constants/border';
+import { LedType } from '../../models/led-strip-config';
 
 type LedCountControlItemProps = {
   displayId: number;
@@ -45,7 +46,7 @@ const LedCountControlItem: Component<LedCountControlItemProps> = (props) => {
     const target = e.target as HTMLInputElement;
     const newValue = parseInt(target.value);
     const currentLen = config()?.len || 0;
-    
+
     if (!isNaN(newValue) && newValue >= 0 && newValue <= 1000) {
       const deltaLen = newValue - currentLen;
       if (deltaLen !== 0) {
@@ -63,6 +64,19 @@ const LedCountControlItem: Component<LedCountControlItemProps> = (props) => {
       // Reset invalid input
       target.value = (config()?.len || 0).toString();
     }
+  };
+
+  const handleLedTypeChange = (e: Event) => {
+    const target = e.target as HTMLSelectElement;
+    const newType = target.value as LedType;
+
+    invoke('patch_led_strip_type', {
+      displayId: props.displayId,
+      border: props.border,
+      ledType: newType,
+    }).catch((e) => {
+      console.error(e);
+    });
   };
 
   return (
@@ -106,6 +120,18 @@ const LedCountControlItem: Component<LedCountControlItemProps> = (props) => {
           >
             +
           </button>
+        </div>
+
+        <div class="mt-1">
+          <select
+            class="select select-xs w-full text-xs"
+            value={config()?.led_type || LedType.RGB}
+            onChange={handleLedTypeChange}
+            title="LED类型"
+          >
+            <option value={LedType.RGB}>RGB</option>
+            <option value={LedType.RGBW}>RGBW</option>
+          </select>
         </div>
       </div>
     </div>

@@ -74,6 +74,8 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
       return;
     }
 
+    // Frontend always uses RGB data (3 bytes per LED) for preview
+    // The backend sends RGB data to frontend regardless of LED type
     const offset = mapper.start * 3;
 
     console.log('🎨 LED: Updating colors', {
@@ -124,7 +126,19 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
     },
   });
 
-
+  const onWheel = (e: WheelEvent) => {
+    if (localProps.config) {
+      invoke('patch_led_strip_len', {
+        displayId: localProps.config.display_id,
+        border: localProps.config.border,
+        deltaLen: e.deltaY > 0 ? 1 : -1,
+      })
+        .then(() => {})
+        .catch((e) => {
+          console.error(e);
+        });
+    }
+  };
 
   return (
     <section
@@ -140,7 +154,7 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
           stripConfiguration.selectedStripPart?.displayId ===
             localProps.config?.display_id,
       }}
-
+      onWheel={onWheel}
     >
       <For each={colors()}>{(item) => <Pixel color={item} />}</For>
     </section>
