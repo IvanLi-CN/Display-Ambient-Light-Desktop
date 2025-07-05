@@ -12,9 +12,6 @@
 				"tauri",
 				"dev"
 			],
-			"problemMatcher": [
-				"$eslint-stylish"
-			],
 			"options": {
 				"env": {
 					"RUST_LOG": "info"
