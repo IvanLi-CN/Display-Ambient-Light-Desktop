@@ -11,14 +11,13 @@ import { DisplayStateIndex } from './components/displays/display-state-index';
 function App() {
   createEffect(() => {
     invoke<LedStripConfigContainer>('read_config').then((config) => {
-      console.log('App: read config', config);
       setLedStripStore({
         strips: config.strips,
         mappers: config.mappers,
         colorCalibration: config.color_calibration,
       });
     }).catch((error) => {
-      console.error('App: Failed to read config:', error);
+      console.error('Failed to read config:', error);
     });
   });
 

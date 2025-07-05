@@ -43,50 +43,35 @@ export const ScreenViewWebSocket: Component<ScreenViewWebSocketProps> = (props) 
 
   const connectWebSocket = () => {
     if (!isMounted) {
-      console.log('Component not mounted, skipping WebSocket connection');
       return;
     }
 
     const wsUrl = `ws://127.0.0.1:8765`;
-    console.log('Connecting to WebSocket:', wsUrl, 'with displayId:', localProps.displayId);
 
     setConnectionStatus('connecting');
     websocket = new WebSocket(wsUrl);
     websocket.binaryType = 'arraybuffer';
-    console.log('WebSocket object created:', websocket);
 
     websocket.onopen = () => {
-      console.log('WebSocket connected successfully!');
       setConnectionStatus('connected');
 
       // Send initial configuration
       const config = {
         display_id: localProps.displayId,
-        width: localProps.width || 320,  // Reduced from 400 for better performance
-        height: localProps.height || 180, // Reduced from 225 for better performance
-        quality: localProps.quality || 50  // Reduced from 75 for faster compression
+        width: localProps.width || 320,
+        height: localProps.height || 180,
+        quality: localProps.quality || 50
       };
-      console.log('Sending WebSocket configuration:', config);
       websocket?.send(JSON.stringify(config));
     };
 
     websocket.onmessage = (event) => {
-      console.log('🔍 WebSocket message received:', {
-        type: typeof event.data,
-        isArrayBuffer: event.data instanceof ArrayBuffer,
-        size: event.data instanceof ArrayBuffer ? event.data.byteLength : 'N/A'
-      });
-
       if (event.data instanceof ArrayBuffer) {
-        console.log('📦 Processing ArrayBuffer frame, size:', event.data.byteLength);
         handleJpegFrame(new Uint8Array(event.data));
-      } else {
-        console.log('⚠️ Received non-ArrayBuffer data:', event.data);
       }
     };
 
     websocket.onclose = (event) => {
-      console.log('WebSocket closed:', event.code, event.reason);
       setConnectionStatus('disconnected');
       websocket = null;
       
@@ -100,7 +85,6 @@ export const ScreenViewWebSocket: Component<ScreenViewWebSocketProps> = (props) 
     };
 
     websocket.onerror = (error) => {
-      console.error('WebSocket error:', error);
       setConnectionStatus('error');
     };
   };
@@ -204,7 +188,6 @@ export const ScreenViewWebSocket: Component<ScreenViewWebSocketProps> = (props) 
 
   // Initialize canvas and resize observer
   onMount(() => {
-    console.log('ScreenViewWebSocket mounted with displayId:', localProps.displayId);
     const context = canvas.getContext('2d');
     setCtx(context);
 
@@ -217,7 +200,6 @@ export const ScreenViewWebSocket: Component<ScreenViewWebSocketProps> = (props) 
     resizeObserver.observe(root);
 
     // Connect WebSocket
-    console.log('About to connect WebSocket...');
     connectWebSocket();
 
     onCleanup(() => {
@@ -227,17 +209,7 @@ export const ScreenViewWebSocket: Component<ScreenViewWebSocketProps> = (props) 
     });
   });
 
-  // Debug function to list displays
-  const debugDisplays = async () => {
-    try {
-      const result = await invoke('list_display_info');
-      console.log('Available displays:', result);
-      alert(`Available displays: ${result}`);
-    } catch (error) {
-      console.error('Failed to get display info:', error);
-      alert(`Error: ${error}`);
-    }
-  };
+
 
   // Status indicator
   const getStatusColor = () => {
@@ -275,13 +247,6 @@ export const ScreenViewWebSocket: Component<ScreenViewWebSocketProps> = (props) 
         {connectionStatus() === 'connected' && (
           <span>| {fps()} FPS | {frameCount()} frames</span>
         )}
-        <button
-          onClick={debugDisplays}
-          class="ml-2 px-1 py-0.5 bg-blue-600 hover:bg-blue-700 rounded text-xs"
-          title="Debug: Show available displays"
-        >
-          Debug
-        </button>
       </div>
       
       {rootProps.children}

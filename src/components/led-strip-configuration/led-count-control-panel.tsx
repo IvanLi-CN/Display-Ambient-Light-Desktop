@@ -1,9 +1,10 @@
 import { invoke } from '@tauri-apps/api/core';
-import { Component, createMemo, For, JSX, splitProps } from 'solid-js';
+import { Component, createMemo, For, JSX, splitProps, useContext } from 'solid-js';
 import { DisplayInfo } from '../../models/display-info.model';
 import { ledStripStore } from '../../stores/led-strip.store';
 import { Borders } from '../../constants/border';
 import { LedType } from '../../models/led-strip-config';
+import { LedStripConfigurationContext } from '../../contexts/led-strip-configuration.context';
 
 type LedCountControlItemProps = {
   displayId: number;
@@ -12,6 +13,8 @@ type LedCountControlItemProps = {
 };
 
 const LedCountControlItem: Component<LedCountControlItemProps> = (props) => {
+  const [stripConfiguration, { setHoveredStripPart }] = useContext(LedStripConfigurationContext);
+
   const config = createMemo(() => {
     return ledStripStore.strips.find(
       (s) => s.display_id === props.displayId && s.border === props.border
@@ -79,8 +82,28 @@ const LedCountControlItem: Component<LedCountControlItemProps> = (props) => {
     });
   };
 
+  const onMouseEnter = () => {
+    setHoveredStripPart({
+      displayId: props.displayId,
+      border: props.border,
+    });
+  };
+
+  const onMouseLeave = () => {
+    setHoveredStripPart(null);
+  };
+
   return (
-    <div class="card bg-base-100 border border-base-300/50 p-2">
+    <div
+      class="card bg-base-100 border border-base-300/50 p-2 transition-all duration-200 cursor-pointer"
+      classList={{
+        'ring-2 ring-primary bg-primary/20 border-primary':
+          stripConfiguration.hoveredStripPart?.border === props.border &&
+          stripConfiguration.hoveredStripPart?.displayId === props.displayId,
+      }}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
       <div class="flex flex-col gap-1">
         <div class="text-center">
           <span class="text-xs font-medium text-base-content">
@@ -140,7 +163,7 @@ const LedCountControlItem: Component<LedCountControlItemProps> = (props) => {
 
 type LedCountControlPanelProps = {
   display: DisplayInfo;
-} & JSX.HTMLAttributes<HTMLElement>;
+} & JSX.HTMLAttributes<HTMLDivElement>;
 
 export const LedCountControlPanel: Component<LedCountControlPanelProps> = (props) => {
   const [localProps, rootProps] = splitProps(props, ['display']);

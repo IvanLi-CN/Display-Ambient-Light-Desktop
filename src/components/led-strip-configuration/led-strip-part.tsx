@@ -60,33 +60,15 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
     );
 
     if (index === -1) {
-      console.log('🔍 LED: Strip config not found', {
-        displayId: localProps.config.display_id,
-        border: localProps.config.border,
-        availableStrips: ledStripStore.strips.length
-      });
       return;
     }
 
     const mapper = ledStripStore.mappers[index];
     if (!mapper) {
-      console.log('🔍 LED: Mapper not found', { index, mappersCount: ledStripStore.mappers.length });
       return;
     }
 
-    // Frontend always uses RGB data (3 bytes per LED) for preview
-    // The backend sends RGB data to frontend regardless of LED type
     const offset = mapper.start * 3;
-
-    console.log('🎨 LED: Updating colors', {
-      displayId: localProps.config.display_id,
-      border: localProps.config.border,
-      stripLength: localProps.config.len,
-      mapperPos: mapper.pos,
-      offset,
-      colorsArrayLength: ledStripStore.colors.length,
-      firstFewColors: Array.from(ledStripStore.colors.slice(offset, offset + 9))
-    });
 
     const colors = new Array(localProps.config.len).fill(null).map((_, i) => {
       const index = offset + i * 3;
@@ -94,12 +76,6 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
       const g = ledStripStore.colors[index + 1] || 0;
       const b = ledStripStore.colors[index + 2] || 0;
       return `rgb(${r}, ${g}, ${b})`;
-    });
-
-    console.log('🎨 LED: Generated colors', {
-      border: localProps.config.border,
-      colorsCount: colors.length,
-      sampleColors: colors.slice(0, 3)
     });
 
     setColors(colors);

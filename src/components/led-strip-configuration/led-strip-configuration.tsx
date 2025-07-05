@@ -19,19 +19,17 @@ export const LedStripConfiguration = () => {
   createEffect(() => {
     invoke<string>('list_display_info').then((displays) => {
       const parsedDisplays = JSON.parse(displays);
-      console.log('LedStripConfiguration: Loaded displays:', parsedDisplays);
       setDisplayStore({
         displays: parsedDisplays,
       });
     }).catch((error) => {
-      console.error('LedStripConfiguration: Failed to load displays:', error);
+      console.error('Failed to load displays:', error);
     });
 
     invoke<LedStripConfigContainer>('read_led_strip_configs').then((configs) => {
-      console.log('LedStripConfiguration: Loaded LED strip configs:', configs);
       setLedStripStore(configs);
     }).catch((error) => {
-      console.error('LedStripConfiguration: Failed to load LED strip configs:', error);
+      console.error('Failed to load LED strip configs:', error);
     });
   });
 
@@ -86,6 +84,7 @@ export const LedStripConfiguration = () => {
     LedStripConfigurationContextType[0]
   >({
     selectedStripPart: null,
+    hoveredStripPart: null,
   });
 
   const ledStripConfigurationContextValue: LedStripConfigurationContextType = [
@@ -94,6 +93,11 @@ export const LedStripConfiguration = () => {
       setSelectedStripPart: (v) => {
         setLedStripConfiguration({
           selectedStripPart: v,
+        });
+      },
+      setHoveredStripPart: (v) => {
+        setLedStripConfiguration({
+          hoveredStripPart: v,
         });
       },
     },
@@ -135,10 +139,9 @@ export const LedStripConfiguration = () => {
             </div>
             <div class="h-96 mb-4">
               <DisplayListContainer>
-                {displayStore.displays.map((display) => {
-                  console.log('LedStripConfiguration: Rendering DisplayView for display:', display);
-                  return <DisplayView display={display} />;
-                })}
+                {displayStore.displays.map((display) => (
+                  <DisplayView display={display} />
+                ))}
               </DisplayListContainer>
             </div>
             <div class="text-xs text-base-content/50">

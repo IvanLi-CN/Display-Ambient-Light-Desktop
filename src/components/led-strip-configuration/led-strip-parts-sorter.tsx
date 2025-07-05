@@ -29,7 +29,7 @@ const SorterItem: Component<{ strip: LedStripConfig; mapper: LedStripPixelMapper
   const [dragCurr, setDragCurr] = createSignal<{ x: number; y: number } | null>(null);
   const [dragStartIndex, setDragStartIndex] = createSignal<number>(0);
   const [cellWidth, setCellWidth] = createSignal<number>(0);
-  const [, { setSelectedStripPart }] = useContext(LedStripConfigurationContext);
+  const [stripConfiguration, { setSelectedStripPart, setHoveredStripPart }] = useContext(LedStripConfigurationContext);
   const [rootWidth, setRootWidth] = createSignal<number>(0);
 
   let root: HTMLDivElement;
@@ -38,9 +38,6 @@ const SorterItem: Component<{ strip: LedStripConfig; mapper: LedStripPixelMapper
     if (targetStart === props.mapper.start) {
       return;
     }
-    console.log(
-      `moving strip part ${props.strip.display_id} ${props.strip.border} from ${props.mapper.start} to ${targetStart}`,
-    );
     invoke('move_strip_part', {
       displayId: props.strip.display_id,
       border: props.strip.border,
@@ -151,6 +148,17 @@ const SorterItem: Component<{ strip: LedStripConfig; mapper: LedStripPixelMapper
     }).catch((err) => console.error(err));
   };
 
+  const onMouseEnter = () => {
+    setHoveredStripPart({
+      displayId: props.strip.display_id,
+      border: props.strip.border,
+    });
+  };
+
+  const onMouseLeave = () => {
+    setHoveredStripPart(null);
+  };
+
   const setColor = (fullIndex: number, colorsIndex: number, fullLeds: string[]) => {
     const colors = ledStripStore.colors;
     let c1 = `rgb(${Math.floor(colors[colorsIndex * 3] * 0.8)}, ${Math.floor(
@@ -162,7 +170,6 @@ const SorterItem: Component<{ strip: LedStripConfig; mapper: LedStripPixelMapper
     )}, ${Math.min(Math.floor(colors[colorsIndex * 3 + 2] * 1.2), 255)})`;
 
     if (fullLeds.length <= fullIndex) {
-      console.error('out of range', fullIndex, fullLeds.length);
       return;
     }
 
@@ -221,9 +228,16 @@ const SorterItem: Component<{ strip: LedStripConfig; mapper: LedStripPixelMapper
 
   return (
     <div
-      class="flex mx-2 select-none cursor-ew-resize focus:cursor-ew-resize"
+      class="flex mx-2 select-none cursor-ew-resize focus:cursor-ew-resize transition-colors duration-200"
+      classList={{
+        'bg-primary/20 rounded-lg':
+          stripConfiguration.hoveredStripPart?.border === props.strip.border &&
+          stripConfiguration.hoveredStripPart?.displayId === props.strip.display_id,
+      }}
       onPointerDown={onPointerDown}
       ondblclick={reverse}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       ref={root!}
     >
       <div

@@ -38,7 +38,7 @@ export const WhiteBalance = () => {
           setIsFullscreen(true);
         }
       } catch (error) {
-        console.error('Failed to auto enter fullscreen:', error);
+        // Silently handle fullscreen error
       }
     };
 
@@ -101,7 +101,6 @@ export const WhiteBalance = () => {
     const unlisten = listen('config_changed', (event) => {
       const { strips, mappers, color_calibration } =
         event.payload as LedStripConfigContainer;
-      console.log(event.payload);
       setLedStripStore({
         strips,
         mappers,
@@ -121,9 +120,9 @@ export const WhiteBalance = () => {
     const calibration = { ...ledStripStore.colorCalibration };
     calibration[key] = value;
     setLedStripStore('colorCalibration', calibration);
-    invoke('set_color_calibration', { calibration }).catch((error) =>
-      console.log(error),
-    );
+    invoke('set_color_calibration', { calibration }).catch(() => {
+      // Silently handle error
+    });
   };
 
   const toggleFullscreen = async () => {
@@ -138,7 +137,7 @@ export const WhiteBalance = () => {
         setPanelPosition({ x: 0, y: 0 });
       }
     } catch (error) {
-      console.error('Failed to toggle fullscreen:', error);
+      // Silently handle fullscreen error
     }
   };
 
@@ -156,7 +155,9 @@ export const WhiteBalance = () => {
   const reset = () => {
     invoke('set_color_calibration', {
       calibration: new ColorCalibration(),
-    }).catch((error) => console.log(error));
+    }).catch(() => {
+      // Silently handle error
+    });
   };
 
   return (
