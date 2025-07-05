@@ -4,6 +4,7 @@
 mod ambient_light;
 mod display;
 mod led_color;
+mod led_test_effects;
 mod rpc;
 mod screenshot;
 mod screenshot_manager;
@@ -13,6 +14,7 @@ mod volume;
 use ambient_light::{Border, ColorCalibration, LedStripConfig, LedStripConfigGroup, LedType};
 use display::{DisplayManager, DisplayState};
 use display_info::DisplayInfo;
+use led_test_effects::{LedTestEffects, TestEffectConfig, TestEffectType};
 use paris::{error, info, warn};
 use rpc::{BoardInfo, UdpRpc};
 use screenshot::Screenshot;
@@ -24,6 +26,14 @@ use tauri::{Manager, Emitter, Runtime};
 use regex;
 use tauri::http::{Request, Response};
 use volume::VolumeManager;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+
+// Global static variables for LED test effect management
+static EFFECT_HANDLE: tokio::sync::OnceCell<Arc<RwLock<Option<tokio::task::JoinHandle<()>>>>> =
+    tokio::sync::OnceCell::const_new();
+static CANCEL_TOKEN: tokio::sync::OnceCell<Arc<RwLock<Option<tokio_util::sync::CancellationToken>>>> =
+    tokio::sync::OnceCell::const_new();
 #[derive(Serialize, Deserialize)]
 #[serde(remote = "DisplayInfo")]
 struct DisplayInfoDef {
@@ -140,10 +150,6 @@ async fn patch_led_strip_len(display_id: u32, border: Border, delta_len: i8) -> 
 
 #[tauri::command]
 async fn patch_led_strip_type(display_id: u32, border: Border, led_type: LedType) -> Result<(), String> {
-    info!(
-        "patch_led_strip_type: {} {:?} {:?}",
-        display_id, border, led_type
-    );
     let config_manager = ambient_light::ConfigManager::global().await;
     config_manager
         .patch_led_strip_type(display_id, border, led_type)
@@ -153,7 +159,6 @@ async fn patch_led_strip_type(display_id: u32, border: Border, led_type: LedType
             e.to_string()
         })?;
 
-    info!("patch_led_strip_type: ok");
     Ok(())
 }
 
@@ -165,6 +170,193 @@ async fn send_colors(offset: u16, buffer: Vec<u8>) -> Result<(), String> {
             error!("can not send colors: {}", e);
             e.to_string()
         })
+}
+
+#[tauri::command]
+async fn send_test_colors_to_board(board_address: String, offset: u16, buffer: Vec<u8>) -> Result<(), String> {
+    use tokio::net::UdpSocket;
+
+    let socket = UdpSocket::bind("0.0.0.0:0").await.map_err(|e| {
+        error!("Failed to bind UDP socket: {}", e);
+        e.to_string()
+    })?;
+
+    let mut packet = vec![0x02]; // Header
+    packet.push((offset >> 8) as u8); // Offset high
+    packet.push((offset & 0xff) as u8); // Offset low
+    packet.extend_from_slice(&buffer); // Color data
+
+    socket.send_to(&packet, &board_address).await.map_err(|e| {
+        error!("Failed to send test colors to board {}: {}", board_address, e);
+        e.to_string()
+    })?;
+
+    info!("Sent test colors to board {} with offset {} and {} bytes", board_address, offset, buffer.len());
+    Ok(())
+}
+
+#[tauri::command]
+async fn enable_test_mode() -> Result<(), String> {
+    let publisher = ambient_light::LedColorsPublisher::global().await;
+    publisher.enable_test_mode().await;
+    Ok(())
+}
+
+#[tauri::command]
+async fn disable_test_mode() -> Result<(), String> {
+    info!("🔄 disable_test_mode command called from frontend");
+    let publisher = ambient_light::LedColorsPublisher::global().await;
+    publisher.disable_test_mode().await;
+    info!("✅ disable_test_mode command completed");
+    Ok(())
+}
+
+#[tauri::command]
+async fn is_test_mode_active() -> Result<bool, String> {
+    let publisher = ambient_light::LedColorsPublisher::global().await;
+    Ok(publisher.is_test_mode_active().await)
+}
+
+#[tauri::command]
+async fn start_led_test_effect(
+    board_address: String,
+    effect_config: TestEffectConfig,
+    update_interval_ms: u64,
+) -> Result<(), String> {
+    use tokio::time::{interval, Duration};
+
+    // Enable test mode first
+    let publisher = ambient_light::LedColorsPublisher::global().await;
+    publisher.enable_test_mode().await;
+
+    let handle_storage = EFFECT_HANDLE.get_or_init(|| async {
+        Arc::new(RwLock::new(None))
+    }).await;
+
+    let cancel_storage = CANCEL_TOKEN.get_or_init(|| async {
+        Arc::new(RwLock::new(None))
+    }).await;
+
+    // Stop any existing effect
+    {
+        let mut cancel_guard = cancel_storage.write().await;
+        if let Some(token) = cancel_guard.take() {
+            token.cancel();
+        }
+
+        let mut handle_guard = handle_storage.write().await;
+        if let Some(handle) = handle_guard.take() {
+            let _ = handle.await; // Wait for graceful shutdown
+        }
+    }
+
+    // Start new effect
+    let effect_config = Arc::new(effect_config);
+    let board_address = Arc::new(board_address);
+    let start_time = std::time::Instant::now();
+
+    // Create new cancellation token
+    let cancel_token = tokio_util::sync::CancellationToken::new();
+    let cancel_token_clone = cancel_token.clone();
+
+    let handle = tokio::spawn(async move {
+        let mut interval = interval(Duration::from_millis(update_interval_ms));
+
+        loop {
+            tokio::select! {
+                _ = interval.tick() => {
+                    let elapsed_ms = start_time.elapsed().as_millis() as u64;
+                    let colors = LedTestEffects::generate_colors(&effect_config, elapsed_ms);
+
+                    // Send to board
+                    if let Err(e) = send_test_colors_to_board_internal(&board_address, 0, colors).await {
+                        error!("Failed to send test effect colors: {}", e);
+                        break;
+                    }
+                }
+                _ = cancel_token_clone.cancelled() => {
+                    info!("LED test effect cancelled gracefully");
+                    break;
+                }
+            }
+        }
+        info!("LED test effect task ended");
+    });
+
+    // Store the handle and cancel token
+    {
+        let mut handle_guard = handle_storage.write().await;
+        *handle_guard = Some(handle);
+
+        let mut cancel_guard = cancel_storage.write().await;
+        *cancel_guard = Some(cancel_token);
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn stop_led_test_effect(board_address: String, led_count: u32, led_type: led_test_effects::LedType) -> Result<(), String> {
+    // Stop the effect task first
+
+    info!("🛑 Stopping LED test effect - board: {}", board_address);
+
+    // Cancel the task gracefully first
+    if let Some(cancel_storage) = CANCEL_TOKEN.get() {
+        let mut cancel_guard = cancel_storage.write().await;
+        if let Some(token) = cancel_guard.take() {
+            info!("🔄 Cancelling test effect task gracefully");
+            token.cancel();
+        }
+    }
+
+    // Wait for the task to finish
+    if let Some(handle_storage) = EFFECT_HANDLE.get() {
+        let mut handle_guard = handle_storage.write().await;
+        if let Some(handle) = handle_guard.take() {
+            info!("⏳ Waiting for test effect task to finish");
+            match handle.await {
+                Ok(_) => info!("✅ Test effect task finished successfully"),
+                Err(e) => warn!("⚠️ Test effect task finished with error: {}", e),
+            }
+        }
+    }
+
+    // Turn off all LEDs
+    let bytes_per_led = match led_type {
+        led_test_effects::LedType::RGB => 3,
+        led_test_effects::LedType::RGBW => 4,
+    };
+    let buffer = vec![0u8; (led_count * bytes_per_led) as usize];
+
+    send_test_colors_to_board_internal(&board_address, 0, buffer).await
+        .map_err(|e| e.to_string())?;
+
+    info!("💡 Sent LED off command");
+
+    // Disable test mode to resume normal publishing
+    let publisher = ambient_light::LedColorsPublisher::global().await;
+    publisher.disable_test_mode().await;
+
+    info!("🔄 Test mode disabled, normal publishing resumed");
+    info!("✅ LED test effect stopped completely");
+
+    Ok(())
+}
+
+// Internal helper function
+async fn send_test_colors_to_board_internal(board_address: &str, offset: u16, buffer: Vec<u8>) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    use tokio::net::UdpSocket;
+
+    let socket = UdpSocket::bind("0.0.0.0:0").await?;
+
+    let mut packet = vec![0x02]; // Header
+    packet.push((offset >> 8) as u8); // Offset high
+    packet.push((offset & 0xff) as u8); // Offset low
+    packet.extend_from_slice(&buffer); // Color data
+
+    socket.send_to(&packet, board_address).await?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -356,20 +548,7 @@ fn handle_ambient_light_protocol<R: Runtime>(
 async fn main() {
     env_logger::init();
 
-    // Debug: Print available displays
-    match display_info::DisplayInfo::all() {
-        Ok(displays) => {
-            println!("=== AVAILABLE DISPLAYS ===");
-            for (index, display) in displays.iter().enumerate() {
-                println!("  Display {}: ID={}, Scale={}, Width={}, Height={}",
-                    index, display.id, display.scale_factor, display.width, display.height);
-            }
-            println!("=== END DISPLAYS ===");
-        }
-        Err(e) => {
-            println!("Error getting display info: {}", e);
-        }
-    }
+    // Initialize display info (removed debug output)
 
     tokio::spawn(async move {
         let screenshot_manager = ScreenshotManager::global().await;
@@ -404,6 +583,12 @@ async fn main() {
             patch_led_strip_len,
             patch_led_strip_type,
             send_colors,
+            send_test_colors_to_board,
+            enable_test_mode,
+            disable_test_mode,
+            is_test_mode_active,
+            start_led_test_effect,
+            stop_led_test_effect,
             move_strip_part,
             reverse_led_strip_part,
             set_color_calibration,

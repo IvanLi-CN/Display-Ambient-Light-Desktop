@@ -26,6 +26,7 @@ pub struct LedColorsPublisher {
     colors_rx: Arc<RwLock<watch::Receiver<Vec<u8>>>>,
     colors_tx: Arc<RwLock<watch::Sender<Vec<u8>>>>,
     inner_tasks_version: Arc<RwLock<usize>>,
+    test_mode_active: Arc<RwLock<bool>>,
 }
 
 impl LedColorsPublisher {
@@ -44,6 +45,7 @@ impl LedColorsPublisher {
                     colors_rx: Arc::new(RwLock::new(rx)),
                     colors_tx: Arc::new(RwLock::new(tx)),
                     inner_tasks_version: Arc::new(RwLock::new(0)),
+                    test_mode_active: Arc::new(RwLock::new(false)),
                 }
             })
             .await
@@ -81,12 +83,20 @@ impl LedColorsPublisher {
 
                 let mappers = mappers.clone();
 
-                match Self::send_colors_by_display(colors, mappers, &strips, &color_calibration).await {
-                    Ok(_) => {
-                        // log::info!("sent colors: #{: >15}", display_id);
-                    }
-                    Err(err) => {
-                        warn!("Failed to send colors:  #{: >15}\t{}", display_id, err);
+                // Check if test mode is active before sending normal colors
+                let test_mode_active = {
+                    let publisher = LedColorsPublisher::global().await;
+                    *publisher.test_mode_active.read().await
+                };
+
+                if !test_mode_active {
+                    match Self::send_colors_by_display(colors, mappers, &strips, &color_calibration).await {
+                        Ok(_) => {
+                            // log::info!("sent colors: #{: >15}", display_id);
+                        }
+                        Err(err) => {
+                            warn!("Failed to send colors:  #{: >15}\t{}", display_id, err);
+                        }
                     }
                 }
 
@@ -531,6 +541,35 @@ impl LedColorsPublisher {
 
     pub async fn clone_colors_receiver(&self) -> watch::Receiver<Vec<u8>> {
         self.colors_rx.read().await.clone()
+    }
+
+    /// Enable test mode - this will pause normal LED data publishing
+    pub async fn enable_test_mode(&self) {
+        let mut test_mode = self.test_mode_active.write().await;
+        *test_mode = true;
+        log::info!("Test mode enabled - normal LED publishing paused");
+    }
+
+    /// Disable test mode - this will resume normal LED data publishing
+    pub async fn disable_test_mode(&self) {
+        let mut test_mode = self.test_mode_active.write().await;
+        *test_mode = false;
+        log::info!("Test mode disabled - normal LED publishing resumed");
+    }
+
+    /// Disable test mode with a delay to ensure clean transition
+    pub async fn disable_test_mode_with_delay(&self, delay_ms: u64) {
+        // Wait for the specified delay
+        tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
+
+        let mut test_mode = self.test_mode_active.write().await;
+        *test_mode = false;
+        log::info!("Test mode disabled with delay - normal LED publishing resumed");
+    }
+
+    /// Check if test mode is currently active
+    pub async fn is_test_mode_active(&self) -> bool {
+        *self.test_mode_active.read().await
     }
 }
 
