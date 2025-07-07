@@ -47,8 +47,8 @@ function App() {
 
   return (
     <div class="min-h-screen bg-base-100" data-theme="dark">
-      {/* Navigation */}
-      <div class="navbar bg-base-200 shadow-lg">
+      {/* Fixed Navigation */}
+      <div class="navbar bg-base-200 shadow-lg fixed top-0 left-0 right-0 z-50">
         <div class="navbar-start">
           <div class="dropdown">
             <div tabindex="0" role="button" class="btn btn-ghost lg:hidden">
@@ -80,8 +80,8 @@ function App() {
         </div>
       </div>
 
-      {/* Main Content */}
-      <main class="container mx-auto p-4">
+      {/* Main Content with top padding to account for fixed navbar */}
+      <main class="container mx-auto p-4 pt-20">
         <Routes>
           <Route path="/info" component={InfoIndex} />
           <Route path="/displays" component={DisplayStateIndex} />
