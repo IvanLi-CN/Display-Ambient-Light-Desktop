@@ -95,7 +95,7 @@ const LedCountControlItem: Component<LedCountControlItemProps> = (props) => {
 
   return (
     <div
-      class="card bg-base-100 border border-base-300/50 p-2 transition-all duration-200 cursor-pointer"
+      class="card bg-base-100 border border-base-300/50 p-1.5 transition-all duration-200 cursor-pointer"
       classList={{
         'ring-2 ring-primary bg-primary/20 border-primary':
           stripConfiguration.hoveredStripPart?.border === props.border &&
@@ -111,9 +111,9 @@ const LedCountControlItem: Component<LedCountControlItemProps> = (props) => {
           </span>
         </div>
 
-        <div class="flex items-center gap-1">
+        <div class="flex items-center gap-0.5">
           <button
-            class="btn btn-xs btn-circle btn-outline flex-shrink-0"
+            class="btn btn-xs btn-circle btn-outline flex-shrink-0 min-h-0 h-6 w-6"
             onClick={handleDecrease}
             disabled={!config() || (config()?.len || 0) <= 0}
             title="减少LED数量"
@@ -123,7 +123,7 @@ const LedCountControlItem: Component<LedCountControlItemProps> = (props) => {
 
           <input
             type="number"
-            class="input input-xs flex-1 text-center min-w-0 text-sm font-medium [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            class="input input-xs flex-1 text-center min-w-0 text-xs font-medium [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none h-6 px-1"
             value={config()?.len || 0}
             min="0"
             max="1000"
@@ -136,7 +136,7 @@ const LedCountControlItem: Component<LedCountControlItemProps> = (props) => {
           />
 
           <button
-            class="btn btn-xs btn-circle btn-outline flex-shrink-0"
+            class="btn btn-xs btn-circle btn-outline flex-shrink-0 min-h-0 h-6 w-6"
             onClick={handleIncrease}
             disabled={!config() || (config()?.len || 0) >= 1000}
             title="增加LED数量"
@@ -147,7 +147,7 @@ const LedCountControlItem: Component<LedCountControlItemProps> = (props) => {
 
         <div class="mt-1">
           <select
-            class="select select-xs w-full text-xs"
+            class="select select-xs w-full text-xs h-6 min-h-0"
             value={config()?.led_type || LedType.RGB}
             onChange={handleLedTypeChange}
             title="LED类型"
@@ -177,13 +177,13 @@ export const LedCountControlPanel: Component<LedCountControlPanelProps> = (props
 
   return (
     <div {...rootProps} class={'card bg-base-200 shadow-lg border border-base-300 ' + (rootProps.class || '')}>
-      <div class="card-body p-4">
-        <div class="card-title text-base mb-3 flex items-center justify-between">
+      <div class="card-body p-3">
+        <div class="card-title text-sm mb-2 flex items-center justify-between">
           <span>LED数量控制</span>
-          <div class="badge badge-info badge-outline">显示器 {localProps.display.id}</div>
+          <div class="badge badge-info badge-outline text-xs">显示器 {localProps.display.id}</div>
         </div>
 
-        <div class="grid grid-cols-4 gap-2">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <For each={borders}>
             {(item) => (
               <LedCountControlItem
@@ -195,7 +195,7 @@ export const LedCountControlPanel: Component<LedCountControlPanelProps> = (props
           </For>
         </div>
 
-        <div class="text-xs text-base-content/50 mt-3 p-2 bg-base-300/50 rounded">
+        <div class="text-xs text-base-content/50 mt-2 p-1.5 bg-base-300/50 rounded">
           💡 提示：点击 +/- 按钮或直接输入数值来调整LED数量（范围：0-1000）
         </div>
       </div>

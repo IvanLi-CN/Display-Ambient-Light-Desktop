@@ -81,7 +81,7 @@ function App() {
       </div>
 
       {/* Main Content with top padding to account for fixed navbar */}
-      <main class="container mx-auto p-4 pt-20">
+      <main class="container mx-auto px-2 sm:px-4 py-4 pt-20 max-w-full overflow-x-auto">
         <Routes>
           <Route path="/info" component={InfoIndex} />
           <Route path="/displays" component={DisplayStateIndex} />

@@ -104,13 +104,13 @@ export const LedStripConfiguration = () => {
   ];
 
   return (
-    <div class="space-y-6">
+    <div class="space-y-4">
       <div class="flex items-center justify-between">
-        <h1 class="text-2xl font-bold text-base-content">灯条配置</h1>
+        <h1 class="text-xl font-bold text-base-content">灯条配置</h1>
         <div class="stats shadow">
-          <div class="stat">
-            <div class="stat-title">显示器数量</div>
-            <div class="stat-value text-primary">{displayStore.displays.length}</div>
+          <div class="stat py-2 px-4">
+            <div class="stat-title text-xs">显示器数量</div>
+            <div class="stat-value text-primary text-lg">{displayStore.displays.length}</div>
           </div>
         </div>
       </div>
@@ -118,10 +118,10 @@ export const LedStripConfiguration = () => {
       <LedStripConfigurationContext.Provider value={ledStripConfigurationContextValue}>
         {/* LED Strip Sorter Panel */}
         <div class="card bg-base-200 shadow-lg">
-          <div class="card-body p-4">
-            <div class="card-title text-base mb-3">
+          <div class="card-body p-3">
+            <div class="card-title text-sm mb-2">
               <span>灯条排序</span>
-              <div class="badge badge-info badge-outline">实时预览</div>
+              <div class="badge badge-info badge-outline text-xs">实时预览</div>
             </div>
             <LedStripPartsSorter />
             <div class="text-xs text-base-content/50 mt-2">
@@ -132,12 +132,12 @@ export const LedStripConfiguration = () => {
 
         {/* Display Configuration Panel */}
         <div class="card bg-base-200 shadow-lg">
-          <div class="card-body p-4">
-            <div class="card-title text-base mb-3">
+          <div class="card-body p-3">
+            <div class="card-title text-sm mb-2">
               <span>显示器配置</span>
-              <div class="badge badge-secondary badge-outline">可视化编辑</div>
+              <div class="badge badge-secondary badge-outline text-xs">可视化编辑</div>
             </div>
-            <div class="h-96 mb-4">
+            <div class="h-80 mb-3">
               <DisplayListContainer>
                 {displayStore.displays.map((display) => (
                   <DisplayView display={display} />
@@ -151,12 +151,12 @@ export const LedStripConfiguration = () => {
         </div>
 
         {/* LED Count Control Panels */}
-        <div class="space-y-4">
-          <div class="flex items-center gap-2 mb-3">
-            <h2 class="text-lg font-semibold text-base-content">LED数量控制</h2>
-            <div class="badge badge-info badge-outline">实时调整</div>
+        <div class="space-y-3">
+          <div class="flex items-center gap-2 mb-2">
+            <h2 class="text-base font-semibold text-base-content">LED数量控制</h2>
+            <div class="badge badge-info badge-outline text-xs">实时调整</div>
           </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="led-control-grid">
             {displayStore.displays.map((display) => (
               <LedCountControlPanel display={display} />
             ))}
