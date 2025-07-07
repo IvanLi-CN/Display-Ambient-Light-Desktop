@@ -5,6 +5,16 @@ type Props = {
 } & JSX.HTMLAttributes<HTMLInputElement>;
 
 export const ColorSlider: Component<Props> = (props) => {
+  const handleMouseDown = (e: MouseEvent) => {
+    // 阻止事件冒泡到父元素，避免触发面板拖拽
+    e.stopPropagation();
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    // 阻止事件冒泡到父元素
+    e.stopPropagation();
+  };
+
   return (
     <input
       type="range"
@@ -17,6 +27,8 @@ export const ColorSlider: Component<Props> = (props) => {
         'range range-primary w-full bg-gradient-to-r ' +
         props.class
       }
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
     />
   );
 };

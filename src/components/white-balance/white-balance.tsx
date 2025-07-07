@@ -56,13 +56,17 @@ export const WhiteBalance = () => {
 
   // 拖拽处理函数
   const handleMouseDown = (e: MouseEvent) => {
+    // 确保只有在标题栏区域点击时才触发拖拽
     setIsDragging(true);
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setDragOffset({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
-    });
+    const panelRect = (e.currentTarget as HTMLElement).closest('.fixed')?.getBoundingClientRect();
+    if (panelRect) {
+      setDragOffset({
+        x: e.clientX - panelRect.left,
+        y: e.clientY - panelRect.top
+      });
+    }
     e.preventDefault();
+    e.stopPropagation();
   };
 
   const handleMouseMove = (e: MouseEvent) => {
@@ -338,22 +342,24 @@ export const WhiteBalance = () => {
 
           {/* 可拖拽的RGB控制面板 */}
           <div
-            class="fixed w-80 bg-base-200/95 backdrop-blur-sm rounded-lg shadow-xl z-60 cursor-move select-none"
+            class="fixed w-80 bg-base-200/95 backdrop-blur-sm rounded-lg shadow-xl z-60 select-none"
             style={{
               left: `${panelPosition().x}px`,
               top: `${panelPosition().y}px`,
               transform: 'none'
             }}
-            onMouseDown={handleMouseDown}
           >
             <div class="card-body p-4">
-              <div class="card-title text-base mb-3 flex justify-between items-center">
+              <div
+                class="card-title text-base mb-3 flex justify-between items-center cursor-move"
+                onMouseDown={handleMouseDown}
+              >
                 <div class="flex items-center gap-2">
                   <span class="text-xs opacity-60">⋮⋮</span>
                   <span>RGB调节</span>
                   <div class="badge badge-secondary badge-outline">可拖拽</div>
                 </div>
-                <button class="btn btn-ghost btn-xs" onClick={toggleFullscreen} title="退出全屏">
+                <button class="btn btn-ghost btn-xs cursor-pointer" onClick={toggleFullscreen} title="退出全屏">
                   <BsFullscreenExit size={14} />
                 </button>
               </div>
