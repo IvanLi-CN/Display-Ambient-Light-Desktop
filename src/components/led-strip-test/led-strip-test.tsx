@@ -1,12 +1,13 @@
 import { createSignal, createEffect, For, Show, onCleanup } from 'solid-js';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 
 interface BoardInfo {
   fullname: string;
   host: string;
   address: string;
   port: number;
-  connect_status: string;
+  connect_status: 'Connected' | 'Disconnected' | { Connecting: number };
 }
 
 interface TestPattern {
@@ -31,8 +32,9 @@ export const LedStripTest = () => {
   const [currentPattern, setCurrentPattern] = createSignal<TestPattern | null>(null);
   const [animationSpeed, setAnimationSpeed] = createSignal(33); // ~30fps
 
-  // Load available boards
+  // Load available boards and listen for changes
   createEffect(() => {
+    // Initial load
     invoke<BoardInfo[]>('get_boards').then((boardList) => {
       setBoards(boardList);
       if (boardList.length > 0 && !selectedBoard()) {
@@ -40,6 +42,35 @@ export const LedStripTest = () => {
       }
     }).catch((error) => {
       console.error('Failed to load boards:', error);
+    });
+
+    // Listen for board changes
+    const unlisten = listen<BoardInfo[]>('boards_changed', (event) => {
+      const boardList = event.payload;
+      setBoards(boardList);
+
+      // If currently selected board is no longer available, select the first available one
+      const currentBoard = selectedBoard();
+      if (currentBoard) {
+        const stillExists = boardList.find(board =>
+          board.host === currentBoard.host &&
+          board.address === currentBoard.address &&
+          board.port === currentBoard.port
+        );
+
+        if (!stillExists) {
+          // Current board is no longer available, select first available or null
+          setSelectedBoard(boardList.length > 0 ? boardList[0] : null);
+        }
+      } else if (boardList.length > 0) {
+        // No board was selected, select the first one
+        setSelectedBoard(boardList[0]);
+      }
+    });
+
+    // Cleanup listener when effect is disposed
+    onCleanup(() => {
+      unlisten.then((unlistenFn) => unlistenFn());
     });
   });
 
@@ -161,8 +192,11 @@ export const LedStripTest = () => {
           <div class="form-control w-full max-w-xs">
             <label class="label">
               <span class="label-text">Select Hardware Board</span>
+              <span class="label-text-alt">
+                {boards().length > 0 ? `${boards().length} device(s) found` : 'Searching...'}
+              </span>
             </label>
-            <select 
+            <select
               class="select select-bordered w-full max-w-xs"
               value={selectedBoard()?.host || ''}
               onChange={(e) => {
@@ -170,13 +204,29 @@ export const LedStripTest = () => {
                 setSelectedBoard(board || null);
               }}
             >
-              <option disabled value="">Choose a board</option>
+              <option disabled value="">
+                {boards().length > 0 ? 'Choose a board' : 'No boards found'}
+              </option>
               <For each={boards()}>
-                {(board) => (
-                  <option value={board.host}>
-                    {board.host} ({board.address}:{board.port})
-                  </option>
-                )}
+                {(board) => {
+                  const getStatusIcon = (status: BoardInfo['connect_status']) => {
+                    if (status === 'Connected') return '🟢';
+                    if (typeof status === 'object' && 'Connecting' in status) return '🟡';
+                    return '🔴';
+                  };
+
+                  const getStatusText = (status: BoardInfo['connect_status']) => {
+                    if (status === 'Connected') return 'Connected';
+                    if (typeof status === 'object' && 'Connecting' in status) return 'Connecting';
+                    return 'Disconnected';
+                  };
+
+                  return (
+                    <option value={board.host}>
+                      {getStatusIcon(board.connect_status)} {board.host} ({board.address}:{board.port}) - {getStatusText(board.connect_status)}
+                    </option>
+                  );
+                }}
               </For>
             </select>
           </div>
