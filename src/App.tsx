@@ -50,18 +50,18 @@ function App() {
       {/* Fixed Navigation */}
       <div class="navbar bg-base-200 shadow-lg fixed top-0 left-0 right-0 z-50">
         <div class="navbar-start">
-          <div class="dropdown">
-            <div tabindex="0" role="button" class="btn btn-ghost lg:hidden">
+          <div class="dropdown dropdown-hover">
+            <div tabindex="0" role="button" class="btn btn-ghost lg:hidden" onClick={(e) => e.currentTarget.focus()}>
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16"></path>
               </svg>
             </div>
-            <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow bg-base-100 rounded-box w-52">
-              <li><A href="/info" class="text-base-content">基本信息</A></li>
-              <li><A href="/displays" class="text-base-content">显示器信息</A></li>
-              <li><A href="/led-strips-configuration" class="text-base-content">灯条配置</A></li>
-              <li><A href="/white-balance" class="text-base-content">白平衡</A></li>
-              <li><A href="/led-strip-test" class="text-base-content">灯带测试</A></li>
+            <ul class="menu menu-sm dropdown-content mt-3 z-[100] p-2 shadow bg-base-100 rounded-box w-52 border border-base-300">
+              <li><A href="/info" class="text-base-content hover:bg-base-200">基本信息</A></li>
+              <li><A href="/displays" class="text-base-content hover:bg-base-200">显示器信息</A></li>
+              <li><A href="/led-strips-configuration" class="text-base-content hover:bg-base-200">灯条配置</A></li>
+              <li><A href="/white-balance" class="text-base-content hover:bg-base-200">白平衡</A></li>
+              <li><A href="/led-strip-test" class="text-base-content hover:bg-base-200">灯带测试</A></li>
             </ul>
           </div>
           <a class="btn btn-ghost text-xl text-primary font-bold">环境光控制</a>
