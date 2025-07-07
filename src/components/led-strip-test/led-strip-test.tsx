@@ -58,7 +58,10 @@ export const LedStripTest = () => {
           board.port === currentBoard.port
         );
 
-        if (!stillExists) {
+        if (stillExists) {
+          // Update to the new board object to reflect any status changes
+          setSelectedBoard(stillExists);
+        } else {
           // Current board is no longer available, select first available or null
           setSelectedBoard(boardList.length > 0 ? boardList[0] : null);
         }

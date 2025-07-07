@@ -194,25 +194,42 @@ impl UdpRpc {
                 continue;
             }
 
+            // Store previous board states to detect changes
+            let prev_boards = boards
+                .values()
+                .map(|it| async move { it.info.read().await.clone() });
+            let prev_boards = join_all(prev_boards).await;
+
+            // Check all boards
             for board in boards.values() {
                 if let Err(err) = board.check().await {
                     error!("failed to check board: {:?}", err);
                 }
             }
 
-            let tx_boards = boards
+            // Get current board states after check
+            let current_boards = boards
                 .values()
                 .map(|it| async move { it.info.read().await.clone() });
-            let tx_boards = join_all(tx_boards).await;
+            let current_boards = join_all(current_boards).await;
 
             drop(boards);
 
-            let board_change_sender = self.boards_change_sender.clone();
-            if let Err(err) = board_change_sender.send(tx_boards) {
-                error!("failed to send board change: {:?}", err);
-            }
+            // Only send update if there are actual changes
+            let has_changes = prev_boards.len() != current_boards.len() ||
+                prev_boards.iter().zip(current_boards.iter()).any(|(prev, current)| {
+                    prev.connect_status != current.connect_status ||
+                    prev.ttl != current.ttl ||
+                    prev.checked_at != current.checked_at
+                });
 
-            drop(board_change_sender);
+            if has_changes {
+                let board_change_sender = self.boards_change_sender.clone();
+                if let Err(err) = board_change_sender.send(current_boards) {
+                    error!("failed to send board change: {:?}", err);
+                }
+                drop(board_change_sender);
+            }
         }
     }
 }
