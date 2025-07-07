@@ -116,50 +116,52 @@ export const LedStripConfiguration = () => {
       </div>
 
       <LedStripConfigurationContext.Provider value={ledStripConfigurationContextValue}>
-        {/* LED Strip Sorter Panel */}
-        <div class="card bg-base-200 shadow-lg">
-          <div class="card-body p-3">
-            <div class="card-title text-sm mb-2">
-              <span>灯条排序</span>
-              <div class="badge badge-info badge-outline text-xs">实时预览</div>
-            </div>
-            <LedStripPartsSorter />
-            <div class="text-xs text-base-content/50 mt-2">
-              💡 提示：拖拽灯条段落来调整顺序，双击可反转方向
+        <div class="space-y-4">
+          {/* LED Strip Sorter Panel */}
+          <div class="card bg-base-200 shadow-lg">
+            <div class="card-body p-3">
+              <div class="card-title text-sm mb-2">
+                <span>灯条排序</span>
+                <div class="badge badge-info badge-outline text-xs">实时预览</div>
+              </div>
+              <LedStripPartsSorter />
+              <div class="text-xs text-base-content/50 mt-2">
+                💡 提示：拖拽灯条段落来调整顺序，双击可反转方向
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Display Configuration Panel */}
-        <div class="card bg-base-200 shadow-lg">
-          <div class="card-body p-3">
-            <div class="card-title text-sm mb-2">
-              <span>显示器配置</span>
-              <div class="badge badge-secondary badge-outline text-xs">可视化编辑</div>
-            </div>
-            <div class="h-80 mb-3">
-              <DisplayListContainer>
-                {displayStore.displays.map((display) => (
-                  <DisplayView display={display} />
-                ))}
-              </DisplayListContainer>
-            </div>
-            <div class="text-xs text-base-content/50">
-              💡 提示：悬停显示器查看详细信息，使用下方控制面板调整LED数量
+          {/* Display Configuration Panel - Auto height based on content */}
+          <div class="card bg-base-200 shadow-lg">
+            <div class="card-body p-3">
+              <div class="card-title text-sm mb-2">
+                <span>显示器配置</span>
+                <div class="badge badge-secondary badge-outline text-xs">可视化编辑</div>
+              </div>
+              <div class="mb-3">
+                <DisplayListContainer>
+                  {displayStore.displays.map((display) => (
+                    <DisplayView display={display} />
+                  ))}
+                </DisplayListContainer>
+              </div>
+              <div class="text-xs text-base-content/50">
+                💡 提示：悬停显示器查看详细信息，使用下方控制面板调整LED数量
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* LED Count Control Panels */}
-        <div class="space-y-3">
-          <div class="flex items-center gap-2 mb-2">
-            <h2 class="text-base font-semibold text-base-content">LED数量控制</h2>
-            <div class="badge badge-info badge-outline text-xs">实时调整</div>
-          </div>
-          <div class="led-control-grid">
-            {displayStore.displays.map((display) => (
-              <LedCountControlPanel display={display} />
-            ))}
+          {/* LED Count Control Panels */}
+          <div class="flex-shrink-0">
+            <div class="flex items-center gap-2 mb-2">
+              <h2 class="text-base font-semibold text-base-content">LED数量控制</h2>
+              <div class="badge badge-info badge-outline text-xs">实时调整</div>
+            </div>
+            <div class="led-control-grid">
+              {displayStore.displays.map((display) => (
+                <LedCountControlPanel display={display} />
+              ))}
+            </div>
           </div>
         </div>
       </LedStripConfigurationContext.Provider>

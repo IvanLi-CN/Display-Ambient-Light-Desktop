@@ -75,7 +75,7 @@ export const DisplayListContainer: ParentComponent = (props) => {
   createEffect(() => {});
 
   return (
-    <section ref={root!} class="relative bg-gray-400/30" style={rootStyle()}>
+    <section ref={root!} class="relative bg-gray-400/30 h-full w-full" style={rootStyle()}>
       <ol class="absolute" style={olStyle()}>
         {props.children}
       </ol>

@@ -46,9 +46,9 @@ function App() {
   });
 
   return (
-    <div class="min-h-screen bg-base-100" data-theme="dark">
+    <div class="h-screen bg-base-100 flex flex-col" data-theme="dark">
       {/* Fixed Navigation */}
-      <div class="navbar bg-base-200 shadow-lg fixed top-0 left-0 right-0 z-50">
+      <div class="navbar bg-base-200 shadow-lg flex-shrink-0 z-50">
         <div class="navbar-start">
           <div class="dropdown dropdown-hover">
             <div tabindex="0" role="button" class="btn btn-ghost lg:hidden" onClick={(e) => e.currentTarget.focus()}>
@@ -80,8 +80,8 @@ function App() {
         </div>
       </div>
 
-      {/* Main Content with top padding to account for fixed navbar */}
-      <main class="container mx-auto px-2 sm:px-4 py-4 pt-20 max-w-full overflow-x-auto">
+      {/* Main Content - fills remaining height */}
+      <main class="flex-1 container mx-auto px-2 sm:px-4 py-4 max-w-full overflow-x-auto min-h-0">
         <Routes>
           <Route path="/info" component={InfoIndex} />
           <Route path="/displays" component={DisplayStateIndex} />
