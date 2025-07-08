@@ -19,13 +19,17 @@ pub struct TestEffectConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum LedType {
-    RGB,
-    RGBW,
+    WS2812B,
+    SK6812,
 }
 
 pub struct LedTestEffects;
 
 impl LedTestEffects {
+    /// Check if LED type supports white channel (RGBW)
+    fn is_rgbw_type(led_type: &LedType) -> bool {
+        matches!(led_type, LedType::SK6812)
+    }
     /// Generate LED colors for a specific test effect at a given time
     pub fn generate_colors(config: &TestEffectConfig, time_ms: u64) -> Vec<u8> {
         let time_seconds = time_ms as f64 / 1000.0;
@@ -60,7 +64,7 @@ impl LedTestEffects {
             buffer.push(rgb.1);
             buffer.push(rgb.2);
             
-            if matches!(led_type, LedType::RGBW) {
+            if Self::is_rgbw_type(&led_type) {
                 buffer.push(0); // White channel
             }
         }
@@ -93,7 +97,7 @@ impl LedTestEffects {
             buffer.push(color.1);
             buffer.push(color.2);
             
-            if matches!(led_type, LedType::RGBW) {
+            if Self::is_rgbw_type(&led_type) {
                 buffer.push(0); // White channel
             }
         }
@@ -114,7 +118,7 @@ impl LedTestEffects {
                 buffer.push(255);
                 buffer.push(255);
                 
-                if matches!(led_type, LedType::RGBW) {
+                if Self::is_rgbw_type(&led_type) {
                     buffer.push(255); // White channel
                 }
             } else {
@@ -123,7 +127,7 @@ impl LedTestEffects {
                 buffer.push(0);
                 buffer.push(0);
                 
-                if matches!(led_type, LedType::RGBW) {
+                if Self::is_rgbw_type(&led_type) {
                     buffer.push(0); // White channel
                 }
             }
@@ -144,7 +148,7 @@ impl LedTestEffects {
             buffer.push(brightness);
             buffer.push(brightness);
             
-            if matches!(led_type, LedType::RGBW) {
+            if Self::is_rgbw_type(&led_type) {
                 buffer.push(brightness); // White channel
             }
         }

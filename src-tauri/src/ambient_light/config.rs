@@ -18,13 +18,13 @@ pub enum Border {
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq)]
 pub enum LedType {
-    RGB,
-    RGBW,
+    WS2812B,
+    SK6812,
 }
 
 impl Default for LedType {
     fn default() -> Self {
-        LedType::RGB
+        LedType::WS2812B
     }
 }
 
@@ -151,7 +151,7 @@ impl LedStripConfigGroup {
                     },
                     start_pos: j + i * 4 * 30,
                     len: 30,
-                    led_type: LedType::RGB,
+                    led_type: LedType::WS2812B,
                 };
                 configs.push(item);
                 strips.push(item);

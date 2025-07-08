@@ -322,12 +322,12 @@ impl LedColorsPublisher {
             let led_type = if group_index < strips.len() {
                 strips[group_index].led_type
             } else {
-                LedType::RGB // fallback to RGB
+                LedType::WS2812B // fallback to WS2812B
             };
 
             let bytes_per_led = match led_type {
-                LedType::RGB => 3,
-                LedType::RGBW => 4,
+                LedType::WS2812B => 3,
+                LedType::SK6812 => 4,
             };
 
             let mut buffer = Vec::<u8>::with_capacity(group_size * bytes_per_led);
@@ -348,7 +348,7 @@ impl LedColorsPublisher {
                 for i in start_index..end_index {
                     if i < colors.len() {
                         let bytes = match led_type {
-                            LedType::RGB => {
+                            LedType::WS2812B => {
                                 let calibration_bytes = color_calibration.to_bytes();
                                 let color_bytes = colors[i].as_bytes();
                                 // Apply calibration to RGB values
@@ -358,7 +358,7 @@ impl LedColorsPublisher {
                                     ((color_bytes[2] as f32 * calibration_bytes[2] as f32 / 255.0) as u8),
                                 ]
                             }
-                            LedType::RGBW => {
+                            LedType::SK6812 => {
                                 let calibration_bytes = color_calibration.to_bytes_rgbw();
                                 let color_bytes = colors[i].as_bytes();
                                 // Apply calibration to RGB values and use calibrated W
@@ -375,8 +375,8 @@ impl LedColorsPublisher {
                         log::warn!("Index {} out of bounds for colors array of length {}", i, colors.len());
                         // Add black color as fallback
                         match led_type {
-                            LedType::RGB => buffer.extend_from_slice(&[0, 0, 0]),
-                            LedType::RGBW => buffer.extend_from_slice(&[0, 0, 0, 0]),
+                            LedType::WS2812B => buffer.extend_from_slice(&[0, 0, 0]),
+                            LedType::SK6812 => buffer.extend_from_slice(&[0, 0, 0, 0]),
                         }
                     }
                 }
@@ -396,7 +396,7 @@ impl LedColorsPublisher {
                 for i in (start_index..end_index).rev() {
                     if i < colors.len() {
                         let bytes = match led_type {
-                            LedType::RGB => {
+                            LedType::WS2812B => {
                                 let calibration_bytes = color_calibration.to_bytes();
                                 let color_bytes = colors[i].as_bytes();
                                 // Apply calibration to RGB values
@@ -406,7 +406,7 @@ impl LedColorsPublisher {
                                     ((color_bytes[2] as f32 * calibration_bytes[2] as f32 / 255.0) as u8),
                                 ]
                             }
-                            LedType::RGBW => {
+                            LedType::SK6812 => {
                                 let calibration_bytes = color_calibration.to_bytes_rgbw();
                                 let color_bytes = colors[i].as_bytes();
                                 // Apply calibration to RGB values and use calibrated W
@@ -423,8 +423,8 @@ impl LedColorsPublisher {
                         log::warn!("Index {} out of bounds for colors array of length {}", i, colors.len());
                         // Add black color as fallback
                         match led_type {
-                            LedType::RGB => buffer.extend_from_slice(&[0, 0, 0]),
-                            LedType::RGBW => buffer.extend_from_slice(&[0, 0, 0, 0]),
+                            LedType::WS2812B => buffer.extend_from_slice(&[0, 0, 0]),
+                            LedType::SK6812 => buffer.extend_from_slice(&[0, 0, 0, 0]),
                         }
                     }
                 }

@@ -324,8 +324,8 @@ async fn stop_led_test_effect(board_address: String, led_count: u32, led_type: l
 
     // Turn off all LEDs
     let bytes_per_led = match led_type {
-        led_test_effects::LedType::RGB => 3,
-        led_test_effects::LedType::RGBW => 4,
+        led_test_effects::LedType::WS2812B => 3,
+        led_test_effects::LedType::SK6812 => 4,
     };
     let buffer = vec![0u8; (led_count * bytes_per_led) as usize];
 
