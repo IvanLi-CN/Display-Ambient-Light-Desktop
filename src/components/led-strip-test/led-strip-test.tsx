@@ -1,6 +1,7 @@
 import { createSignal, createEffect, For, Show, onCleanup } from 'solid-js';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { useLanguage } from '../../i18n/index';
 
 interface BoardInfo {
   fullname: string;
@@ -24,6 +25,7 @@ interface TestEffectConfig {
 }
 
 export const LedStripTest = () => {
+  const { t } = useLanguage();
   const [boards, setBoards] = createSignal<BoardInfo[]>([]);
   const [selectedBoard, setSelectedBoard] = createSignal<BoardInfo | null>(null);
   const [ledCount, setLedCount] = createSignal(60);
@@ -100,23 +102,23 @@ export const LedStripTest = () => {
   // Test patterns
   const testPatterns: TestPattern[] = [
     {
-      name: '流光效果',
-      description: '彩虹色流光，用于测试灯带方向',
+      name: t('ledTest.flowingRainbow'),
+      description: t('ledTest.flowingRainbowDesc'),
       effect_type: 'FlowingRainbow'
     },
     {
-      name: '十个一组计数',
-      description: '每十个LED一组不同颜色，用于快速计算灯珠数量',
+      name: t('ledTest.groupCounting'),
+      description: t('ledTest.groupCountingDesc'),
       effect_type: 'GroupCounting'
     },
     {
-      name: '单色扫描',
-      description: '单个LED依次点亮，用于精确测试每个LED位置',
+      name: t('ledTest.singleScan'),
+      description: t('ledTest.singleScanDesc'),
       effect_type: 'SingleScan'
     },
     {
-      name: '呼吸灯',
-      description: '整条灯带呼吸效果，用于测试整体亮度',
+      name: t('ledTest.breathing'),
+      description: t('ledTest.breathingDesc'),
       effect_type: 'Breathing'
     }
   ];

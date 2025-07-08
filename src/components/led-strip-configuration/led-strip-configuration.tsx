@@ -13,9 +13,11 @@ import {
   LedStripConfigurationContext,
   LedStripConfigurationContextType,
 } from '../../contexts/led-strip-configuration.context';
+import { useLanguage } from '../../i18n/index';
 
 
 export const LedStripConfiguration = () => {
+  const { t } = useLanguage();
   createEffect(() => {
     invoke<string>('list_display_info').then((displays) => {
       const parsedDisplays = JSON.parse(displays);
@@ -106,10 +108,10 @@ export const LedStripConfiguration = () => {
   return (
     <div class="space-y-4">
       <div class="flex items-center justify-between">
-        <h1 class="text-xl font-bold text-base-content">灯条配置</h1>
+        <h1 class="text-xl font-bold text-base-content">{t('ledConfig.title')}</h1>
         <div class="stats shadow">
           <div class="stat py-2 px-4">
-            <div class="stat-title text-xs">显示器数量</div>
+            <div class="stat-title text-xs">{t('displays.displayCount')}</div>
             <div class="stat-value text-primary text-lg">{displayStore.displays.length}</div>
           </div>
         </div>
@@ -121,12 +123,12 @@ export const LedStripConfiguration = () => {
           <div class="card bg-base-200 shadow-lg">
             <div class="card-body p-3">
               <div class="card-title text-sm mb-2">
-                <span>灯条排序</span>
-                <div class="badge badge-info badge-outline text-xs">实时预览</div>
+                <span>{t('ledConfig.stripSorting')}</span>
+                <div class="badge badge-info badge-outline text-xs">{t('ledConfig.realtimePreview')}</div>
               </div>
               <LedStripPartsSorter />
               <div class="text-xs text-base-content/50 mt-2">
-                💡 提示：拖拽灯条段落来调整顺序，双击可反转方向
+                💡 {t('ledConfig.sortingTip')}
               </div>
             </div>
           </div>
@@ -135,8 +137,8 @@ export const LedStripConfiguration = () => {
           <div class="card bg-base-200 shadow-lg">
             <div class="card-body p-3">
               <div class="card-title text-sm mb-2">
-                <span>显示器配置</span>
-                <div class="badge badge-secondary badge-outline text-xs">可视化编辑</div>
+                <span>{t('ledConfig.displayConfiguration')}</span>
+                <div class="badge badge-secondary badge-outline text-xs">{t('ledConfig.visualEditor')}</div>
               </div>
               <div class="mb-3">
                 <DisplayListContainer>
@@ -146,7 +148,7 @@ export const LedStripConfiguration = () => {
                 </DisplayListContainer>
               </div>
               <div class="text-xs text-base-content/50">
-                💡 提示：悬停显示器查看详细信息，使用下方控制面板调整LED数量
+                💡 {t('ledConfig.displayTip')}
               </div>
             </div>
           </div>
@@ -154,8 +156,8 @@ export const LedStripConfiguration = () => {
           {/* LED Count Control Panels */}
           <div class="flex-shrink-0">
             <div class="flex items-center gap-2 mb-2">
-              <h2 class="text-base font-semibold text-base-content">LED数量控制</h2>
-              <div class="badge badge-info badge-outline text-xs">实时调整</div>
+              <h2 class="text-base font-semibold text-base-content">{t('ledConfig.ledCountControl')}</h2>
+              <div class="badge badge-info badge-outline text-xs">{t('ledConfig.realtimeAdjustment')}</div>
             </div>
             <div class="led-control-grid">
               {displayStore.displays.map((display) => (

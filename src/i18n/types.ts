@@ -1,0 +1,219 @@
+export type Language = 'zh-CN' | 'en-US';
+
+export interface TranslationDict {
+  // Navigation
+  nav: {
+    title: string;
+    info: string;
+    displays: string;
+    ledConfiguration: string;
+    whiteBalance: string;
+    ledTest: string;
+  };
+  
+  // Common UI elements
+  common: {
+    version: string;
+    primary: string;
+    save: string;
+    cancel: string;
+    reset: string;
+    close: string;
+    fullscreen: string;
+    exitFullscreen: string;
+    loading: string;
+    error: string;
+    success: string;
+    warning: string;
+    confirm: string;
+    delete: string;
+    edit: string;
+    add: string;
+    remove: string;
+    enable: string;
+    disable: string;
+    start: string;
+    stop: string;
+    test: string;
+    apply: string;
+    refresh: string;
+    realtime: string;
+  };
+  
+  // Info page
+  info: {
+    title: string;
+    boardInfo: string;
+    systemInfo: string;
+    deviceName: string;
+    ipAddress: string;
+    macAddress: string;
+    firmwareVersion: string;
+    hardwareVersion: string;
+    uptime: string;
+    status: string;
+    connected: string;
+    disconnected: string;
+    lastSeen: string;
+    port: string;
+    latency: string;
+    hostname: string;
+    deviceCount: string;
+    noDevicesFound: string;
+    checkConnection: string;
+  };
+  
+  // Display page
+  displays: {
+    title: string;
+    count: string;
+    noDisplays: string;
+    checkConnection: string;
+    displayInfo: string;
+    resolution: string;
+    refreshRate: string;
+    colorDepth: string;
+    isPrimary: string;
+    position: string;
+    size: string;
+    scaleFactor: string;
+    lastModified: string;
+    displayCount: string;
+    noDisplaysFound: string;
+    brightnessSettings: string;
+    currentBrightness: string;
+    maxBrightness: string;
+    minBrightness: string;
+    contrastSettings: string;
+    currentContrast: string;
+    maxContrast: string;
+    minContrast: string;
+    modeSettings: string;
+    currentMode: string;
+    maxMode: string;
+    minMode: string;
+  };
+  
+  // LED Strip Configuration
+  ledConfig: {
+    title: string;
+    displaySelection: string;
+    ledStripConfig: string;
+    ledCount: string;
+    ledType: string;
+    position: string;
+    top: string;
+    bottom: string;
+    left: string;
+    right: string;
+    preview: string;
+    configuration: string;
+    sorter: string;
+    moveUp: string;
+    moveDown: string;
+    reverse: string;
+    rgb: string;
+    rgbw: string;
+    segments: string;
+    totalLeds: string;
+    saveConfig: string;
+    loadConfig: string;
+    stripSorting: string;
+    realtimePreview: string;
+    sortingTip: string;
+    displayConfiguration: string;
+    visualEditor: string;
+    displayTip: string;
+    ledCountControl: string;
+    realtimeAdjustment: string;
+    decreaseLedCount: string;
+    increaseLedCount: string;
+    display: string;
+    controlTip: string;
+  };
+  
+  // White Balance
+  whiteBalance: {
+    title: string;
+    colorCalibration: string;
+    redChannel: string;
+    greenChannel: string;
+    blueChannel: string;
+    whiteChannel: string;
+    brightness: string;
+    temperature: string;
+    resetToDefault: string;
+    fullscreenMode: string;
+    normalMode: string;
+    instructions: string;
+    helpText: string;
+    compareColors: string;
+    adjustValues: string;
+    dragToMove: string;
+    back: string;
+    colorTest: string;
+    clickToTest: string;
+    colorTestTip: string;
+    rgbAdjustment: string;
+    realtimeAdjustment: string;
+    usageInstructions: string;
+    recommendedMethod: string;
+    adjustmentTips: string;
+    comparisonMethod: string;
+    fullscreenTip: string;
+    dragTip: string;
+    redStrong: string;
+    greenStrong: string;
+    blueStrong: string;
+    whiteYellow: string;
+    whiteBlue: string;
+    whiteComparison: string;
+    colorComparison: string;
+    environmentTest: string;
+    resetNote: string;
+    fullscreenComparisonTip: string;
+    draggable: string;
+    exitFullscreen: string;
+    notEnabled: string;
+  };
+  
+  // LED Test
+  ledTest: {
+    title: string;
+    testEffects: string;
+    staticColor: string;
+    rainbow: string;
+    breathing: string;
+    wave: string;
+    chase: string;
+    twinkle: string;
+    fire: string;
+    speed: string;
+    brightness: string;
+    color: string;
+    startTest: string;
+    stopTest: string;
+    testRunning: string;
+    testStopped: string;
+    selectEffect: string;
+    effectSettings: string;
+    flowingRainbow: string;
+    flowingRainbowDesc: string;
+    groupCounting: string;
+    groupCountingDesc: string;
+    singleScan: string;
+    singleScanDesc: string;
+    breathingDesc: string;
+  };
+  
+  // Error messages
+  errors: {
+    failedToLoad: string;
+    failedToSave: string;
+    failedToConnect: string;
+    invalidConfiguration: string;
+    deviceNotFound: string;
+    networkError: string;
+    unknownError: string;
+  };
+}

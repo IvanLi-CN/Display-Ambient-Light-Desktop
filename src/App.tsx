@@ -8,10 +8,12 @@ import { setLedStripStore } from './stores/led-strip.store';
 import { LedStripConfigContainer } from './models/led-strip-config';
 import { InfoIndex } from './components/info/info-index';
 import { DisplayStateIndex } from './components/displays/display-state-index';
+import { useLanguage } from './i18n/index';
 
 function App() {
   const location = useLocation();
   const [previousPath, setPreviousPath] = createSignal<string>('');
+  const { t, locale, setLocale } = useLanguage();
 
   // Monitor route changes and cleanup LED tests when leaving the test page
   createEffect(() => {
@@ -57,26 +59,49 @@ function App() {
               </svg>
             </div>
             <ul class="menu menu-sm dropdown-content mt-3 z-[100] p-2 shadow bg-base-100 rounded-box w-52 border border-base-300">
-              <li><A href="/info" class="text-base-content hover:bg-base-200">基本信息</A></li>
-              <li><A href="/displays" class="text-base-content hover:bg-base-200">显示器信息</A></li>
-              <li><A href="/led-strips-configuration" class="text-base-content hover:bg-base-200">灯条配置</A></li>
-              <li><A href="/white-balance" class="text-base-content hover:bg-base-200">白平衡</A></li>
-              <li><A href="/led-strip-test" class="text-base-content hover:bg-base-200">灯带测试</A></li>
+              <li><A href="/info" class="text-base-content hover:bg-base-200">{t('nav.info')}</A></li>
+              <li><A href="/displays" class="text-base-content hover:bg-base-200">{t('nav.displays')}</A></li>
+              <li><A href="/led-strips-configuration" class="text-base-content hover:bg-base-200">{t('nav.ledConfiguration')}</A></li>
+              <li><A href="/white-balance" class="text-base-content hover:bg-base-200">{t('nav.whiteBalance')}</A></li>
+              <li><A href="/led-strip-test" class="text-base-content hover:bg-base-200">{t('nav.ledTest')}</A></li>
             </ul>
           </div>
-          <a class="btn btn-ghost text-xl text-primary font-bold">环境光控制</a>
+          <a class="btn btn-ghost text-xl text-primary font-bold">{t('nav.title')}</a>
         </div>
         <div class="navbar-center hidden lg:flex">
           <ul class="menu menu-horizontal px-1">
-            <li><A href="/info" class="btn btn-ghost text-base-content hover:text-primary">基本信息</A></li>
-            <li><A href="/displays" class="btn btn-ghost text-base-content hover:text-primary">显示器信息</A></li>
-            <li><A href="/led-strips-configuration" class="btn btn-ghost text-base-content hover:text-primary">灯条配置</A></li>
-            <li><A href="/white-balance" class="btn btn-ghost text-base-content hover:text-primary">白平衡</A></li>
-            <li><A href="/led-strip-test" class="btn btn-ghost text-base-content hover:text-primary">灯带测试</A></li>
+            <li><A href="/info" class="btn btn-ghost text-base-content hover:text-primary">{t('nav.info')}</A></li>
+            <li><A href="/displays" class="btn btn-ghost text-base-content hover:text-primary">{t('nav.displays')}</A></li>
+            <li><A href="/led-strips-configuration" class="btn btn-ghost text-base-content hover:text-primary">{t('nav.ledConfiguration')}</A></li>
+            <li><A href="/white-balance" class="btn btn-ghost text-base-content hover:text-primary">{t('nav.whiteBalance')}</A></li>
+            <li><A href="/led-strip-test" class="btn btn-ghost text-base-content hover:text-primary">{t('nav.ledTest')}</A></li>
           </ul>
         </div>
         <div class="navbar-end">
-          <div class="badge badge-primary badge-outline">v1.0</div>
+          <div class="dropdown dropdown-end">
+            <div tabindex="0" role="button" class="btn btn-ghost btn-sm">
+              {locale() === 'zh-CN' ? '中文' : 'English'}
+            </div>
+            <ul class="dropdown-content z-[100] menu p-2 shadow bg-base-100 rounded-box w-32 border border-base-300">
+              <li>
+                <button
+                  class={`${locale() === 'zh-CN' ? 'active' : ''}`}
+                  onClick={() => setLocale('zh-CN')}
+                >
+                  中文
+                </button>
+              </li>
+              <li>
+                <button
+                  class={`${locale() === 'en-US' ? 'active' : ''}`}
+                  onClick={() => setLocale('en-US')}
+                >
+                  English
+                </button>
+              </li>
+            </ul>
+          </div>
+          <div class="badge badge-primary badge-outline ml-2">v1.0</div>
         </div>
       </div>
 

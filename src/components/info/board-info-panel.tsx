@@ -1,5 +1,6 @@
 import { Component, ParentComponent, createMemo } from 'solid-js';
 import { BoardInfo } from '../../models/board-info.model';
+import { useLanguage } from '../../i18n/index';
 
 type ItemProps = {
   label: string;
@@ -15,6 +16,7 @@ const Item: ParentComponent<ItemProps> = (props) => {
 };
 
 export const BoardInfoPanel: Component<{ board: BoardInfo }> = (props) => {
+  const { t } = useLanguage();
   const ttl = createMemo(() => {
     if (props.board.connect_status !== 'Connected') {
       return '--';
@@ -60,10 +62,10 @@ export const BoardInfoPanel: Component<{ board: BoardInfo }> = (props) => {
           <div class={statusBadgeClass()}>{connectStatus()}</div>
         </div>
         <div class="space-y-2">
-          <Item label="主机名">{props.board.host}</Item>
-          <Item label="IP地址">{props.board.address}</Item>
-          <Item label="端口">{props.board.port}</Item>
-          <Item label="延迟">{ttl()}</Item>
+          <Item label={t('info.hostname')}>{props.board.host}</Item>
+          <Item label={t('info.ipAddress')}>{props.board.address}</Item>
+          <Item label={t('info.port')}>{props.board.port}</Item>
+          <Item label={t('info.latency')}>{ttl()}</Item>
         </div>
       </div>
     </div>

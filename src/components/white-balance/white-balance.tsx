@@ -10,6 +10,7 @@ import { BiRegularReset } from 'solid-icons/bi';
 import { BsFullscreen, BsFullscreenExit } from 'solid-icons/bs';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import transparentBg from '../../assets/transparent-grid-background.svg?url';
+import { useLanguage } from '../../i18n/index';
 
 const Value: Component<{ value: number }> = (props) => {
   return (
@@ -20,6 +21,7 @@ const Value: Component<{ value: number }> = (props) => {
 };
 
 export const WhiteBalance = () => {
+  const { t } = useLanguage();
   const [isFullscreen, setIsFullscreen] = createSignal(false);
   const [panelPosition, setPanelPosition] = createSignal({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = createSignal(false);
@@ -170,19 +172,19 @@ export const WhiteBalance = () => {
       {!isFullscreen() && (
         <div class="space-y-6">
           <div class="flex items-center justify-between">
-            <h1 class="text-2xl font-bold text-base-content">白平衡调节</h1>
+            <h1 class="text-2xl font-bold text-base-content">{t('whiteBalance.title')}</h1>
             <div class="flex gap-2">
-              <button class="btn btn-outline btn-sm" onClick={toggleFullscreen} title="进入全屏">
+              <button class="btn btn-outline btn-sm" onClick={toggleFullscreen} title={t('common.fullscreen')}>
                 <BsFullscreen size={16} />
-                全屏
+                {t('common.fullscreen')}
               </button>
-              <button class="btn btn-outline btn-sm" onClick={reset} title="重置到100%">
+              <button class="btn btn-outline btn-sm" onClick={reset} title={t('common.reset')}>
                 <BiRegularReset size={16} />
-                重置
+                {t('common.reset')}
               </button>
-              <button class="btn btn-primary btn-sm" onClick={exit} title="返回">
+              <button class="btn btn-primary btn-sm" onClick={exit} title={t('whiteBalance.back')}>
                 <VsClose size={16} />
-                返回
+                {t('whiteBalance.back')}
               </button>
             </div>
           </div>
@@ -192,8 +194,8 @@ export const WhiteBalance = () => {
             <div class="card bg-base-200 shadow-lg">
               <div class="card-body p-4">
                 <div class="card-title text-base mb-3">
-                  <span>颜色测试</span>
-                  <div class="badge badge-info badge-outline">点击测试</div>
+                  <span>{t('whiteBalance.colorTest')}</span>
+                  <div class="badge badge-info badge-outline">{t('whiteBalance.clickToTest')}</div>
                 </div>
                 <div
                   class="aspect-square rounded-lg overflow-hidden border border-base-300"
@@ -204,7 +206,7 @@ export const WhiteBalance = () => {
                   <TestColorsBg />
                 </div>
                 <div class="text-xs text-base-content/50 mt-2">
-                  💡 提示：点击颜色块进行单色测试，再次点击返回多色模式
+                  💡 {t('whiteBalance.colorTestTip')}
                 </div>
               </div>
             </div>
@@ -213,14 +215,14 @@ export const WhiteBalance = () => {
             <div class="card bg-base-200 shadow-lg">
               <div class="card-body p-4">
                 <div class="card-title text-base mb-3">
-                  <span>RGB调节</span>
-                  <div class="badge badge-secondary badge-outline">实时调节</div>
+                  <span>{t('whiteBalance.rgbAdjustment')}</span>
+                  <div class="badge badge-secondary badge-outline">{t('whiteBalance.realtimeAdjustment')}</div>
                 </div>
 
                 <div class="space-y-4">
                   <div class="form-control">
                     <label class="label">
-                      <span class="label-text font-semibold text-red-500">红色 (R)</span>
+                      <span class="label-text font-semibold text-red-500">{t('whiteBalance.redChannel')}</span>
                       <Value value={ledStripStore.colorCalibration.r} />
                     </label>
                     <ColorSlider
@@ -237,7 +239,7 @@ export const WhiteBalance = () => {
 
                   <div class="form-control">
                     <label class="label">
-                      <span class="label-text font-semibold text-green-500">绿色 (G)</span>
+                      <span class="label-text font-semibold text-green-500">{t('whiteBalance.greenChannel')}</span>
                       <Value value={ledStripStore.colorCalibration.g} />
                     </label>
                     <ColorSlider
@@ -254,7 +256,7 @@ export const WhiteBalance = () => {
 
                   <div class="form-control">
                     <label class="label">
-                      <span class="label-text font-semibold text-blue-500">蓝色 (B)</span>
+                      <span class="label-text font-semibold text-blue-500">{t('whiteBalance.blueChannel')}</span>
                       <Value value={ledStripStore.colorCalibration.b} />
                     </label>
                     <ColorSlider
@@ -271,7 +273,7 @@ export const WhiteBalance = () => {
 
                   <div class="form-control">
                     <label class="label">
-                      <span class="label-text font-semibold text-amber-500">白色 (W)</span>
+                      <span class="label-text font-semibold text-amber-500">{t('whiteBalance.whiteChannel')}</span>
                       <Value value={ledStripStore.colorCalibration.w} />
                     </label>
                     <ColorSlider
@@ -291,37 +293,37 @@ export const WhiteBalance = () => {
                 <div class="collapse collapse-arrow bg-base-100 mt-4">
                   <input type="checkbox" />
                   <div class="collapse-title text-sm font-medium text-base-content/80">
-                    💡 白平衡调节使用说明
+                    💡 {t('whiteBalance.usageInstructions')}
                   </div>
                   <div class="collapse-content text-xs text-base-content/70 space-y-3">
                     <div class="space-y-2">
-                      <p class="font-semibold text-primary">🎯 推荐使用方法：</p>
+                      <p class="font-semibold text-primary">{t('whiteBalance.recommendedMethod')}</p>
                       <ol class="list-decimal list-inside space-y-1 ml-2">
-                        <li>点击上方"全屏"按钮进入全屏模式</li>
-                        <li>全屏模式下屏幕边缘会显示彩色条带</li>
+                        <li>{t('whiteBalance.fullscreenTip')}</li>
+                        <li>{t('whiteBalance.dragTip')}</li>
                         <li>将RGB控制面板拖拽到合适位置</li>
                         <li>对比LED灯条颜色与屏幕边缘颜色</li>
                       </ol>
                     </div>
 
                     <div class="space-y-2">
-                      <p class="font-semibold text-secondary">🔧 调节技巧：</p>
+                      <p class="font-semibold text-secondary">{t('whiteBalance.adjustmentTips')}</p>
                       <ul class="list-disc list-inside space-y-1 ml-2">
-                        <li><span class="text-red-500 font-medium">红色偏强</span>：降低R值，LED会减少红色成分</li>
-                        <li><span class="text-green-500 font-medium">绿色偏强</span>：降低G值，LED会减少绿色成分</li>
-                        <li><span class="text-blue-500 font-medium">蓝色偏强</span>：降低B值，LED会减少蓝色成分</li>
-                        <li><span class="text-base-content font-medium">白色发黄</span>：适当提高B值，降低R/G值</li>
-                        <li><span class="text-base-content font-medium">白色发蓝</span>：适当降低B值，提高R/G值</li>
+                        <li>{t('whiteBalance.redStrong')}</li>
+                        <li>{t('whiteBalance.greenStrong')}</li>
+                        <li>{t('whiteBalance.blueStrong')}</li>
+                        <li>{t('whiteBalance.whiteYellow')}</li>
+                        <li>{t('whiteBalance.whiteBlue')}</li>
                       </ul>
                     </div>
 
                     <div class="space-y-2">
-                      <p class="font-semibold text-accent">📋 对比方法：</p>
+                      <p class="font-semibold text-accent">{t('whiteBalance.comparisonMethod')}</p>
                       <ul class="list-disc list-inside space-y-1 ml-2">
-                        <li>重点观察白色区域，确保LED白光与屏幕白色一致</li>
-                        <li>检查彩色区域，确保LED颜色饱和度合适</li>
-                        <li>在不同环境光下测试，确保效果稳定</li>
-                        <li>调节完成后可点击"重置"按钮恢复默认值</li>
+                        <li>{t('whiteBalance.whiteComparison')}</li>
+                        <li>{t('whiteBalance.colorComparison')}</li>
+                        <li>{t('whiteBalance.environmentTest')}</li>
+                        <li>{t('whiteBalance.resetNote')}</li>
                       </ul>
                     </div>
                   </div>
@@ -356,10 +358,10 @@ export const WhiteBalance = () => {
               >
                 <div class="flex items-center gap-2">
                   <span class="text-xs opacity-60">⋮⋮</span>
-                  <span>RGB调节</span>
-                  <div class="badge badge-secondary badge-outline">可拖拽</div>
+                  <span>{t('whiteBalance.rgbAdjustment')}</span>
+                  <div class="badge badge-secondary badge-outline">{t('whiteBalance.draggable')}</div>
                 </div>
-                <button class="btn btn-ghost btn-xs cursor-pointer" onClick={toggleFullscreen} title="退出全屏">
+                <button class="btn btn-ghost btn-xs cursor-pointer" onClick={toggleFullscreen} title={t('whiteBalance.exitFullscreen')}>
                   <BsFullscreenExit size={14} />
                 </button>
               </div>
@@ -367,7 +369,7 @@ export const WhiteBalance = () => {
               <div class="space-y-4">
                 <div class="form-control">
                   <label class="label">
-                    <span class="label-text font-semibold text-red-500">红色 (R)</span>
+                    <span class="label-text font-semibold text-red-500">{t('whiteBalance.redChannel')}</span>
                     <Value value={ledStripStore.colorCalibration.r} />
                   </label>
                   <ColorSlider
@@ -384,7 +386,7 @@ export const WhiteBalance = () => {
 
                 <div class="form-control">
                   <label class="label">
-                    <span class="label-text font-semibold text-green-500">绿色 (G)</span>
+                    <span class="label-text font-semibold text-green-500">{t('whiteBalance.greenChannel')}</span>
                     <Value value={ledStripStore.colorCalibration.g} />
                   </label>
                   <ColorSlider
@@ -401,7 +403,7 @@ export const WhiteBalance = () => {
 
                 <div class="form-control">
                   <label class="label">
-                    <span class="label-text font-semibold text-blue-500">蓝色 (B)</span>
+                    <span class="label-text font-semibold text-blue-500">{t('whiteBalance.blueChannel')}</span>
                     <Value value={ledStripStore.colorCalibration.b} />
                   </label>
                   <ColorSlider
@@ -418,7 +420,7 @@ export const WhiteBalance = () => {
 
                 <div class="form-control">
                   <label class="label">
-                    <span class="label-text font-semibold text-amber-500">白色 (W)</span>
+                    <span class="label-text font-semibold text-amber-500">{t('whiteBalance.whiteChannel')}</span>
                     <Value value={ledStripStore.colorCalibration.w} />
                   </label>
                   <ColorSlider
@@ -435,25 +437,25 @@ export const WhiteBalance = () => {
 
                 <div class="form-control">
                   <label class="label">
-                    <span class="label-text font-semibold text-base-content/70">白色 (W)</span>
-                    <div class="badge badge-outline badge-sm">暂未启用</div>
+                    <span class="label-text font-semibold text-base-content/70">{t('whiteBalance.whiteChannel')}</span>
+                    <div class="badge badge-outline badge-sm">{t('whiteBalance.notEnabled')}</div>
                   </label>
                   <ColorSlider class="from-yellow-50 to-cyan-50" disabled />
                 </div>
               </div>
 
               <div class="text-xs text-base-content/60 mt-3 p-2 bg-base-300/50 rounded">
-                💡 对比屏幕边缘颜色与LED灯条，调节RGB滑块使颜色一致
+                💡 {t('whiteBalance.fullscreenComparisonTip')}
               </div>
 
               <div class="flex gap-2 mt-4">
-                <button class="btn btn-outline btn-sm flex-1" onClick={reset} title="重置到100%">
+                <button class="btn btn-outline btn-sm flex-1" onClick={reset} title={t('common.reset')}>
                   <BiRegularReset size={14} />
-                  重置
+                  {t('common.reset')}
                 </button>
-                <button class="btn btn-primary btn-sm flex-1" onClick={exit} title="返回">
+                <button class="btn btn-primary btn-sm flex-1" onClick={exit} title={t('whiteBalance.back')}>
                   <VsClose size={14} />
-                  返回
+                  {t('whiteBalance.back')}
                 </button>
               </div>
             </div>

@@ -5,6 +5,7 @@ import { ledStripStore } from '../../stores/led-strip.store';
 import { Borders } from '../../constants/border';
 import { LedType } from '../../models/led-strip-config';
 import { LedStripConfigurationContext } from '../../contexts/led-strip-configuration.context';
+import { useLanguage } from '../../i18n/index';
 
 type LedCountControlItemProps = {
   displayId: number;
@@ -14,6 +15,7 @@ type LedCountControlItemProps = {
 
 const LedCountControlItem: Component<LedCountControlItemProps> = (props) => {
   const [stripConfiguration, { setHoveredStripPart }] = useContext(LedStripConfigurationContext);
+  const { t } = useLanguage();
 
   const config = createMemo(() => {
     return ledStripStore.strips.find(
@@ -116,7 +118,7 @@ const LedCountControlItem: Component<LedCountControlItemProps> = (props) => {
             class="btn btn-xs btn-circle btn-outline flex-shrink-0 min-h-0 h-6 w-6"
             onClick={handleDecrease}
             disabled={!config() || (config()?.len || 0) <= 0}
-            title="减少LED数量"
+            title={t('ledConfig.decreaseLedCount')}
           >
             -
           </button>
@@ -139,7 +141,7 @@ const LedCountControlItem: Component<LedCountControlItemProps> = (props) => {
             class="btn btn-xs btn-circle btn-outline flex-shrink-0 min-h-0 h-6 w-6"
             onClick={handleIncrease}
             disabled={!config() || (config()?.len || 0) >= 1000}
-            title="增加LED数量"
+            title={t('ledConfig.increaseLedCount')}
           >
             +
           </button>
@@ -150,7 +152,7 @@ const LedCountControlItem: Component<LedCountControlItemProps> = (props) => {
             class="select select-xs w-full text-xs h-6 min-h-0"
             value={config()?.led_type || LedType.RGB}
             onChange={handleLedTypeChange}
-            title="LED类型"
+            title={t('ledConfig.ledType')}
           >
             <option value={LedType.RGB}>RGB</option>
             <option value={LedType.RGBW}>RGBW</option>
@@ -167,20 +169,21 @@ type LedCountControlPanelProps = {
 
 export const LedCountControlPanel: Component<LedCountControlPanelProps> = (props) => {
   const [localProps, rootProps] = splitProps(props, ['display']);
+  const { t } = useLanguage();
 
   const borders: { border: Borders; label: string }[] = [
-    { border: 'Top', label: '上' },
-    { border: 'Bottom', label: '下' },
-    { border: 'Left', label: '左' },
-    { border: 'Right', label: '右' },
+    { border: 'Top', label: t('ledConfig.top') },
+    { border: 'Bottom', label: t('ledConfig.bottom') },
+    { border: 'Left', label: t('ledConfig.left') },
+    { border: 'Right', label: t('ledConfig.right') },
   ];
 
   return (
     <div {...rootProps} class={'card bg-base-200 shadow-lg border border-base-300 ' + (rootProps.class || '')}>
       <div class="card-body p-3">
         <div class="card-title text-sm mb-2 flex items-center justify-between">
-          <span>LED数量控制</span>
-          <div class="badge badge-info badge-outline text-xs">显示器 {localProps.display.id}</div>
+          <span>{t('ledConfig.ledCountControl')}</span>
+          <div class="badge badge-info badge-outline text-xs">{t('ledConfig.display')} {localProps.display.id}</div>
         </div>
 
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -196,7 +199,7 @@ export const LedCountControlPanel: Component<LedCountControlPanelProps> = (props
         </div>
 
         <div class="text-xs text-base-content/50 mt-2 p-1.5 bg-base-300/50 rounded">
-          💡 提示：点击 +/- 按钮或直接输入数值来调整LED数量（范围：0-1000）
+          💡 {t('ledConfig.controlTip')}
         </div>
       </div>
     </div>
