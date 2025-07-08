@@ -1,5 +1,6 @@
 import { Component, JSX, ParentComponent, splitProps } from 'solid-js';
 import { DisplayInfo } from '../../models/display-info.model';
+import { useLanguage } from '../../i18n/index';
 
 type DisplayInfoItemProps = {
   label: string;
@@ -20,26 +21,28 @@ type DisplayInfoPanelProps = {
 
 export const DisplayInfoPanel: Component<DisplayInfoPanelProps> = (props) => {
   const [localProps, rootProps] = splitProps(props, ['display']);
+  const { t } = useLanguage();
+
   return (
     <div {...rootProps} class={'card bg-base-100/95 backdrop-blur shadow-lg border border-base-300 ' + rootProps.class}>
       <div class="card-body p-4">
         <div class="card-title text-sm mb-3 flex items-center justify-between">
-          <span class="text-base-content">显示器信息</span>
+          <span class="text-base-content">{t('displays.displayInfo')}</span>
           {localProps.display.is_primary && (
-            <div class="badge badge-primary badge-sm">主显示器</div>
+            <div class="badge badge-primary badge-sm">{t('displays.isPrimary')}</div>
           )}
         </div>
         <div class="space-y-1">
-          <DisplayInfoItem label="ID">
+          <DisplayInfoItem label={t('displays.id')}>
             <code class="bg-base-200 px-1 rounded text-xs">{localProps.display.id}</code>
           </DisplayInfoItem>
-          <DisplayInfoItem label="位置">
+          <DisplayInfoItem label={t('displays.position')}>
             ({localProps.display.x}, {localProps.display.y})
           </DisplayInfoItem>
-          <DisplayInfoItem label="尺寸">
+          <DisplayInfoItem label={t('displays.size')}>
             {localProps.display.width} × {localProps.display.height}
           </DisplayInfoItem>
-          <DisplayInfoItem label="缩放">
+          <DisplayInfoItem label={t('displays.scale')}>
             {localProps.display.scale_factor}×
           </DisplayInfoItem>
         </div>

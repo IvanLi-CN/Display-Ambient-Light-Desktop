@@ -191,14 +191,14 @@ export const LedStripTest = () => {
     <div class="container mx-auto p-6 space-y-6">
       <div class="card bg-base-200 shadow-xl">
         <div class="card-body">
-          <h2 class="card-title text-2xl mb-4">LED Strip Testing</h2>
+          <h2 class="card-title text-2xl mb-4">{t('ledTest.title')}</h2>
           
           {/* Hardware Selection */}
           <div class="form-control w-full max-w-xs">
             <label class="label">
-              <span class="label-text">Select Hardware Board</span>
+              <span class="label-text">{t('ledTest.selectHardwareBoard')}</span>
               <span class="label-text-alt">
-                {boards().length > 0 ? `${boards().length} device(s) found` : 'Searching...'}
+                {boards().length > 0 ? `${boards().length} ${t('ledTest.devicesFound')}` : t('ledTest.searching')}
               </span>
             </label>
             <select
@@ -210,7 +210,7 @@ export const LedStripTest = () => {
               }}
             >
               <option disabled value="">
-                {boards().length > 0 ? 'Choose a board' : 'No boards found'}
+                {boards().length > 0 ? t('ledTest.chooseBoard') : t('ledTest.noBoardsFound')}
               </option>
               <For each={boards()}>
                 {(board) => {
@@ -221,9 +221,9 @@ export const LedStripTest = () => {
                   };
 
                   const getStatusText = (status: BoardInfo['connect_status']) => {
-                    if (status === 'Connected') return 'Connected';
-                    if (typeof status === 'object' && 'Connecting' in status) return 'Connecting';
-                    return 'Disconnected';
+                    if (status === 'Connected') return t('ledTest.connected');
+                    if (typeof status === 'object' && 'Connecting' in status) return t('ledTest.connecting');
+                    return t('ledTest.disconnected');
                   };
 
                   return (
@@ -240,10 +240,10 @@ export const LedStripTest = () => {
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
             <div class="form-control">
               <label class="label">
-                <span class="label-text">LED Count</span>
+                <span class="label-text">{t('ledTest.ledCount')}</span>
               </label>
-              <input 
-                type="number" 
+              <input
+                type="number"
                 class="input input-bordered w-full text-center text-lg"
                 value={ledCount()}
                 min="1"
@@ -251,10 +251,10 @@ export const LedStripTest = () => {
                 onInput={(e) => setLedCount(parseInt(e.target.value) || 60)}
               />
             </div>
-            
+
             <div class="form-control">
               <label class="label">
-                <span class="label-text">LED Type</span>
+                <span class="label-text">{t('ledTest.ledType')}</span>
               </label>
               <select
                 class="select select-bordered w-full"
@@ -265,10 +265,10 @@ export const LedStripTest = () => {
                 <option value="SK6812">SK6812</option>
               </select>
             </div>
-            
+
             <div class="form-control">
               <label class="label">
-                <span class="label-text">Animation Speed (ms)</span>
+                <span class="label-text">{t('ledTest.animationSpeed')}</span>
               </label>
               <input
                 type="number"
@@ -301,12 +301,12 @@ export const LedStripTest = () => {
                       <Show 
                         when={currentPattern() === pattern && isRunning()}
                         fallback={
-                          <button 
+                          <button
                             class="btn btn-primary"
                             onClick={() => startTest(pattern)}
                             disabled={!selectedBoard()}
                           >
-                            Start Test
+                            {t('ledTest.startTestButton')}
                           </button>
                         }
                       >
@@ -314,7 +314,7 @@ export const LedStripTest = () => {
                           class="btn btn-error"
                           onClick={() => stopTest()}
                         >
-                          Stop Test
+                          {t('ledTest.stopTest')}
                         </button>
                       </Show>
                     </div>

@@ -61,6 +61,9 @@ export interface TranslationDict {
     deviceCount: string;
     noDevicesFound: string;
     checkConnection: string;
+    // Device status
+    timeout: string;
+    connecting: string;
   };
   
   // Display page
@@ -92,6 +95,9 @@ export interface TranslationDict {
     currentMode: string;
     maxMode: string;
     minMode: string;
+    // Display info panel specific
+    id: string;
+    scale: string;
   };
   
   // LED Strip Configuration
@@ -175,6 +181,9 @@ export interface TranslationDict {
     draggable: string;
     exitFullscreen: string;
     notEnabled: string;
+    // Missing white balance instructions
+    dragPanelTip: string;
+    compareColorsTip: string;
   };
   
   // LED Test
@@ -204,6 +213,20 @@ export interface TranslationDict {
     singleScan: string;
     singleScanDesc: string;
     breathingDesc: string;
+    // LED test form labels
+    ledCount: string;
+    ledType: string;
+    animationSpeed: string;
+    startTestButton: string;
+    // Hardware selection
+    selectHardwareBoard: string;
+    devicesFound: string;
+    searching: string;
+    chooseBoard: string;
+    noBoardsFound: string;
+    connected: string;
+    connecting: string;
+    disconnected: string;
   };
   
   // Error messages

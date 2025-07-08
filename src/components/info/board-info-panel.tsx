@@ -23,7 +23,7 @@ export const BoardInfoPanel: Component<{ board: BoardInfo }> = (props) => {
     }
 
     if (props.board.ttl == null) {
-      return 'timeout';
+      return t('info.timeout');
     }
 
     return (
@@ -39,7 +39,7 @@ export const BoardInfoPanel: Component<{ board: BoardInfo }> = (props) => {
     }
 
     if ('Connecting' in props.board.connect_status) {
-      return `Connecting (${props.board.connect_status.Connecting.toFixed(0)})`;
+      return `${t('info.connecting')} (${props.board.connect_status.Connecting.toFixed(0)})`;
     }
   });
 

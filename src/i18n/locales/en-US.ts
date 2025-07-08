@@ -58,6 +58,9 @@ export const enUS: TranslationDict = {
     deviceCount: 'Device Count',
     noDevicesFound: 'No Devices Found',
     checkConnection: 'Please check device connection status',
+    // Device status
+    timeout: 'Timeout',
+    connecting: 'Connecting',
   },
   
   displays: {
@@ -88,6 +91,9 @@ export const enUS: TranslationDict = {
     currentMode: 'Current Mode',
     maxMode: 'Max Mode',
     minMode: 'Min Mode',
+    // Display info panel specific
+    id: 'ID',
+    scale: 'Scale',
   },
   
   ledConfig: {
@@ -169,6 +175,9 @@ export const enUS: TranslationDict = {
     draggable: 'Draggable',
     exitFullscreen: 'Exit Fullscreen',
     notEnabled: 'Not Enabled',
+    // Missing white balance instructions
+    dragPanelTip: 'Drag the RGB control panel to a suitable position',
+    compareColorsTip: 'Compare LED strip colors with screen edge colors',
   },
   
   ledTest: {
@@ -197,6 +206,20 @@ export const enUS: TranslationDict = {
     singleScan: 'Single Scan',
     singleScanDesc: 'Light up each LED individually for precise position testing',
     breathingDesc: 'Breathing effect for the entire LED strip to test overall brightness',
+    // LED test form labels
+    ledCount: 'LED Count',
+    ledType: 'LED Type',
+    animationSpeed: 'Animation Speed (ms)',
+    startTestButton: 'Start Test',
+    // Hardware selection
+    selectHardwareBoard: 'Select Hardware Board',
+    devicesFound: 'device(s) found',
+    searching: 'Searching...',
+    chooseBoard: 'Choose a board',
+    noBoardsFound: 'No boards found',
+    connected: 'Connected',
+    connecting: 'Connecting',
+    disconnected: 'Disconnected',
   },
   
   errors: {

@@ -58,6 +58,9 @@ export const zhCN: TranslationDict = {
     deviceCount: '设备总数',
     noDevicesFound: '未发现设备',
     checkConnection: '请检查设备连接状态',
+    // Device status
+    timeout: '超时',
+    connecting: '连接中',
   },
   
   displays: {
@@ -88,6 +91,9 @@ export const zhCN: TranslationDict = {
     currentMode: '当前模式',
     maxMode: '最大模式',
     minMode: '最小模式',
+    // Display info panel specific
+    id: 'ID',
+    scale: '缩放',
   },
   
   ledConfig: {
@@ -169,10 +175,13 @@ export const zhCN: TranslationDict = {
     draggable: '可拖拽',
     exitFullscreen: '退出全屏',
     notEnabled: '暂未启用',
+    // Missing white balance instructions
+    dragPanelTip: '将RGB控制面板拖拽到合适位置',
+    compareColorsTip: '对比LED灯条颜色与屏幕边缘颜色',
   },
   
   ledTest: {
-    title: '灯带测试',
+    title: 'LED灯带测试',
     testEffects: '测试效果',
     staticColor: '静态颜色',
     rainbow: '彩虹',
@@ -197,6 +206,20 @@ export const zhCN: TranslationDict = {
     singleScan: '单色扫描',
     singleScanDesc: '单个LED依次点亮，用于精确测试每个LED位置',
     breathingDesc: '整条灯带呼吸效果，用于测试整体亮度',
+    // LED test form labels
+    ledCount: 'LED数量',
+    ledType: 'LED类型',
+    animationSpeed: '动画速度 (ms)',
+    startTestButton: '开始测试',
+    // Hardware selection
+    selectHardwareBoard: '选择硬件板',
+    devicesFound: '个设备',
+    searching: '搜索中...',
+    chooseBoard: '选择设备',
+    noBoardsFound: '未找到设备',
+    connected: '已连接',
+    connecting: '连接中',
+    disconnected: '已断开',
   },
   
   errors: {

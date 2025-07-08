@@ -301,8 +301,8 @@ export const WhiteBalance = () => {
                       <ol class="list-decimal list-inside space-y-1 ml-2">
                         <li>{t('whiteBalance.fullscreenTip')}</li>
                         <li>{t('whiteBalance.dragTip')}</li>
-                        <li>将RGB控制面板拖拽到合适位置</li>
-                        <li>对比LED灯条颜色与屏幕边缘颜色</li>
+                        <li>{t('whiteBalance.dragPanelTip')}</li>
+                        <li>{t('whiteBalance.compareColorsTip')}</li>
                       </ol>
                     </div>
 
