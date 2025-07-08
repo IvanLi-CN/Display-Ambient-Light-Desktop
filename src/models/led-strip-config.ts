@@ -1,8 +1,8 @@
 import { Borders } from '../constants/border';
 
 export enum LedType {
-  RGB = 'RGB',
-  RGBW = 'RGBW',
+  WS2812B = 'WS2812B',
+  SK6812 = 'SK6812',
 }
 
 export type LedStripPixelMapper = {
@@ -29,6 +29,6 @@ export class LedStripConfig {
     public readonly display_id: number,
     public readonly border: Borders,
     public len: number,
-    public led_type: LedType = LedType.RGB,
+    public led_type: LedType = LedType.WS2812B,
   ) {}
 }

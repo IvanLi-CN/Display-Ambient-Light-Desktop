@@ -29,7 +29,7 @@ export const LedStripTest = () => {
   const [boards, setBoards] = createSignal<BoardInfo[]>([]);
   const [selectedBoard, setSelectedBoard] = createSignal<BoardInfo | null>(null);
   const [ledCount, setLedCount] = createSignal(60);
-  const [ledType, setLedType] = createSignal<'RGB' | 'RGBW'>('RGB');
+  const [ledType, setLedType] = createSignal<'WS2812B' | 'SK6812'>('WS2812B');
   const [isRunning, setIsRunning] = createSignal(false);
   const [currentPattern, setCurrentPattern] = createSignal<TestPattern | null>(null);
   const [animationSpeed, setAnimationSpeed] = createSignal(33); // ~30fps
@@ -256,13 +256,13 @@ export const LedStripTest = () => {
               <label class="label">
                 <span class="label-text">LED Type</span>
               </label>
-              <select 
+              <select
                 class="select select-bordered w-full"
                 value={ledType()}
-                onChange={(e) => setLedType(e.target.value as 'RGB' | 'RGBW')}
+                onChange={(e) => setLedType(e.target.value as 'WS2812B' | 'SK6812')}
               >
-                <option value="RGB">RGB</option>
-                <option value="RGBW">RGBW</option>
+                <option value="WS2812B">WS2812B</option>
+                <option value="SK6812">SK6812</option>
               </select>
             </div>
             

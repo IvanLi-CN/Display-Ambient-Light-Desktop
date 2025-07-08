@@ -150,12 +150,12 @@ const LedCountControlItem: Component<LedCountControlItemProps> = (props) => {
         <div class="mt-1">
           <select
             class="select select-xs w-full text-xs h-6 min-h-0"
-            value={config()?.led_type || LedType.RGB}
+            value={config()?.led_type || LedType.WS2812B}
             onChange={handleLedTypeChange}
             title={t('ledConfig.ledType')}
           >
-            <option value={LedType.RGB}>RGB</option>
-            <option value={LedType.RGBW}>RGBW</option>
+            <option value={LedType.WS2812B}>WS2812B</option>
+            <option value={LedType.SK6812}>SK6812</option>
           </select>
         </div>
       </div>
