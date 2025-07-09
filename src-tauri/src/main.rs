@@ -56,6 +56,23 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
+#[derive(Serialize)]
+struct AppVersion {
+    version: String,
+    is_dev: bool,
+}
+
+#[tauri::command]
+fn get_app_version() -> AppVersion {
+    let version = env!("CARGO_PKG_VERSION").to_string();
+    let is_dev = cfg!(debug_assertions) && std::env::var("HIDE_DEV_MARKER").is_err();
+
+    AppVersion {
+        version,
+        is_dev,
+    }
+}
+
 #[tauri::command]
 fn list_display_info() -> Result<String, String> {
     let displays = display_info::DisplayInfo::all().map_err(|e| {
@@ -575,6 +592,7 @@ async fn main() {
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
             greet,
+            get_app_version,
             list_display_info,
             read_led_strip_configs,
             write_led_strip_configs,

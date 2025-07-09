@@ -9,11 +9,22 @@ import { LedStripConfigContainer } from './models/led-strip-config';
 import { InfoIndex } from './components/info/info-index';
 import { DisplayStateIndex } from './components/displays/display-state-index';
 import { useLanguage } from './i18n/index';
+import { AppVersion } from './models/app-version.model';
 
 function App() {
   const location = useLocation();
   const [previousPath, setPreviousPath] = createSignal<string>('');
   const { t, locale, setLocale } = useLanguage();
+  const [appVersion, setAppVersion] = createSignal<AppVersion>({ version: '1.0.0', is_dev: false });
+
+  // Get app version on mount
+  createEffect(() => {
+    invoke<AppVersion>('get_app_version').then((version) => {
+      setAppVersion(version);
+    }).catch((error) => {
+      console.error('Failed to get app version:', error);
+    });
+  });
 
   // Monitor route changes and cleanup LED tests when leaving the test page
   createEffect(() => {
@@ -101,7 +112,16 @@ function App() {
               </li>
             </ul>
           </div>
-          <div class="badge badge-primary badge-outline ml-2">v1.0</div>
+          <div class="flex items-center gap-2 ml-2">
+            <div class="badge badge-primary badge-outline">
+              v{appVersion().version}
+            </div>
+            {appVersion().is_dev && (
+              <div class="badge badge-warning badge-outline">
+                DEV
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
