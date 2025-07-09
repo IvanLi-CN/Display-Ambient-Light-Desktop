@@ -34,6 +34,69 @@ export const LedStripTest = () => {
   const [currentPattern, setCurrentPattern] = createSignal<TestPattern | null>(null);
   const [animationSpeed, setAnimationSpeed] = createSignal(33); // ~30fps
 
+  // Temporary input values for better UX
+  const [ledCountInput, setLedCountInput] = createSignal('60');
+  const [animationSpeedInput, setAnimationSpeedInput] = createSignal('33');
+
+  // Input handlers for LED count
+  const handleLedCountInput = (e: Event) => {
+    const target = e.target as HTMLInputElement;
+    setLedCountInput(target.value);
+  };
+
+  const handleLedCountBlur = (e: Event) => {
+    const target = e.target as HTMLInputElement;
+    const value = parseInt(target.value);
+    if (!isNaN(value) && value >= 1 && value <= 1000) {
+      setLedCount(value);
+      setLedCountInput(value.toString());
+    } else {
+      // Reset to current valid value
+      setLedCountInput(ledCount().toString());
+      target.value = ledCount().toString();
+    }
+  };
+
+  const handleLedCountKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleLedCountBlur(e);
+    }
+  };
+
+  // Input handlers for animation speed
+  const handleAnimationSpeedInput = (e: Event) => {
+    const target = e.target as HTMLInputElement;
+    setAnimationSpeedInput(target.value);
+  };
+
+  const handleAnimationSpeedBlur = (e: Event) => {
+    const target = e.target as HTMLInputElement;
+    const value = parseInt(target.value);
+    if (!isNaN(value) && value >= 16 && value <= 200) {
+      setAnimationSpeed(value);
+      setAnimationSpeedInput(value.toString());
+    } else {
+      // Reset to current valid value
+      setAnimationSpeedInput(animationSpeed().toString());
+      target.value = animationSpeed().toString();
+    }
+  };
+
+  const handleAnimationSpeedKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleAnimationSpeedBlur(e);
+    }
+  };
+
+  // Sync input values with actual values
+  createEffect(() => {
+    setLedCountInput(ledCount().toString());
+  });
+
+  createEffect(() => {
+    setAnimationSpeedInput(animationSpeed().toString());
+  });
+
   // Load available boards and listen for changes
   createEffect(() => {
     // Initial load
@@ -245,10 +308,12 @@ export const LedStripTest = () => {
               <input
                 type="number"
                 class="input input-bordered w-full text-center text-lg"
-                value={ledCount()}
+                value={ledCountInput()}
                 min="1"
                 max="1000"
-                onInput={(e) => setLedCount(parseInt(e.target.value) || 60)}
+                onInput={handleLedCountInput}
+                onBlur={handleLedCountBlur}
+                onKeyDown={handleLedCountKeyDown}
               />
             </div>
 
@@ -273,11 +338,13 @@ export const LedStripTest = () => {
               <input
                 type="number"
                 class="input input-bordered w-full text-center"
-                value={animationSpeed()}
+                value={animationSpeedInput()}
                 min="16"
                 max="200"
                 step="1"
-                onInput={(e) => setAnimationSpeed(parseInt(e.target.value) || 33)}
+                onInput={handleAnimationSpeedInput}
+                onBlur={handleAnimationSpeedBlur}
+                onKeyDown={handleAnimationSpeedKeyDown}
               />
             </div>
           </div>
