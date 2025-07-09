@@ -42,6 +42,45 @@ dependencies = [
 ]
 
 [[package]]
+name = "ambient-light-control"
+version = "2.0.0-alpha"
+dependencies = [
+ "anyhow",
+ "color_space",
+ "core-foundation 0.9.4",
+ "core-graphics 0.22.3",
+ "coreaudio-rs",
+ "ddc-hi",
+ "dirs 5.0.1",
+ "display-info",
+ "env_logger",
+ "futures",
+ "futures-util",
+ "hex",
+ "image",
+ "itertools 0.10.5",
+ "log",
+ "mdns-sd",
+ "paris",
+ "percent-encoding",
+ "regex",
+ "screen-capture-kit",
+ "serde",
+ "serde_json",
+ "sha1",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-shell",
+ "time",
+ "tokio",
+ "tokio-stream",
+ "tokio-tungstenite",
+ "tokio-util",
+ "toml 0.7.8",
+ "url-build-parse",
+]
+
+[[package]]
 name = "android-tzdata"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4396,45 +4435,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06794f8f6c5c898b3275aebefa6b8a1cb24cd2c6c79397ab15774837a0bc5755"
 dependencies = [
  "winapi-util",
-]
-
-[[package]]
-name = "test-demo"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "color_space",
- "core-foundation 0.9.4",
- "core-graphics 0.22.3",
- "coreaudio-rs",
- "ddc-hi",
- "dirs 5.0.1",
- "display-info",
- "env_logger",
- "futures",
- "futures-util",
- "hex",
- "image",
- "itertools 0.10.5",
- "log",
- "mdns-sd",
- "paris",
- "percent-encoding",
- "regex",
- "screen-capture-kit",
- "serde",
- "serde_json",
- "sha1",
- "tauri",
- "tauri-build",
- "tauri-plugin-shell",
- "time",
- "tokio",
- "tokio-stream",
- "tokio-tungstenite",
- "tokio-util",
- "toml 0.7.8",
- "url-build-parse",
 ]
 
 [[package]]

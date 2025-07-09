@@ -1,7 +1,26 @@
 {
-  "name": "test-demo",
-  "version": "0.0.0",
-  "description": "",
+  "name": "display-ambient-light",
+  "version": "2.0.0-alpha",
+  "description": "A desktop application for controlling ambient lighting based on screen content, supporting WS2812B and SK6812 LED strips with real-time color synchronization.",
+  "author": "Ivan Li",
+  "homepage": "https://github.com/IvanLi-CN/Display-Ambient-Light-Desktop",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:IvanLi-CN/Display-Ambient-Light-Desktop.git"
+  },
+  "keywords": [
+    "ambient-light",
+    "led-control",
+    "screen-sync",
+    "ws2812b",
+    "sk6812",
+    "tauri",
+    "desktop-app"
+  ],
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=10.0.0"
+  },
   "scripts": {
     "start": "vite",
     "dev": "vite",

@@ -1,8 +1,8 @@
 # Display Ambient Light Desktop App
 
-[![Build](https://github.com/USERNAME/REPOSITORY/workflows/Build%20Desktop%20App/badge.svg)](https://github.com/USERNAME/REPOSITORY/actions/workflows/build.yml)
-[![CI](https://github.com/USERNAME/REPOSITORY/workflows/CI/badge.svg)](https://github.com/USERNAME/REPOSITORY/actions/workflows/ci.yml)
-[![Release](https://github.com/USERNAME/REPOSITORY/workflows/Release/badge.svg)](https://github.com/USERNAME/REPOSITORY/actions/workflows/release.yml)
+[![Build](https://github.com/IvanLi-CN/Display-Ambient-Light-Desktop/workflows/Build%20Desktop%20App/badge.svg)](https://github.com/IvanLi-CN/Display-Ambient-Light-Desktop/actions/workflows/build.yml)
+[![CI](https://github.com/IvanLi-CN/Display-Ambient-Light-Desktop/workflows/CI/badge.svg)](https://github.com/IvanLi-CN/Display-Ambient-Light-Desktop/actions/workflows/ci.yml)
+[![Release](https://github.com/IvanLi-CN/Display-Ambient-Light-Desktop/workflows/Release/badge.svg)](https://github.com/IvanLi-CN/Display-Ambient-Light-Desktop/actions/workflows/release.yml)
 
 A desktop application built with Tauri 2.0 for ambient light control, supporting multi-monitor screen sampling and LED strip control to create immersive ambient lighting effects.
 
@@ -56,12 +56,13 @@ A desktop application built with Tauri 2.0 for ambient light control, supporting
 2. **Install Node.js and pnpm**
 
    ```bash
-   # Install Node.js (recommended using nvm)
+   # Install Node.js 22 LTS (recommended using nvm)
    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-   nvm install node
+   nvm install 22
+   nvm use 22
 
-   # Install pnpm
-   npm install -g pnpm
+   # Install pnpm 10+
+   npm install -g pnpm@latest
    ```
 
 3. **Install Tauri CLI**
@@ -75,8 +76,8 @@ A desktop application built with Tauri 2.0 for ambient light control, supporting
 1. **Clone the project**
 
    ```bash
-   git clone <repository-url>
-   cd display-ambient-light/desktop
+   git clone git@github.com:IvanLi-CN/Display-Ambient-Light-Desktop.git
+   cd Display-Ambient-Light-Desktop
    ```
 
 2. **Install dependencies**
