@@ -102,6 +102,41 @@ export const WhiteBalance = () => {
     }
   });
 
+  // 监听ESC键和窗口全屏状态变化
+  createEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullscreen()) {
+        toggleFullscreen();
+      }
+    };
+
+    const checkFullscreenStatus = async () => {
+      try {
+        const window = getCurrentWindow();
+        const currentFullscreen = await window.isFullscreen();
+        if (currentFullscreen !== isFullscreen()) {
+          setIsFullscreen(currentFullscreen);
+          // 退出全屏时重置面板位置
+          if (!currentFullscreen) {
+            setPanelPosition({ x: 0, y: 0 });
+          }
+        }
+      } catch (error) {
+        // Silently handle error
+      }
+    };
+
+    // 定期检查全屏状态
+    const intervalId = setInterval(checkFullscreenStatus, 100);
+
+    document.addEventListener('keydown', handleKeyDown);
+
+    onCleanup(() => {
+      document.removeEventListener('keydown', handleKeyDown);
+      clearInterval(intervalId);
+    });
+  });
+
   // listen to config_changed event
   createEffect(() => {
     const unlisten = listen('config_changed', (event) => {
