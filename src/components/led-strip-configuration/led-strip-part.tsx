@@ -43,7 +43,7 @@ export const Pixel: Component<PixelProps> = (props) => {
 
 export const LedStripPart: Component<LedStripPartProps> = (props) => {
   const [localProps, rootProps] = splitProps(props, ['config']);
-  const [stripConfiguration] = useContext(LedStripConfigurationContext);
+  const [stripConfiguration, { setHoveredStripPart }] = useContext(LedStripConfigurationContext);
 
   const [colors, setColors] = createSignal<string[]>([]);
 
@@ -116,12 +116,25 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
     }
   };
 
+  const onMouseEnter = () => {
+    if (localProps.config) {
+      setHoveredStripPart({
+        displayId: localProps.config.display_id,
+        border: localProps.config.border,
+      });
+    }
+  };
+
+  const onMouseLeave = () => {
+    setHoveredStripPart(null);
+  };
+
   return (
     <section
       {...rootProps}
       ref={setAnchor}
       class={
-        'flex rounded-full flex-nowrap justify-around items-center overflow-hidden bg-gray-800/20 border border-gray-600/30 min-h-[32px] min-w-[32px] ' +
+        'flex rounded-full flex-nowrap justify-around items-center overflow-hidden bg-gray-800/20 border border-gray-600/30 min-h-[12px] min-w-[12px] m-1 px-0.5 py-0.5 transition-all duration-200 ' +
         rootProps.class
       }
       classList={{
@@ -129,8 +142,13 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
           stripConfiguration.selectedStripPart?.border === localProps.config?.border &&
           stripConfiguration.selectedStripPart?.displayId ===
             localProps.config?.display_id,
+        'ring-2 ring-primary bg-primary/20 border-primary':
+          stripConfiguration.hoveredStripPart?.border === localProps.config?.border &&
+          stripConfiguration.hoveredStripPart?.displayId === localProps.config?.display_id,
       }}
       onWheel={onWheel}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
     >
       <For each={colors()}>{(item) => <Pixel color={item} />}</For>
     </section>
