@@ -53,12 +53,12 @@ function App() {
       <div class="navbar bg-base-200 shadow-lg flex-shrink-0 z-50">
         <div class="navbar-start">
           <div class="dropdown dropdown-hover">
-            <div tabindex="0" role="button" class="btn btn-ghost lg:hidden" onClick={(e) => e.currentTarget.focus()}>
+            <div tabindex="0" role="button" class="btn btn-ghost lg:hidden">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16"></path>
               </svg>
             </div>
-            <ul class="menu menu-sm dropdown-content mt-3 z-[100] p-2 shadow bg-base-100 rounded-box w-52 border border-base-300">
+            <ul class="menu menu-sm dropdown-content z-[100] p-2 shadow bg-base-100 rounded-box w-52 border border-base-300">
               <li><A href="/info" class="text-base-content hover:bg-base-200">{t('nav.info')}</A></li>
               <li><A href="/displays" class="text-base-content hover:bg-base-200">{t('nav.displays')}</A></li>
               <li><A href="/led-strips-configuration" class="text-base-content hover:bg-base-200">{t('nav.ledConfiguration')}</A></li>
@@ -78,7 +78,7 @@ function App() {
           </ul>
         </div>
         <div class="navbar-end">
-          <div class="dropdown dropdown-end">
+          <div class="dropdown dropdown-end dropdown-hover">
             <div tabindex="0" role="button" class="btn btn-ghost btn-sm">
               {locale() === 'zh-CN' ? '中文' : 'English'}
             </div>
