@@ -4,18 +4,60 @@ This directory contains GitHub Actions workflows for automated CI/CD processes.
 
 ## Workflows Overview
 
-### 🔨 `build.yml` - Build Desktop App
-**Triggers:** Push to main/develop, Pull Requests, Releases
+### 🚀 `release.yml` - Release Build
 
-**Purpose:** Builds the desktop application for all supported platforms (macOS, Windows, Linux)
+**Triggers:** Manual workflow dispatch
+
+**Purpose:** Creates production releases with semantic versioning
 
 **Features:**
-- Cross-platform builds (macOS Universal, Windows x64, Linux x64)
-- Automatic artifact uploads
-- Release asset publishing
-- Caching for faster builds
+
+- **Third-party Actions**: Uses proven `paulhatch/semantic-version` and `softprops/action-gh-release`
+- **Multiple version modes**: Semantic auto, manual input, or increment-based
+- **Semantic version validation**: Ensures proper version format
+- **Automatic version updates**: Updates all configuration files
+- **Cross-platform builds**: All supported platforms
+- **Custom or auto-generated release notes**: Flexible release documentation
+- **Automatic prerelease detection**: Based on version format
+
+**Usage:**
+
+1. Go to Actions tab in GitHub
+2. Select "Release Build" workflow
+3. Click "Run workflow"
+4. Choose version mode:
+   - **Semantic Auto**: Uses commit messages to determine version (MAJOR/MINOR patterns)
+   - **Manual**: Enter complete version (e.g., 1.0.0, 2.1.0-beta.1)
+   - **Patch**: Auto-increment patch version (1.0.0 → 1.0.1)
+   - **Minor**: Auto-increment minor version (1.0.0 → 1.1.0)
+   - **Major**: Auto-increment major version (1.0.0 → 2.0.0)
+5. Optionally add custom release notes
+6. Choose prerelease option if needed
 
 **Artifacts:**
+
+- **macOS**: DMG installer and .app bundle
+- **Windows**: MSI and NSIS installers
+- **Linux**: DEB package and AppImage
+
+### 🚧 `dev-build.yml` - Development Build
+
+**Triggers:** Push to main branch
+
+**Purpose:** Creates automated development releases for every commit on main branch
+
+**Features:**
+
+- Automatic version generation with timestamp and commit hash
+- Cross-platform builds for all supported platforms
+- Creates pre-release with development artifacts
+- Automatic cleanup of old development releases (keeps latest 10)
+- Version updates in all configuration files
+
+**Version Format:** `2.0.0-alpha.dev.YYYYMMDDHHMM.{commit-hash}`
+
+**Artifacts:**
+
 - **macOS**: DMG installer and .app bundle
 - **Windows**: MSI and NSIS installers
 - **Linux**: DEB package and AppImage

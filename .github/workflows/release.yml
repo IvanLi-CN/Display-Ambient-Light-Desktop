@@ -1,86 +1,177 @@
-name: Release
+name: Release Build
 
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Release version (e.g., v1.0.0)'
+      version_mode:
+        description: 'Version mode'
         required: true
+        type: choice
+        options:
+          - 'semantic-auto'
+          - 'manual'
+          - 'patch'
+          - 'minor'
+          - 'major'
+        default: 'semantic-auto'
+      manual_version:
+        description: 'Manual version (only used if version_mode is "manual", e.g., 1.0.0, 2.1.0-beta.1)'
+        required: false
         type: string
       prerelease:
         description: 'Mark as pre-release'
         required: false
         type: boolean
         default: false
+      release_notes:
+        description: 'Release notes (optional, will use auto-generated if empty)'
+        required: false
+        type: string
 
 env:
   CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
 
 jobs:
-  create-release:
+  determine-version:
     runs-on: ubuntu-latest
     outputs:
-      release_id: ${{ steps.create_release.outputs.id }}
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
-    
+      version: ${{ steps.version.outputs.version }}
+      version_tag: ${{ steps.version.outputs.version_tag }}
+      is_prerelease: ${{ steps.check-prerelease.outputs.is_prerelease }}
+      should_release: ${{ steps.check-release.outputs.should_release }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.event.inputs.version }}
-          release_name: Release ${{ github.event.inputs.version }}
-          draft: false
-          prerelease: ${{ github.event.inputs.prerelease }}
-          body: |
-            ## Changes in this Release
-            
-            - Auto-generated release for version ${{ github.event.inputs.version }}
-            
-            ## Downloads
-            
-            Choose the appropriate installer for your operating system:
-            
-            ### macOS
-            - **DMG**: Universal binary for Intel and Apple Silicon Macs
-            
-            ### Windows
-            - **MSI**: Windows Installer package
-            - **EXE**: NSIS installer
-            
-            ### Linux
-            - **DEB**: Debian/Ubuntu package
-            - **AppImage**: Portable application
-            
-            ## Installation Notes
-            
-            ### macOS
-            1. Download the DMG file
-            2. Open the DMG and drag the app to Applications folder
-            3. On first launch, you may need to right-click and select "Open" due to Gatekeeper
-            
-            ### Windows
-            1. Download the MSI or EXE installer
-            2. Run the installer as administrator
-            3. Follow the installation wizard
-            
-            ### Linux
-            1. **DEB**: `sudo dpkg -i ambient-light-desktop_*.deb`
-            2. **AppImage**: Make executable and run directly
-            
-            ## System Requirements
-            
-            - **macOS**: 13.0 or later
-            - **Windows**: Windows 10 or later
-            - **Linux**: Ubuntu 22.04 or equivalent
+          fetch-depth: 0  # Fetch all history for version calculation
 
-  build-and-upload:
-    needs: create-release
+      - name: Determine version using semantic-version action
+        id: version
+        if: github.event.inputs.version_mode != 'manual' && github.event.inputs.version_mode != 'semantic-auto'
+        uses: paulhatch/semantic-version@v5.4.0
+        with:
+          tag_prefix: "v"
+          major_pattern: "(MAJOR)"
+          minor_pattern: "(MINOR)"
+          version_format: "${major}.${minor}.${patch}"
+          bump_each_commit: false
+          search_commit_body: true
+
+      - name: Manual version handling
+        id: manual-version
+        if: github.event.inputs.version_mode == 'manual'
+        run: |
+          MANUAL_VERSION="${{ github.event.inputs.manual_version }}"
+
+          if [[ -z "$MANUAL_VERSION" ]]; then
+            echo "Error: Manual version is required when version_mode is 'manual'"
+            exit 1
+          fi
+
+          # Remove 'v' prefix if present
+          CLEAN_VERSION="${MANUAL_VERSION#v}"
+
+          # Validate semantic versioning format
+          if [[ ! $CLEAN_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$ ]]; then
+            echo "Error: Version '$MANUAL_VERSION' is not a valid semantic version"
+            echo "Examples: 1.0.0, 2.1.0-beta.1, 1.0.0-alpha.1+build.1"
+            exit 1
+          fi
+
+          echo "version=${CLEAN_VERSION}" >> $GITHUB_OUTPUT
+          echo "version_tag=v${CLEAN_VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Calculate incremented version
+        id: increment-version
+        if: github.event.inputs.version_mode == 'patch' || github.event.inputs.version_mode == 'minor' || github.event.inputs.version_mode == 'major'
+        run: |
+          # Get the latest tag
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag: $LATEST_TAG"
+
+          # Remove 'v' prefix and extract version components
+          CURRENT_VERSION="${LATEST_TAG#v}"
+
+          # Handle case where no previous tags exist
+          if [[ "$CURRENT_VERSION" == "v0.0.0" ]]; then
+            CURRENT_VERSION="0.0.0"
+          fi
+
+          # Extract major.minor.patch (ignore prerelease/build metadata)
+          if [[ $CURRENT_VERSION =~ ^([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
+            MAJOR="${BASH_REMATCH[1]}"
+            MINOR="${BASH_REMATCH[2]}"
+            PATCH="${BASH_REMATCH[3]}"
+          else
+            echo "Error: Cannot parse current version '$CURRENT_VERSION'"
+            exit 1
+          fi
+
+          echo "Current version components: $MAJOR.$MINOR.$PATCH"
+
+          # Increment based on mode
+          case "${{ github.event.inputs.version_mode }}" in
+            "major")
+              MAJOR=$((MAJOR + 1))
+              MINOR=0
+              PATCH=0
+              ;;
+            "minor")
+              MINOR=$((MINOR + 1))
+              PATCH=0
+              ;;
+            "patch")
+              PATCH=$((PATCH + 1))
+              ;;
+          esac
+
+          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+          echo "version=${NEW_VERSION}" >> $GITHUB_OUTPUT
+          echo "version_tag=v${NEW_VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Set final version
+        id: final-version
+        run: |
+          if [[ "${{ github.event.inputs.version_mode }}" == "manual" ]]; then
+            VERSION="${{ steps.manual-version.outputs.version }}"
+            VERSION_TAG="${{ steps.manual-version.outputs.version_tag }}"
+          elif [[ "${{ github.event.inputs.version_mode }}" == "semantic-auto" ]]; then
+            VERSION="${{ steps.version.outputs.version }}"
+            VERSION_TAG="${{ steps.version.outputs.version_tag }}"
+          else
+            VERSION="${{ steps.increment-version.outputs.version }}"
+            VERSION_TAG="${{ steps.increment-version.outputs.version_tag }}"
+          fi
+
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "version_tag=${VERSION_TAG}" >> $GITHUB_OUTPUT
+          echo "Final version: ${VERSION}"
+          echo "Final version tag: ${VERSION_TAG}"
+
+      - name: Check if prerelease
+        id: check-prerelease
+        run: |
+          VERSION="${{ steps.final-version.outputs.version }}"
+          IS_PRERELEASE="false"
+
+          # Check if version contains prerelease identifiers or manual prerelease flag
+          if [[ $VERSION =~ -[a-zA-Z0-9.-]+ ]] || [[ "${{ github.event.inputs.prerelease }}" == "true" ]]; then
+            IS_PRERELEASE="true"
+          fi
+
+          echo "is_prerelease=${IS_PRERELEASE}" >> $GITHUB_OUTPUT
+          echo "Is prerelease: ${IS_PRERELEASE}"
+
+      - name: Check if should release
+        id: check-release
+        run: |
+          # Always release for manual triggers
+          echo "should_release=true" >> $GITHUB_OUTPUT
+
+  build:
+    needs: determine-version
     strategy:
       fail-fast: false
       matrix:
@@ -96,7 +187,7 @@ jobs:
             target: 'x86_64-pc-windows-msvc'
 
     runs-on: ${{ matrix.platform }}
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -107,16 +198,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -131,10 +222,168 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install
 
-      - name: Build and release
+      - name: Update version in configuration files
+        shell: bash
+        run: |
+          VERSION="${{ needs.determine-version.outputs.version }}"
+
+          # Update package.json version
+          npm version "$VERSION" --no-git-tag-version
+
+          # Update Cargo.toml version (cross-platform compatible)
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            sed -i '' "s/^version = \".*\"/version = \"$VERSION\"/" src-tauri/Cargo.toml
+          else
+            sed -i "s/^version = \".*\"/version = \"$VERSION\"/" src-tauri/Cargo.toml
+          fi
+
+          # Update tauri.conf.json version (cross-platform compatible)
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            sed -i '' "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" src-tauri/tauri.conf.json
+          else
+            sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" src-tauri/tauri.conf.json
+          fi
+
+          echo "Updated version to: $VERSION"
+
+      - name: Build frontend
+        run: pnpm build
+
+      - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          releaseId: ${{ needs.create-release.outputs.release_id }}
           args: ${{ matrix.args }}
+
+      - name: Upload artifacts (macOS)
+        if: matrix.platform == 'macos-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-release-${{ needs.determine-version.outputs.version }}
+          path: |
+            src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+            src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app
+
+      - name: Upload artifacts (Linux)
+        if: matrix.platform == 'ubuntu-22.04'
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-release-${{ needs.determine-version.outputs.version }}
+          path: |
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/appimage/*.AppImage
+
+      - name: Upload artifacts (Windows)
+        if: matrix.platform == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release-${{ needs.determine-version.outputs.version }}
+          path: |
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/nsis/*.exe
+  create-release:
+    needs: [determine-version, build]
+    runs-on: ubuntu-latest
+    if: needs.determine-version.outputs.should_release == 'true'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Display structure of downloaded files
+        run: ls -la
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          VERSION="${{ needs.determine-version.outputs.version }}"
+          CUSTOM_NOTES="${{ github.event.inputs.release_notes }}"
+
+          if [ -n "$CUSTOM_NOTES" ]; then
+            # Use custom release notes
+            cat > release_notes.md << 'EOF'
+          ${{ github.event.inputs.release_notes }}
+          EOF
+          else
+            # Generate default release notes
+            cat > release_notes.md << EOF
+          ## 🚀 Release v${VERSION}
+
+          This is a production release of Ambient Light Control.
+
+          ### 📦 Downloads
+
+          Choose the appropriate installer for your operating system:
+
+          #### macOS
+          - **DMG**: Universal binary for Intel and Apple Silicon Macs
+
+          #### Windows
+          - **MSI**: Windows Installer package
+          - **EXE**: NSIS installer
+
+          #### Linux
+          - **DEB**: Debian/Ubuntu package
+          - **AppImage**: Portable application
+
+          ### 📋 Installation Notes
+
+          #### macOS
+          1. Download the DMG file
+          2. Open the DMG and drag the app to Applications folder
+          3. On first launch, you may need to right-click and select "Open" due to Gatekeeper
+
+          #### Windows
+          1. Download the MSI or EXE installer
+          2. Run the installer as administrator
+          3. Follow the installation wizard
+
+          #### Linux
+          **DEB Package (Ubuntu/Debian)**
+          \`\`\`bash
+          sudo dpkg -i ambient-light-control_*.deb
+          sudo apt-get install -f  # Fix dependencies if needed
+          \`\`\`
+
+          **AppImage (Universal)**
+          \`\`\`bash
+          chmod +x Ambient-Light-Control_*.AppImage
+          ./Ambient-Light-Control_*.AppImage
+          \`\`\`
+
+          ### ⚠️ System Requirements
+
+          - **macOS**: 13.0 or later
+          - **Windows**: Windows 10 or later
+          - **Linux**: Ubuntu 22.04 or equivalent
+
+          ---
+
+          **Build Information:**
+          - Version: v${VERSION}
+          - Commit: ${{ github.sha }}
+          - Build Date: \$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          EOF
+          fi
+
+          echo "Generated release notes:"
+          cat release_notes.md
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.determine-version.outputs.version_tag }}
+          name: "Release ${{ needs.determine-version.outputs.version_tag }}"
+          body_path: release_notes.md
+          prerelease: ${{ needs.determine-version.outputs.is_prerelease == 'true' }}
+          draft: false
+          files: |
+            macos-release-${{ needs.determine-version.outputs.version }}/**/*
+            linux-release-${{ needs.determine-version.outputs.version }}/**/*
+            windows-release-${{ needs.determine-version.outputs.version }}/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

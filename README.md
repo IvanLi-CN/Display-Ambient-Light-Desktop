@@ -161,6 +161,26 @@ desktop/
 - Use `console.log` and Rust's `println!` for debugging
 - Check Tauri console output for backend logs
 
+## 🚧 Development Builds
+
+Automated development builds are created for every commit to the `main` branch. These builds are available as pre-releases on the [GitHub Releases](../../releases) page.
+
+### Features
+
+- **Automatic versioning** with timestamp and commit hash
+- **Cross-platform builds** for macOS, Windows, and Linux
+- **Pre-release artifacts** for testing latest changes
+- **Auto-cleanup** of old development builds (keeps latest 10)
+
+### Usage
+
+1. Visit the [Releases page](../../releases)
+2. Look for releases tagged with `dev-` prefix
+3. Download the appropriate installer for your platform
+4. **Note**: Development builds may contain bugs and are not recommended for production use
+
+For more details, see [Development Builds Documentation](docs/development-builds.md).
+
 ## 🤝 Contributing
 
 1. Fork the project
