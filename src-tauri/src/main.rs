@@ -182,8 +182,8 @@ async fn send_test_colors_to_board(board_address: String, offset: u16, buffer: V
     })?;
 
     let mut packet = vec![0x02]; // Header
-    packet.push((offset >> 8) as u8); // Offset high
-    packet.push((offset & 0xff) as u8); // Offset low
+    packet.push((offset >> 8) as u8); // Byte offset high
+    packet.push((offset & 0xff) as u8); // Byte offset low
     packet.extend_from_slice(&buffer); // Color data
 
     socket.send_to(&packet, &board_address).await.map_err(|e| {
@@ -351,8 +351,8 @@ async fn send_test_colors_to_board_internal(board_address: &str, offset: u16, bu
     let socket = UdpSocket::bind("0.0.0.0:0").await?;
 
     let mut packet = vec![0x02]; // Header
-    packet.push((offset >> 8) as u8); // Offset high
-    packet.push((offset & 0xff) as u8); // Offset low
+    packet.push((offset >> 8) as u8); // Byte offset high
+    packet.push((offset & 0xff) as u8); // Byte offset low
     packet.extend_from_slice(&buffer); // Color data
 
     socket.send_to(&packet, board_address).await?;

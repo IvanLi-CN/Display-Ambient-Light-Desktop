@@ -430,10 +430,12 @@ impl LedColorsPublisher {
                 }
             }
 
-            let offset = group.start.min(group.end);
+            // Calculate byte offset based on LED position and LED type
+            let led_offset = group.start.min(group.end);
+            let byte_offset = led_offset * bytes_per_led;
             let mut tx_buffer = vec![2];
-            tx_buffer.push((offset >> 8) as u8);
-            tx_buffer.push((offset & 0xff) as u8);
+            tx_buffer.push((byte_offset >> 8) as u8);
+            tx_buffer.push((byte_offset & 0xff) as u8);
             tx_buffer.append(&mut buffer);
 
             udp_rpc.send_to_all(&tx_buffer).await?;

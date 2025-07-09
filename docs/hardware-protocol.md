@@ -64,8 +64,8 @@ Byte 0: Header (0x01)
 
 ```text
 Byte 0: Header (0x02)
-Byte 1: Offset High (upper 8 bits of LED start position)
-Byte 2: Offset Low (lower 8 bits of LED start position)
+Byte 1: Offset High (upper 8 bits of data byte offset)
+Byte 2: Offset Low (lower 8 bits of data byte offset)
 Byte 3+: LED Color Data (variable length)
 ```
 
@@ -84,6 +84,26 @@ Byte 3+: LED Color Data (variable length)
 ```
 
 All values are 0-255.
+
+### Offset Calculation
+
+The offset field specifies the starting byte position in the LED data buffer:
+
+- **16-bit value**: Combines Offset High and Offset Low bytes (big-endian)
+- **Range**: 0-65535 bytes supported
+- **Purpose**: Allows partial updates of LED strip data at any byte position
+
+**Example Calculations:**
+
+- Byte position 0: `Offset High = 0x00, Offset Low = 0x00`
+- Byte position 30: `Offset High = 0x00, Offset Low = 0x1E` (10 RGB LEDs × 3 bytes)
+- Byte position 256: `Offset High = 0x01, Offset Low = 0x00`
+- Byte position 1000: `Offset High = 0x03, Offset Low = 0xE8`
+
+**LED Position to Byte Offset Conversion:**
+
+- **RGB LEDs**: `byte_offset = led_position × 3`
+- **RGBW LEDs**: `byte_offset = led_position × 4`
 
 ## LED Chip Specifications
 
@@ -206,24 +226,24 @@ Unknown → Connecting(1) → Connected
 
 ### RGB Example
 
-3 RGB LEDs starting at position 0: Red, Green, Blue
+3 RGB LEDs starting at byte offset 0: Red, Green, Blue
 
 ```text
 02 00 00 FF 00 00 00 FF 00 00 00 FF
 │  │  │  └─────────────────────────── 9 bytes color data
-│  │  └─ Offset Low (0)
+│  │  └─ Offset Low (0 bytes)
 │  └─ Offset High (0)
 └─ Header (0x02)
 ```
 
 ### RGBW Example
 
-2 RGBW LEDs starting at position 10: White, Warm White
+2 RGBW LEDs starting at byte offset 40 (LED position 10): White, Warm White
 
 ```text
-02 00 0A FF FF FF FF FF C8 96 C8
+02 00 28 FF FF FF FF FF C8 96 C8
 │  │  │  └─────────────────────── 8 bytes color data
-│  │  └─ Offset Low (10)
+│  │  └─ Offset Low (40 bytes = 0x28)
 │  └─ Offset High (0)
 └─ Header (0x02)
 ```
@@ -284,13 +304,14 @@ void handle_ping(uint8_t* data, size_t len) {
 void handle_led_data(uint8_t* data, size_t len) {
     if (len < 3) return;
 
-    uint16_t offset = (data[1] << 8) | data[2];
+    uint16_t byte_offset = (data[1] << 8) | data[2];
     uint8_t* color_data = &data[3];
     size_t color_len = len - 3;
 
     // Direct forward to LED strip - supports WS2812B, SK6812, SK6812-RGBW
+    // byte_offset specifies the starting byte position in LED data buffer
     // Color order conversion handled by LED driver library
-    led_strip_update(offset, color_data, color_len);
+    led_strip_update(byte_offset, color_data, color_len);
 }
 ```
 
@@ -379,7 +400,7 @@ void led_strip_update(uint16_t offset, uint8_t* data, size_t len) {
 - Verify hardware processes 0x02 packets correctly
 - Check WS2812 wiring and power supply
 - Monitor packet reception on hardware side
-- Verify offset calculations and LED strip configuration
+- Verify byte offset calculations and LED strip configuration
 
 **Wrong Colors**:
 
