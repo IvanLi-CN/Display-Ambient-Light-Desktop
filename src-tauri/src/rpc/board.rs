@@ -3,11 +3,7 @@ use std::{sync::Arc, time::Duration};
 use paris::{error, info, warn};
 use tokio::{io, net::UdpSocket, sync::RwLock, task::yield_now, time::timeout};
 
-use crate::{
-    ambient_light::ConfigManager,
-    rpc::DisplaySettingRequest,
-    volume::VolumeManager,
-};
+use crate::{ambient_light::ConfigManager, rpc::DisplaySettingRequest, volume::VolumeManager};
 
 use super::{BoardConnectStatus, BoardInfo, BoardMessageChannels};
 

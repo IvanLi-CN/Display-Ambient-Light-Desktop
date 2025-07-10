@@ -20,7 +20,6 @@ use rpc::{BoardInfo, UdpRpc};
 use screenshot::Screenshot;
 use screenshot_manager::ScreenshotManager;
 
-use regex;
 use serde::{Deserialize, Serialize};
 use serde_json::to_string;
 use std::sync::Arc;
@@ -47,11 +46,12 @@ struct DisplayInfoDef {
     pub scale_factor: f32,
     pub is_primary: bool,
     pub frequency: f32,
-    #[serde(skip, default = "default_cg_display")]
+    #[serde(skip, default = "_default_cg_display")]
     pub raw_handle: core_graphics::display::CGDisplay,
 }
 
 fn _default_cg_display() -> core_graphics::display::CGDisplay {
+    // Default display for serde deserialization
     core_graphics::display::CGDisplay::main()
 }
 
