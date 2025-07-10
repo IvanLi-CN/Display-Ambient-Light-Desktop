@@ -1,4 +1,4 @@
-import { Routes, Route, useLocation, A } from '@solidjs/router';
+import { Routes, Route, useLocation, A, Navigate } from '@solidjs/router';
 import { LedStripConfiguration } from './components/led-strip-configuration/led-strip-configuration';
 import { WhiteBalance } from './components/white-balance/white-balance';
 import { LedStripTest } from './components/led-strip-test/led-strip-test';
@@ -128,6 +128,7 @@ function App() {
       {/* Main Content - fills remaining height */}
       <main class="flex-1 container mx-auto px-2 sm:px-4 py-4 max-w-full overflow-x-auto min-h-0">
         <Routes>
+          <Route path="/" element={<Navigate href="/info" />} />
           <Route path="/info" component={InfoIndex} />
           <Route path="/displays" component={DisplayStateIndex} />
           <Route path="/led-strips-configuration" component={LedStripConfiguration} />
