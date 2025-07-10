@@ -11,16 +11,11 @@ env:
 
 jobs:
   lint-and-test:
-    runs-on: ubuntu-latest
-    
+    runs-on: macos-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -71,7 +66,7 @@ jobs:
         working-directory: src-tauri
 
   security-audit:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     
     steps:
       - name: Checkout repository
