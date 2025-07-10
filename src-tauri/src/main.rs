@@ -51,7 +51,7 @@ struct DisplayInfoDef {
     pub raw_handle: core_graphics::display::CGDisplay,
 }
 
-fn default_cg_display() -> core_graphics::display::CGDisplay {
+fn _default_cg_display() -> core_graphics::display::CGDisplay {
     core_graphics::display::CGDisplay::main()
 }
 
