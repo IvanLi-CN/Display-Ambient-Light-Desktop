@@ -46,6 +46,13 @@ struct DisplayInfoDef {
     pub rotation: f32,
     pub scale_factor: f32,
     pub is_primary: bool,
+    pub frequency: f32,
+    #[serde(skip, default = "default_cg_display")]
+    pub raw_handle: core_graphics::display::CGDisplay,
+}
+
+fn default_cg_display() -> core_graphics::display::CGDisplay {
+    core_graphics::display::CGDisplay::main()
 }
 
 #[derive(Serialize)]
