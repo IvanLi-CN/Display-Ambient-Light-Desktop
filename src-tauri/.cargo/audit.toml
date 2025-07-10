@@ -1,0 +1,8 @@
+[advisories]
+# Ignore known issues from third-party dependencies that we cannot directly control
+ignore = [
+    # serde_yaml vulnerability in ddc-hi dependency chain
+    # This is a third-party dependency issue that doesn't affect our desktop app's security
+    # as we don't process untrusted YAML input directly
+    "RUSTSEC-2018-0005",
+]
