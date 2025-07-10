@@ -61,7 +61,7 @@ struct DisplayInfoWrapper<'a>(#[serde(with = "DisplayInfoDef")] &'a DisplayInfo)
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
 #[tauri::command]
 fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
+    format!("Hello, {name}! You've been greeted from Rust!")
 }
 
 #[derive(Serialize)]
@@ -85,7 +85,7 @@ fn list_display_info() -> Result<String, String> {
         e.to_string()
     })?;
     let displays: Vec<DisplayInfoWrapper> =
-        displays.iter().map(|v| DisplayInfoWrapper(v)).collect();
+        displays.iter().map(DisplayInfoWrapper).collect();
     let json_str = to_string(&displays).map_err(|e| {
         error!("can not list display info: {}", e);
         e.to_string()
@@ -128,7 +128,7 @@ async fn get_led_strips_sample_points(
         let sample_points = screenshot.get_sample_points(&config);
         Ok(sample_points)
     } else {
-        return Err(format!("display not found: {}", config.display_id));
+        Err(format!("display not found: {}", config.display_id))
     }
 }
 
@@ -147,7 +147,7 @@ async fn get_one_edge_colors(
             Screenshot::get_one_edge_colors(&sample_points, &bytes, screenshot.bytes_per_row);
         Ok(colors)
     } else {
-        Err(format!("display not found: {}", display_id))
+        Err(format!("display not found: {display_id}"))
     }
 }
 
@@ -457,7 +457,7 @@ async fn get_boards() -> Result<Vec<BoardInfo>, String> {
     let udp_rpc = UdpRpc::global().await;
 
     if let Err(e) = udp_rpc {
-        return Err(format!("can not ping: {}", e));
+        return Err(format!("can not ping: {e}"));
     }
 
     let udp_rpc = udp_rpc.as_ref().unwrap();
@@ -554,7 +554,7 @@ fn handle_ambient_light_protocol<R: Runtime>(
                     }
                 } else {
                     error!("Display {} not found", display_id);
-                    Err(format!("Display {} not found", display_id))
+                    Err(format!("Display {display_id} not found"))
                 }
             })
         });
@@ -576,7 +576,7 @@ fn handle_ambient_light_protocol<R: Runtime>(
                 error!("Failed to get screenshot: {}", e);
                 Response::builder()
                     .status(500)
-                    .body(format!("Error: {}", e).into_bytes())
+                    .body(format!("Error: {e}").into_bytes())
                     .unwrap()
             }
         }
@@ -698,27 +698,24 @@ async fn main() {
 
             let app_handle = app.handle().clone();
             tokio::spawn(async move {
-                loop {
-                    match UdpRpc::global().await {
-                        Ok(udp_rpc) => {
-                            let mut receiver = udp_rpc.subscribe_boards_change();
-                            loop {
-                                if let Err(err) = receiver.changed().await {
-                                    error!("boards change receiver changed error: {}", err);
-                                    return;
-                                }
-
-                                let boards = receiver.borrow().clone();
-
-                                let boards = boards.into_iter().collect::<Vec<_>>();
-
-                                app_handle.emit("boards_changed", boards).unwrap();
+                match UdpRpc::global().await {
+                    Ok(udp_rpc) => {
+                        let mut receiver = udp_rpc.subscribe_boards_change();
+                        loop {
+                            if let Err(err) = receiver.changed().await {
+                                error!("boards change receiver changed error: {}", err);
+                                return;
                             }
+
+                            let boards = receiver.borrow().clone();
+
+                            let boards = boards.into_iter().collect::<Vec<_>>();
+
+                            app_handle.emit("boards_changed", boards).unwrap();
                         }
-                        Err(err) => {
-                            error!("udp rpc error: {}", err);
-                            return;
-                        }
+                    }
+                    Err(err) => {
+                        error!("udp rpc error: {}", err);
                     }
                 }
             });

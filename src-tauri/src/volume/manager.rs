@@ -104,7 +104,7 @@ impl VolumeManager {
         };
 
         log::debug!("device id: {}", device_id);
-        log::debug!("address: {:?}", address);
+        log::debug!("address: {address:?}");
 
         if 0 == unsafe { AudioObjectHasProperty(device_id, &address) } {
             anyhow::bail!("Can not get audio property");
@@ -145,8 +145,8 @@ impl VolumeManager {
             mElement: 0,
         };
 
-        log::debug!("device id: {}", device_id);
-        log::debug!("address: {:?}", address);
+        log::debug!("device id: {device_id}");
+        log::debug!("address: {address:?}");
 
         if 0 == unsafe { AudioObjectHasProperty(device_id, &address) } {
             anyhow::bail!("Can not get audio property");
@@ -175,13 +175,13 @@ impl VolumeManager {
             anyhow::bail!("Can not get audio property. data size is not matched.");
         }
 
-        log::debug!("current system volume of primary device: {}", volume);
+        log::debug!("current system volume of primary device: {volume}");
 
         Ok(volume)
     }
 
     pub async fn get_volume(&self) -> f32 {
-        self.current_volume.read().await.clone()
+        *self.current_volume.read().await
     }
 }
 

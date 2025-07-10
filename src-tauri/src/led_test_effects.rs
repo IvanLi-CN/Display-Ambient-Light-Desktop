@@ -219,7 +219,7 @@ mod tests {
         let config = TestEffectConfig {
             effect_type: TestEffectType::FlowingRainbow,
             led_count: 10,
-            led_type: LedType::RGB,
+            led_type: LedType::WS2812B,
             speed: 1.0,
         };
 
@@ -232,7 +232,7 @@ mod tests {
         let config = TestEffectConfig {
             effect_type: TestEffectType::GroupCounting,
             led_count: 20,
-            led_type: LedType::RGB,
+            led_type: LedType::WS2812B,
             speed: 1.0,
         };
 

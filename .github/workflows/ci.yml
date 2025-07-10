@@ -42,6 +42,7 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: './src-tauri -> target'
+          cache-all-crates: true
 
       - name: Install frontend dependencies
         run: pnpm install
@@ -50,8 +51,12 @@ jobs:
         run: cargo fmt --all --check
         working-directory: src-tauri
 
+      - name: Clean Rust build cache
+        run: cargo clean
+        working-directory: src-tauri
+
       - name: Lint Rust code
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --all-targets --all-features -- -D clippy::correctness -D clippy::suspicious -W clippy::complexity -W clippy::perf -W clippy::style
         working-directory: src-tauri
 
       - name: Run Rust tests

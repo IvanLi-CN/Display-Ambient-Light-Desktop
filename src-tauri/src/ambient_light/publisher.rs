@@ -143,14 +143,13 @@ impl LedColorsPublisher {
         let colors_tx = self.colors_tx.clone();
 
         tokio::spawn(async move {
-            for _ in 0..10 {
-                let sorted_colors_tx = sorted_colors_tx.write().await;
-                let colors_tx = colors_tx.write().await;
+            let sorted_colors_tx = sorted_colors_tx.write().await;
+            let colors_tx = colors_tx.write().await;
 
-                let mut all_colors: Vec<Option<Vec<u8>>> = vec![None; display_ids.len()];
-                let mut start: tokio::time::Instant = tokio::time::Instant::now();
+            let mut all_colors: Vec<Option<Vec<u8>>> = vec![None; display_ids.len()];
+            let mut _start: tokio::time::Instant = tokio::time::Instant::now();
 
-                loop {
+            loop {
                     let color_info = display_colors_rx.recv().await;
 
                     if let Err(err) = color_info {
@@ -199,10 +198,9 @@ impl LedColorsPublisher {
                             }
                         };
 
-                        start = tokio::time::Instant::now();
+                        _start = tokio::time::Instant::now();
                     }
                 }
-            }
         });
     }
 
