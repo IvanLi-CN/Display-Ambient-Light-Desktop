@@ -72,7 +72,7 @@ export const LedStripTest = () => {
   const handleAnimationSpeedBlur = (e: Event) => {
     const target = e.target as HTMLInputElement;
     const value = parseInt(target.value);
-    if (!isNaN(value) && value >= 16 && value <= 200) {
+    if (!isNaN(value) && value >= 16 && value <= 3600000) { // Max 1 hour (3600000ms)
       setAnimationSpeed(value);
       setAnimationSpeedInput(value.toString());
     } else {
@@ -340,7 +340,7 @@ export const LedStripTest = () => {
                 class="input input-bordered w-full text-center"
                 value={animationSpeedInput()}
                 min="16"
-                max="200"
+                max="3600000"
                 step="1"
                 onInput={handleAnimationSpeedInput}
                 onBlur={handleAnimationSpeedBlur}
