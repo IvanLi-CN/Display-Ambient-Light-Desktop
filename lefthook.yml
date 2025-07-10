@@ -12,19 +12,19 @@ pre-commit:
 
     # Rust formatting check
     rust-fmt:
-      glob: "src-tauri/src/**/*.rs"
+      glob: "src-tauri/**/*.rs"
       run: cd src-tauri && cargo fmt --all --check
       stage_fixed: false
 
     # Rust linting
     rust-clippy:
-      glob: "src-tauri/src/**/*.rs"
+      glob: "src-tauri/**/*.rs"
       run: cd src-tauri && cargo clippy --all-targets --all-features -- -D clippy::correctness -D clippy::suspicious -W clippy::complexity -W clippy::perf -W clippy::style
       stage_fixed: false
 
     # Rust tests
     rust-test:
-      glob: "src-tauri/src/**/*.rs"
+      glob: "src-tauri/**/*.rs"
       run: cd src-tauri && cargo test --all-features
       stage_fixed: false
 
