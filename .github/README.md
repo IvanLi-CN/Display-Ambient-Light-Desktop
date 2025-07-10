@@ -36,9 +36,7 @@ This directory contains GitHub Actions workflows for automated CI/CD processes.
 
 **Artifacts:**
 
-- **macOS**: DMG installer and .app bundle
-- **Windows**: MSI and NSIS installers
-- **Linux**: DEB package and AppImage
+- **macOS**: DMG installer and .app bundle (Universal binary for Intel and Apple Silicon)
 
 ### 🚧 `dev-build.yml` - Development Build
 
@@ -58,9 +56,7 @@ This directory contains GitHub Actions workflows for automated CI/CD processes.
 
 **Artifacts:**
 
-- **macOS**: DMG installer and .app bundle
-- **Windows**: MSI and NSIS installers
-- **Linux**: DEB package and AppImage
+- **macOS**: DMG installer and .app bundle (Universal binary for Intel and Apple Silicon)
 
 ### 🧪 `ci.yml` - Continuous Integration
 **Triggers:** Push to main/develop, Pull Requests

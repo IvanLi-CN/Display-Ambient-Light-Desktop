@@ -19,7 +19,7 @@ Development builds automatically create pre-release versions for every commit pu
 
 - **Trigger**: Every push to the `main` branch
 - **Workflow**: `.github/workflows/dev-build.yml`
-- **Platforms**: macOS (Universal), Windows (x64), Linux (x64)
+- **Platforms**: macOS (Universal binary for Intel and Apple Silicon)
 
 ### Version Generation
 
@@ -43,14 +43,12 @@ Where:
    - `src-tauri/Cargo.toml`
    - `src-tauri/tauri.conf.json`
 
-2. **Cross-Platform Build**: Builds for all supported platforms:
+2. **macOS Build**: Builds Universal binary for macOS:
    - **macOS**: Universal binary (Intel + Apple Silicon)
-   - **Windows**: x64 MSI and NSIS installers
-   - **Linux**: x64 DEB package and AppImage
 
 3. **Release Creation**: Creates a pre-release on GitHub with:
    - Descriptive release notes
-   - Build artifacts for all platforms
+   - macOS build artifacts
    - Development build warnings
 
 4. **Cleanup**: Automatically removes old development releases (keeps latest 10)
@@ -60,16 +58,9 @@ Where:
 Each development build produces the following artifacts:
 
 ### macOS
-- **DMG**: Disk image installer
-- **APP**: Application bundle
 
-### Windows
-- **MSI**: Windows Installer package
-- **EXE**: NSIS installer
-
-### Linux
-- **DEB**: Debian/Ubuntu package
-- **AppImage**: Portable application
+- **DMG**: Disk image installer (Universal binary for Intel and Apple Silicon)
+- **APP**: Application bundle (Universal binary for Intel and Apple Silicon)
 
 ## Usage
 
@@ -126,7 +117,7 @@ git checkout -- package.json src-tauri/Cargo.toml src-tauri/tauri.conf.json
 
 ### Build Artifacts
 
-- All builds are cross-platform and include debug information
+- All builds are for macOS and include debug information
 - Artifacts are available for 90 days (GitHub default)
 - Download links are provided in release notes
 

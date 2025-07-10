@@ -168,7 +168,7 @@ Automated development builds are created for every commit to the `main` branch. 
 ### Features
 
 - **Automatic versioning** with timestamp and commit hash
-- **Cross-platform builds** for macOS, Windows, and Linux
+- **macOS builds** with Universal binary support (Intel and Apple Silicon)
 - **Pre-release artifacts** for testing latest changes
 - **Auto-cleanup** of old development builds (keeps latest 10)
 
@@ -176,7 +176,7 @@ Automated development builds are created for every commit to the `main` branch. 
 
 1. Visit the [Releases page](../../releases)
 2. Look for releases tagged with `dev-` prefix
-3. Download the appropriate installer for your platform
+3. Download the macOS DMG installer
 4. **Note**: Development builds may contain bugs and are not recommended for production use
 
 For more details, see [Development Builds Documentation](docs/development-builds.md).

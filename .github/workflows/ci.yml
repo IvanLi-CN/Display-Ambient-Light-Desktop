@@ -94,7 +94,9 @@ jobs:
           cache: 'pnpm'
 
       - name: Install frontend dependencies
+        shell: bash
         run: pnpm install
 
       - name: Run npm audit
+        shell: bash
         run: pnpm audit --audit-level moderate
