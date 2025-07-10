@@ -1,8 +1,8 @@
 use std::{env::current_dir, sync::Arc, time::Duration};
 
 use ddc_hi::Display;
-use paris::{error, info, warn};
 use dirs::config_dir;
+use paris::{error, info, warn};
 use tokio::{
     sync::{broadcast, watch, OnceCell, RwLock},
     task::yield_now,
@@ -13,7 +13,10 @@ use crate::{
     rpc::{BoardMessageChannels, DisplaySetting},
 };
 
-use super::{display_handler::{DisplayHandler, SafeDisplay}, display_state::DisplayState};
+use super::{
+    display_handler::{DisplayHandler, SafeDisplay},
+    display_state::DisplayState,
+};
 
 const CONFIG_FILE_NAME: &str = "cc.ivanli.ambient_light/displays.toml";
 

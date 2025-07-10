@@ -1,4 +1,3 @@
-
 #[derive(Clone, Debug)]
 pub enum DisplaySetting {
     Brightness(u8),

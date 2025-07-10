@@ -1,7 +1,6 @@
-
 use std::fmt::Formatter;
-use std::{iter, fmt::Debug};
 use std::sync::Arc;
+use std::{fmt::Debug, iter};
 
 use serde::{Deserialize, Serialize};
 use tauri::async_runtime::RwLock;
@@ -60,13 +59,18 @@ impl Screenshot {
         let width = self.width as usize;
         // let height = CGDisplay::new(self.display_id).bounds().size.height as usize;
         // let width = CGDisplay::new(self.display_id).bounds().size.width as usize;
-        
+
         match config.border {
             crate::ambient_light::Border::Top => {
                 Self::get_one_edge_sample_points(height / 18, width, config.len, SINGLE_AXIS_POINTS)
             }
             crate::ambient_light::Border::Bottom => {
-                let points = Self::get_one_edge_sample_points(height / 18, width, config.len, SINGLE_AXIS_POINTS);
+                let points = Self::get_one_edge_sample_points(
+                    height / 18,
+                    width,
+                    config.len,
+                    SINGLE_AXIS_POINTS,
+                );
                 points
                     .into_iter()
                     .map(|groups| -> Vec<Point> {
@@ -75,7 +79,12 @@ impl Screenshot {
                     .collect()
             }
             crate::ambient_light::Border::Left => {
-                let points = Self::get_one_edge_sample_points(width / 32, height, config.len, SINGLE_AXIS_POINTS);
+                let points = Self::get_one_edge_sample_points(
+                    width / 32,
+                    height,
+                    config.len,
+                    SINGLE_AXIS_POINTS,
+                );
                 points
                     .into_iter()
                     .map(|groups| -> Vec<Point> {
@@ -84,7 +93,12 @@ impl Screenshot {
                     .collect()
             }
             crate::ambient_light::Border::Right => {
-                let points = Self::get_one_edge_sample_points(width / 32, height, config.len, SINGLE_AXIS_POINTS);
+                let points = Self::get_one_edge_sample_points(
+                    width / 32,
+                    height,
+                    config.len,
+                    SINGLE_AXIS_POINTS,
+                );
                 points
                     .into_iter()
                     .map(|groups| -> Vec<Point> {
@@ -153,7 +167,13 @@ impl Screenshot {
                     r += bitmap[position + 2] as f64;
                 } else {
                     // Skip invalid positions or use default values
-                    log::warn!("Invalid pixel position: x={}, y={}, position={}, bitmap_len={}", x, y, position, bitmap.len());
+                    log::warn!(
+                        "Invalid pixel position: x={}, y={}, position={}, bitmap_len={}",
+                        x,
+                        y,
+                        position,
+                        bitmap.len()
+                    );
                 }
             }
             let color = LedColor::new((r / len) as u8, (g / len) as u8, (b / len) as u8);

@@ -5,7 +5,7 @@ use tokio::{sync::OnceCell, task::yield_now};
 
 use crate::ambient_light::{config, LedStripConfigGroup};
 
-use super::{Border, SamplePointMapper, ColorCalibration, LedType};
+use super::{Border, ColorCalibration, LedType, SamplePointMapper};
 
 pub struct ConfigManager {
     config: Arc<RwLock<LedStripConfigGroup>>,
@@ -21,9 +21,12 @@ impl ConfigManager {
                 let (config_update_sender, config_update_receiver) =
                     tokio::sync::watch::channel(configs.clone());
 
-                    if let Err(err) = config_update_sender.send(configs.clone()) {
-                        log::error!("Failed to send config update when read config first time: {}", err);
-                    }
+                if let Err(err) = config_update_sender.send(configs.clone()) {
+                    log::error!(
+                        "Failed to send config update when read config first time: {}",
+                        err
+                    );
+                }
                 drop(config_update_receiver);
                 ConfigManager {
                     config: Arc::new(RwLock::new(configs)),
@@ -253,7 +256,10 @@ impl ConfigManager {
         self.config_update_sender.subscribe()
     }
 
-    pub async fn set_color_calibration(&self, color_calibration: ColorCalibration) -> anyhow::Result<()> {
+    pub async fn set_color_calibration(
+        &self,
+        color_calibration: ColorCalibration,
+    ) -> anyhow::Result<()> {
         let config = self.config.write().await;
 
         let mut cloned_config = config.clone();

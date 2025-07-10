@@ -54,7 +54,7 @@ impl UdpRpc {
                 }
             }
         });
-                
+
         let shared_self_for_check = shared_self.clone();
         tokio::spawn(async move {
             shared_self_for_check.check_boards().await;
@@ -216,12 +216,15 @@ impl UdpRpc {
             drop(boards);
 
             // Only send update if there are actual changes
-            let has_changes = prev_boards.len() != current_boards.len() ||
-                prev_boards.iter().zip(current_boards.iter()).any(|(prev, current)| {
-                    prev.connect_status != current.connect_status ||
-                    prev.ttl != current.ttl ||
-                    prev.checked_at != current.checked_at
-                });
+            let has_changes = prev_boards.len() != current_boards.len()
+                || prev_boards
+                    .iter()
+                    .zip(current_boards.iter())
+                    .any(|(prev, current)| {
+                        prev.connect_status != current.connect_status
+                            || prev.ttl != current.ttl
+                            || prev.checked_at != current.checked_at
+                    });
 
             if has_changes {
                 let board_change_sender = self.boards_change_sender.clone();

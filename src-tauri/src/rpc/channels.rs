@@ -17,7 +17,9 @@ impl BoardMessageChannels {
     pub async fn global() -> &'static Self {
         static BOARD_MESSAGE_CHANNELS: OnceCell<BoardMessageChannels> = OnceCell::const_new();
 
-        BOARD_MESSAGE_CHANNELS.get_or_init(|| async {Self::new()}).await
+        BOARD_MESSAGE_CHANNELS
+            .get_or_init(|| async { Self::new() })
+            .await
     }
 
     pub fn new() -> Self {

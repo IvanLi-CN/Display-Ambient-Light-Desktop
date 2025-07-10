@@ -1,14 +1,14 @@
 use std::collections::HashMap;
+use std::io::Cursor;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use std::io::Cursor;
 
 use anyhow::Result;
+use futures_util::{SinkExt, StreamExt};
 use image::{ImageFormat, RgbaImage};
 use tokio::sync::{broadcast, RwLock};
 use tokio::time::sleep;
 use tokio_tungstenite::{accept_async, tungstenite::Message};
-use futures_util::{SinkExt, StreamExt};
 
 use crate::screenshot::Screenshot;
 use crate::screenshot_manager::ScreenshotManager;
@@ -18,8 +18,8 @@ pub struct StreamConfig {
     pub display_id: u32,
     pub target_width: u32,
     pub target_height: u32,
-    pub quality: u8,  // JPEG quality 1-100
-    pub max_fps: u8,  // Maximum frames per second
+    pub quality: u8, // JPEG quality 1-100
+    pub max_fps: u8, // Maximum frames per second
 }
 
 impl Default for StreamConfig {
@@ -28,7 +28,7 @@ impl Default for StreamConfig {
             display_id: 0,
             target_width: 320,  // Reduced from 400 for better performance
             target_height: 180, // Reduced from 225 for better performance
-            quality: 50,  // Reduced from 75 for faster compression
+            quality: 50,        // Reduced from 75 for faster compression
             max_fps: 15,
         }
     }
@@ -63,7 +63,10 @@ impl ScreenStreamManager {
         }
     }
 
-    pub async fn start_stream(&self, config: StreamConfig) -> Result<broadcast::Receiver<StreamFrame>> {
+    pub async fn start_stream(
+        &self,
+        config: StreamConfig,
+    ) -> Result<broadcast::Receiver<StreamFrame>> {
         let display_id = config.display_id;
         let mut streams = self.streams.write().await;
 
@@ -100,7 +103,10 @@ impl ScreenStreamManager {
         Ok(rx)
     }
 
-    async fn run_stream(display_id: u32, streams: Arc<RwLock<HashMap<u32, Arc<RwLock<StreamState>>>>>) -> Result<()> {
+    async fn run_stream(
+        display_id: u32,
+        streams: Arc<RwLock<HashMap<u32, Arc<RwLock<StreamState>>>>>,
+    ) -> Result<()> {
         log::info!("Starting stream for display_id: {}", display_id);
 
         let screenshot_manager = ScreenshotManager::global().await;
@@ -108,7 +114,8 @@ impl ScreenStreamManager {
         // If display_id is 0, try to get the first available display
         let actual_display_id = if display_id == 0 {
             // Get available displays and use the first one
-            let displays = display_info::DisplayInfo::all().map_err(|e| anyhow::anyhow!("Failed to get displays: {}", e))?;
+            let displays = display_info::DisplayInfo::all()
+                .map_err(|e| anyhow::anyhow!("Failed to get displays: {}", e))?;
             if displays.is_empty() {
                 return Err(anyhow::anyhow!("No displays available"));
             }
@@ -118,14 +125,27 @@ impl ScreenStreamManager {
             display_id
         };
 
-        log::info!("Attempting to subscribe to display_id: {}", actual_display_id);
-        let screenshot_rx = match screenshot_manager.subscribe_by_display_id(actual_display_id).await {
+        log::info!(
+            "Attempting to subscribe to display_id: {}",
+            actual_display_id
+        );
+        let screenshot_rx = match screenshot_manager
+            .subscribe_by_display_id(actual_display_id)
+            .await
+        {
             Ok(rx) => {
-                log::info!("Successfully subscribed to display_id: {}", actual_display_id);
+                log::info!(
+                    "Successfully subscribed to display_id: {}",
+                    actual_display_id
+                );
                 rx
             }
             Err(e) => {
-                log::error!("Failed to subscribe to display_id {}: {}", actual_display_id, e);
+                log::error!(
+                    "Failed to subscribe to display_id {}: {}",
+                    actual_display_id,
+                    e
+                );
                 return Err(e);
             }
         };
@@ -161,7 +181,7 @@ impl ScreenStreamManager {
             // Wait for new screenshot
             if let Ok(_) = screenshot_rx.changed().await {
                 let screenshot = screenshot_rx.borrow().clone();
-                
+
                 // Rate limiting based on max_fps
                 let config = {
                     let streams_lock = streams.read().await;
@@ -182,14 +202,16 @@ impl ScreenStreamManager {
                 // Process screenshot into JPEG frame
                 if let Ok(frame) = Self::process_screenshot(&screenshot, &config).await {
                     last_process_time = Instant::now();
-                    
+
                     // Check if frame content changed (simple hash comparison) or force send
                     let frame_hash = Self::calculate_frame_hash(&frame.jpeg_data);
                     let should_send = {
                         let streams_lock = streams.read().await;
                         if let Some(stream_state) = streams_lock.get(&display_id) {
                             let mut state = stream_state.write().await;
-                            let changed = state.last_screenshot_hash.map_or(true, |hash| hash != frame_hash);
+                            let changed = state
+                                .last_screenshot_hash
+                                .map_or(true, |hash| hash != frame_hash);
                             let elapsed_ms = state.last_force_send.elapsed().as_millis();
                             let force_send = elapsed_ms > 500; // Force send every 500ms for better CPU performance
 
@@ -213,7 +235,10 @@ impl ScreenStreamManager {
                             let state = stream_state.read().await;
                             for tx in state.subscribers.iter() {
                                 if let Err(_) = tx.send(frame.clone()) {
-                                    log::warn!("Failed to send frame to subscriber for display_id: {}", display_id);
+                                    log::warn!(
+                                        "Failed to send frame to subscriber for display_id: {}",
+                                        display_id
+                                    );
                                 }
                             }
                         }
@@ -234,7 +259,10 @@ impl ScreenStreamManager {
         Ok(())
     }
 
-    async fn process_screenshot(screenshot: &Screenshot, config: &StreamConfig) -> Result<StreamFrame> {
+    async fn process_screenshot(
+        screenshot: &Screenshot,
+        config: &StreamConfig,
+    ) -> Result<StreamFrame> {
         let total_start = Instant::now();
         let bytes = screenshot.bytes.read().await;
 
@@ -262,10 +290,14 @@ impl ScreenStreamManager {
                     let p3 = base_ptr.add(i + 3).read();
 
                     // BGRA (0xAABBGGRR) -> RGBA (0xAAGGBBRR)
-                    let s0 = (p0 & 0xFF00FF00) | ((p0 & 0x00FF0000) >> 16) | ((p0 & 0x000000FF) << 16);
-                    let s1 = (p1 & 0xFF00FF00) | ((p1 & 0x00FF0000) >> 16) | ((p1 & 0x000000FF) << 16);
-                    let s2 = (p2 & 0xFF00FF00) | ((p2 & 0x00FF0000) >> 16) | ((p2 & 0x000000FF) << 16);
-                    let s3 = (p3 & 0xFF00FF00) | ((p3 & 0x00FF0000) >> 16) | ((p3 & 0x000000FF) << 16);
+                    let s0 =
+                        (p0 & 0xFF00FF00) | ((p0 & 0x00FF0000) >> 16) | ((p0 & 0x000000FF) << 16);
+                    let s1 =
+                        (p1 & 0xFF00FF00) | ((p1 & 0x00FF0000) >> 16) | ((p1 & 0x000000FF) << 16);
+                    let s2 =
+                        (p2 & 0xFF00FF00) | ((p2 & 0x00FF0000) >> 16) | ((p2 & 0x000000FF) << 16);
+                    let s3 =
+                        (p3 & 0xFF00FF00) | ((p3 & 0x00FF0000) >> 16) | ((p3 & 0x000000FF) << 16);
 
                     base_ptr.add(i).write(s0);
                     base_ptr.add(i + 1).write(s1);
@@ -279,20 +311,21 @@ impl ScreenStreamManager {
             for i in 0..remainder {
                 let idx = remainder_start + i;
                 let pixel = ptr.add(idx).read();
-                let swapped = (pixel & 0xFF00FF00) | ((pixel & 0x00FF0000) >> 16) | ((pixel & 0x000000FF) << 16);
+                let swapped = (pixel & 0xFF00FF00)
+                    | ((pixel & 0x00FF0000) >> 16)
+                    | ((pixel & 0x000000FF) << 16);
                 ptr.add(idx).write(swapped);
             }
         }
 
         // Create image from raw bytes
-        let img = RgbaImage::from_raw(
-            screenshot.width,
-            screenshot.height,
-            rgba_bytes,
-        ).ok_or_else(|| anyhow::anyhow!("Failed to create image from raw bytes"))?;
+        let img = RgbaImage::from_raw(screenshot.width, screenshot.height, rgba_bytes)
+            .ok_or_else(|| anyhow::anyhow!("Failed to create image from raw bytes"))?;
 
         // Resize if needed
-        let final_img = if screenshot.width != config.target_width || screenshot.height != config.target_height {
+        let final_img = if screenshot.width != config.target_width
+            || screenshot.height != config.target_height
+        {
             image::imageops::resize(
                 &img,
                 config.target_width,
@@ -311,8 +344,12 @@ impl ScreenStreamManager {
         rgb_img.write_to(&mut cursor, ImageFormat::Jpeg)?;
 
         let total_duration = total_start.elapsed();
-        log::debug!("Screenshot processed for display {} in {}ms, JPEG size: {} bytes",
-                   config.display_id, total_duration.as_millis(), jpeg_buffer.len());
+        log::debug!(
+            "Screenshot processed for display {} in {}ms, JPEG size: {} bytes",
+            config.display_id,
+            total_duration.as_millis(),
+            jpeg_buffer.len()
+        );
 
         Ok(StreamFrame {
             display_id: config.display_id,
@@ -345,7 +382,10 @@ impl ScreenStreamManager {
             // Mark stream as not running to stop the processing task
             let mut state = stream_state.write().await;
             state.is_running = false;
-            log::info!("Marked stream as not running for display_id: {}", display_id);
+            log::info!(
+                "Marked stream as not running for display_id: {}",
+                display_id
+            );
         }
 
         // Remove the stream from the map
@@ -355,20 +395,19 @@ impl ScreenStreamManager {
 }
 
 // Global instance
-static SCREEN_STREAM_MANAGER: tokio::sync::OnceCell<ScreenStreamManager> = tokio::sync::OnceCell::const_new();
+static SCREEN_STREAM_MANAGER: tokio::sync::OnceCell<ScreenStreamManager> =
+    tokio::sync::OnceCell::const_new();
 
 impl ScreenStreamManager {
     pub async fn global() -> &'static Self {
-        SCREEN_STREAM_MANAGER.get_or_init(|| async {
-            ScreenStreamManager::new()
-        }).await
+        SCREEN_STREAM_MANAGER
+            .get_or_init(|| async { ScreenStreamManager::new() })
+            .await
     }
 }
 
 // WebSocket handler for screen streaming
-pub async fn handle_websocket_connection(
-    stream: tokio::net::TcpStream,
-) -> Result<()> {
+pub async fn handle_websocket_connection(stream: tokio::net::TcpStream) -> Result<()> {
     log::info!("Accepting WebSocket connection...");
 
     let ws_stream = match accept_async(stream).await {
@@ -392,48 +431,52 @@ pub async fn handle_websocket_connection(
         match tokio::time::timeout(timeout_duration, ws_receiver.next()).await {
             Ok(Some(msg)) => {
                 match msg {
-                Ok(Message::Text(text)) => {
-                    log::info!("Received configuration message: {}", text);
+                    Ok(Message::Text(text)) => {
+                        log::info!("Received configuration message: {}", text);
 
-                    if let Ok(config_json) = serde_json::from_str::<serde_json::Value>(&text) {
-                        // Parse configuration from JSON
-                        let display_id = config_json.get("display_id")
-                            .and_then(|v| v.as_u64())
-                            .unwrap_or(0) as u32;
-                        let width = config_json.get("width")
-                            .and_then(|v| v.as_u64())
-                            .unwrap_or(320) as u32;  // Reduced from 400 for better performance
-                        let height = config_json.get("height")
-                            .and_then(|v| v.as_u64())
-                            .unwrap_or(180) as u32;  // Reduced from 225 for better performance
-                        let quality = config_json.get("quality")
-                            .and_then(|v| v.as_u64())
-                            .unwrap_or(50) as u8;  // Reduced from 75 for faster compression
+                        if let Ok(config_json) = serde_json::from_str::<serde_json::Value>(&text) {
+                            // Parse configuration from JSON
+                            let display_id = config_json
+                                .get("display_id")
+                                .and_then(|v| v.as_u64())
+                                .unwrap_or(0) as u32;
+                            let width = config_json
+                                .get("width")
+                                .and_then(|v| v.as_u64())
+                                .unwrap_or(320) as u32; // Reduced from 400 for better performance
+                            let height = config_json
+                                .get("height")
+                                .and_then(|v| v.as_u64())
+                                .unwrap_or(180) as u32; // Reduced from 225 for better performance
+                            let quality = config_json
+                                .get("quality")
+                                .and_then(|v| v.as_u64())
+                                .unwrap_or(50) as u8; // Reduced from 75 for faster compression
 
-                        let config = StreamConfig {
-                            display_id,
-                            target_width: width,
-                            target_height: height,
-                            quality,
-                            max_fps: 15,
-                        };
+                            let config = StreamConfig {
+                                display_id,
+                                target_width: width,
+                                target_height: height,
+                                quality,
+                                max_fps: 15,
+                            };
 
-                        log::info!("Parsed stream config: display_id={}, width={}, height={}, quality={}",
+                            log::info!("Parsed stream config: display_id={}, width={}, height={}, quality={}",
                                   display_id, width, height, quality);
-                        break config;
-                    } else {
-                        log::warn!("Failed to parse configuration JSON: {}", text);
+                            break config;
+                        } else {
+                            log::warn!("Failed to parse configuration JSON: {}", text);
+                        }
                     }
-                }
-                Ok(Message::Close(_)) => {
-                    log::info!("WebSocket connection closed before configuration");
-                    return Ok(());
-                }
-                Err(e) => {
-                    log::warn!("WebSocket error while waiting for config: {}", e);
-                    return Err(e.into());
-                }
-                _ => {}
+                    Ok(Message::Close(_)) => {
+                        log::info!("WebSocket connection closed before configuration");
+                        return Ok(());
+                    }
+                    Err(e) => {
+                        log::warn!("WebSocket error while waiting for config: {}", e);
+                        return Err(e.into());
+                    }
+                    _ => {}
                 }
             }
             Ok(None) => {
@@ -448,8 +491,12 @@ pub async fn handle_websocket_connection(
     };
 
     // Start the stream with the received configuration
-    log::info!("Starting stream with config: display_id={}, width={}, height={}",
-               config.display_id, config.target_width, config.target_height);
+    log::info!(
+        "Starting stream with config: display_id={}, width={}, height={}",
+        config.display_id,
+        config.target_width,
+        config.target_height
+    );
     let stream_manager = ScreenStreamManager::global().await;
     let display_id_for_cleanup = config.display_id;
     let mut frame_rx = match stream_manager.start_stream(config).await {
@@ -472,7 +519,7 @@ pub async fn handle_websocket_connection(
         while let Ok(frame) = frame_rx.recv().await {
             let mut sender = ws_sender_clone.lock().await;
             match sender.send(Message::Binary(frame.jpeg_data)).await {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(e) => {
                     log::warn!("Failed to send frame: {}", e);
                     break;
@@ -511,7 +558,10 @@ pub async fn handle_websocket_connection(
     }
 
     // Clean up resources when connection ends
-    log::info!("WebSocket connection ending, cleaning up resources for display_id: {}", display_id_for_cleanup);
+    log::info!(
+        "WebSocket connection ending, cleaning up resources for display_id: {}",
+        display_id_for_cleanup
+    );
     let stream_manager = ScreenStreamManager::global().await;
     stream_manager.stop_stream(display_id_for_cleanup).await;
 

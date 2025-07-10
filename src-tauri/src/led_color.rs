@@ -6,16 +6,16 @@ pub struct LedColor([u8; 3]);
 
 impl LedColor {
     pub fn default() -> Self {
-        Self ([0, 0, 0] )
+        Self([0, 0, 0])
     }
 
     pub fn new(r: u8, g: u8, b: u8) -> Self {
-        Self ([r, g, b])
+        Self([r, g, b])
     }
 
     pub fn from_hsv(h: f64, s: f64, v: f64) -> Self {
         let rgb = Rgb::from(Hsv::new(h, s, v));
-        Self ([rgb.r as u8, rgb.g as u8, rgb.b as u8])
+        Self([rgb.r as u8, rgb.g as u8, rgb.b as u8])
     }
 
     pub fn get_rgb(&self) -> [u8; 3] {
@@ -40,7 +40,7 @@ impl LedColor {
         self
     }
 
-    pub fn as_bytes (&self) -> [u8; 3] {
+    pub fn as_bytes(&self) -> [u8; 3] {
         self.0
     }
 

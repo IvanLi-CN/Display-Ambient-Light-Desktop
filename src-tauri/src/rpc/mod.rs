@@ -1,11 +1,11 @@
-mod board_info;
-mod udp;
 mod board;
-mod display_setting_request;
+mod board_info;
 mod channels;
+mod display_setting_request;
+mod udp;
 
-pub use board_info::*;
-pub use udp::*;
 pub use board::*;
-pub use display_setting_request::*;
+pub use board_info::*;
 pub use channels::*;
+pub use display_setting_request::*;
+pub use udp::*;

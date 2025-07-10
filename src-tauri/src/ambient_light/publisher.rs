@@ -18,7 +18,7 @@ use crate::{
 
 use itertools::Itertools;
 
-use super::{LedStripConfigGroup, SamplePointMapper, LedStripConfig, ColorCalibration, LedType};
+use super::{ColorCalibration, LedStripConfig, LedStripConfigGroup, LedType, SamplePointMapper};
 
 pub struct LedColorsPublisher {
     sorted_colors_rx: Arc<RwLock<watch::Receiver<Vec<u8>>>>,
@@ -90,7 +90,9 @@ impl LedColorsPublisher {
                 };
 
                 if !test_mode_active {
-                    match Self::send_colors_by_display(colors, mappers, &strips, &color_calibration).await {
+                    match Self::send_colors_by_display(colors, mappers, &strips, &color_calibration)
+                        .await
+                    {
                         Ok(_) => {
                             // log::info!("sent colors: #{: >15}", display_id);
                         }
@@ -140,7 +142,6 @@ impl LedColorsPublisher {
         let sorted_colors_tx = self.sorted_colors_tx.clone();
         let colors_tx = self.colors_tx.clone();
 
-
         tokio::spawn(async move {
             for _ in 0..10 {
                 let sorted_colors_tx = sorted_colors_tx.write().await;
@@ -148,7 +149,6 @@ impl LedColorsPublisher {
 
                 let mut all_colors: Vec<Option<Vec<u8>>> = vec![None; display_ids.len()];
                 let mut start: tokio::time::Instant = tokio::time::Instant::now();
-
 
                 loop {
                     let color_info = display_colors_rx.recv().await;
@@ -207,8 +207,6 @@ impl LedColorsPublisher {
     }
 
     pub async fn start(&self) {
-
-
         let config_manager = ConfigManager::global().await;
         let mut config_receiver = config_manager.clone_config_update_receiver();
         let configs = config_receiver.borrow().clone();
@@ -245,7 +243,8 @@ impl LedColorsPublisher {
             let bound_scale_factor = sample_point_group.bound_scale_factor;
 
             // Get strips for this display
-            let display_strips: Vec<LedStripConfig> = original_configs.strips
+            let display_strips: Vec<LedStripConfig> = original_configs
+                .strips
                 .iter()
                 .filter(|strip| strip.display_id == display_id)
                 .cloned()
@@ -353,9 +352,12 @@ impl LedColorsPublisher {
                                 let color_bytes = colors[i].as_bytes();
                                 // Apply calibration to RGB values
                                 vec![
-                                    ((color_bytes[0] as f32 * calibration_bytes[0] as f32 / 255.0) as u8),
-                                    ((color_bytes[1] as f32 * calibration_bytes[1] as f32 / 255.0) as u8),
-                                    ((color_bytes[2] as f32 * calibration_bytes[2] as f32 / 255.0) as u8),
+                                    ((color_bytes[0] as f32 * calibration_bytes[0] as f32 / 255.0)
+                                        as u8),
+                                    ((color_bytes[1] as f32 * calibration_bytes[1] as f32 / 255.0)
+                                        as u8),
+                                    ((color_bytes[2] as f32 * calibration_bytes[2] as f32 / 255.0)
+                                        as u8),
                                 ]
                             }
                             LedType::SK6812 => {
@@ -363,16 +365,23 @@ impl LedColorsPublisher {
                                 let color_bytes = colors[i].as_bytes();
                                 // Apply calibration to RGB values and use calibrated W
                                 vec![
-                                    ((color_bytes[0] as f32 * calibration_bytes[0] as f32 / 255.0) as u8),
-                                    ((color_bytes[1] as f32 * calibration_bytes[1] as f32 / 255.0) as u8),
-                                    ((color_bytes[2] as f32 * calibration_bytes[2] as f32 / 255.0) as u8),
+                                    ((color_bytes[0] as f32 * calibration_bytes[0] as f32 / 255.0)
+                                        as u8),
+                                    ((color_bytes[1] as f32 * calibration_bytes[1] as f32 / 255.0)
+                                        as u8),
+                                    ((color_bytes[2] as f32 * calibration_bytes[2] as f32 / 255.0)
+                                        as u8),
                                     calibration_bytes[3], // W channel
                                 ]
                             }
                         };
                         buffer.extend_from_slice(&bytes);
                     } else {
-                        log::warn!("Index {} out of bounds for colors array of length {}", i, colors.len());
+                        log::warn!(
+                            "Index {} out of bounds for colors array of length {}",
+                            i,
+                            colors.len()
+                        );
                         // Add black color as fallback
                         match led_type {
                             LedType::WS2812B => buffer.extend_from_slice(&[0, 0, 0]),
@@ -401,9 +410,12 @@ impl LedColorsPublisher {
                                 let color_bytes = colors[i].as_bytes();
                                 // Apply calibration to RGB values
                                 vec![
-                                    ((color_bytes[0] as f32 * calibration_bytes[0] as f32 / 255.0) as u8),
-                                    ((color_bytes[1] as f32 * calibration_bytes[1] as f32 / 255.0) as u8),
-                                    ((color_bytes[2] as f32 * calibration_bytes[2] as f32 / 255.0) as u8),
+                                    ((color_bytes[0] as f32 * calibration_bytes[0] as f32 / 255.0)
+                                        as u8),
+                                    ((color_bytes[1] as f32 * calibration_bytes[1] as f32 / 255.0)
+                                        as u8),
+                                    ((color_bytes[2] as f32 * calibration_bytes[2] as f32 / 255.0)
+                                        as u8),
                                 ]
                             }
                             LedType::SK6812 => {
@@ -411,16 +423,23 @@ impl LedColorsPublisher {
                                 let color_bytes = colors[i].as_bytes();
                                 // Apply calibration to RGB values and use calibrated W
                                 vec![
-                                    ((color_bytes[0] as f32 * calibration_bytes[0] as f32 / 255.0) as u8),
-                                    ((color_bytes[1] as f32 * calibration_bytes[1] as f32 / 255.0) as u8),
-                                    ((color_bytes[2] as f32 * calibration_bytes[2] as f32 / 255.0) as u8),
+                                    ((color_bytes[0] as f32 * calibration_bytes[0] as f32 / 255.0)
+                                        as u8),
+                                    ((color_bytes[1] as f32 * calibration_bytes[1] as f32 / 255.0)
+                                        as u8),
+                                    ((color_bytes[2] as f32 * calibration_bytes[2] as f32 / 255.0)
+                                        as u8),
                                     calibration_bytes[3], // W channel
                                 ]
                             }
                         };
                         buffer.extend_from_slice(&bytes);
                     } else {
-                        log::warn!("Index {} out of bounds for colors array of length {}", i, colors.len());
+                        log::warn!(
+                            "Index {} out of bounds for colors array of length {}",
+                            i,
+                            colors.len()
+                        );
                         // Add black color as fallback
                         match led_type {
                             LedType::WS2812B => buffer.extend_from_slice(&[0, 0, 0]),
@@ -469,7 +488,6 @@ impl LedColorsPublisher {
         let mut screenshots = HashMap::new();
 
         loop {
-
             let screenshot = merged_screenshot_receiver.recv().await;
 
             if let Err(err) = screenshot {
@@ -502,7 +520,6 @@ impl LedColorsPublisher {
 
                     let screenshot = screenshots.get(&display_id).unwrap();
 
-
                     let points: Vec<_> = led_strip_configs
                         .clone()
                         .map(|(_, config)| screenshot.get_sample_points(&config))
@@ -530,8 +547,6 @@ impl LedColorsPublisher {
                     colors_configs.push(colors_config);
                     led_start = led_end;
                 }
-
-
 
                 return Ok(AllColorConfig {
                     sample_point_groups: colors_configs,

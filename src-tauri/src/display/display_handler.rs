@@ -75,7 +75,6 @@ impl DisplayHandler {
             .set_vcp_feature(0x10, brightness)
             .map_err(|err| anyhow::anyhow!("can not set brightness. {:?}", err))?;
 
-
         state.brightness = brightness;
 
         state.last_modified_at = SystemTime::now();
