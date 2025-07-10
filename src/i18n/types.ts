@@ -64,6 +64,7 @@ export interface TranslationDict {
     // Device status
     timeout: string;
     connecting: string;
+    unknown: string;
   };
   
   // Display page

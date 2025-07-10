@@ -61,6 +61,7 @@ export const enUS: TranslationDict = {
     // Device status
     timeout: 'Timeout',
     connecting: 'Connecting',
+    unknown: 'Unknown',
   },
   
   displays: {

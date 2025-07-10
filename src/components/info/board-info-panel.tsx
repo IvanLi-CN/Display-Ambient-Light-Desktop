@@ -35,7 +35,17 @@ export const BoardInfoPanel: Component<{ board: BoardInfo }> = (props) => {
 
   const connectStatus = createMemo(() => {
     if (typeof props.board.connect_status === 'string') {
-      return props.board.connect_status;
+      // Translate the status string
+      switch (props.board.connect_status) {
+        case 'Connected':
+          return t('info.connected');
+        case 'Disconnected':
+          return t('info.disconnected');
+        case 'Unknown':
+          return t('info.unknown');
+        default:
+          return props.board.connect_status;
+      }
     }
 
     if ('Connecting' in props.board.connect_status) {
@@ -44,10 +54,12 @@ export const BoardInfoPanel: Component<{ board: BoardInfo }> = (props) => {
   });
 
   const statusBadgeClass = createMemo(() => {
-    const status = connectStatus();
-    if (status === 'Connected') {
+    // Use the original status for logic, not the translated text
+    const originalStatus = props.board.connect_status;
+
+    if (originalStatus === 'Connected') {
       return 'badge badge-success badge-sm';
-    } else if (status?.startsWith('Connecting')) {
+    } else if (typeof originalStatus === 'object' && 'Connecting' in originalStatus) {
       return 'badge badge-warning badge-sm';
     } else {
       return 'badge badge-error badge-sm';

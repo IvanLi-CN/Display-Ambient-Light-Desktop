@@ -61,6 +61,7 @@ export const zhCN: TranslationDict = {
     // Device status
     timeout: '超时',
     connecting: '连接中',
+    unknown: '未知',
   },
   
   displays: {
