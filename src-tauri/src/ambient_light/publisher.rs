@@ -150,57 +150,57 @@ impl LedColorsPublisher {
             let mut _start: tokio::time::Instant = tokio::time::Instant::now();
 
             loop {
-                    let color_info = display_colors_rx.recv().await;
+                let color_info = display_colors_rx.recv().await;
 
-                    if let Err(err) = color_info {
-                        match err {
-                            broadcast::error::RecvError::Closed => {
-                                return;
-                            }
-                            broadcast::error::RecvError::Lagged(_) => {
-                                warn!("display_colors_rx lagged");
-                                continue;
-                            }
+                if let Err(err) = color_info {
+                    match err {
+                        broadcast::error::RecvError::Closed => {
+                            return;
+                        }
+                        broadcast::error::RecvError::Lagged(_) => {
+                            warn!("display_colors_rx lagged");
+                            continue;
                         }
                     }
-                    let (display_id, colors) = color_info.unwrap();
-
-                    let index = display_ids.iter().position(|id| *id == display_id);
-
-                    if index.is_none() {
-                        warn!("display id not found");
-                        continue;
-                    }
-
-                    all_colors[index.unwrap()] = Some(colors);
-
-                    if all_colors.iter().all(|color| color.is_some()) {
-                        let flatten_colors = all_colors
-                            .clone()
-                            .into_iter()
-                            .flat_map(|c| c.unwrap())
-                            .collect::<Vec<_>>();
-
-                        match colors_tx.send(flatten_colors.clone()) {
-                            Ok(_) => {}
-                            Err(err) => {
-                                warn!("Failed to send colors: {}", err);
-                            }
-                        };
-
-                        let sorted_colors =
-                            ScreenshotManager::get_sorted_colors(&flatten_colors, &mappers);
-
-                        match sorted_colors_tx.send(sorted_colors) {
-                            Ok(_) => {}
-                            Err(err) => {
-                                warn!("Failed to send sorted colors: {}", err);
-                            }
-                        };
-
-                        _start = tokio::time::Instant::now();
-                    }
                 }
+                let (display_id, colors) = color_info.unwrap();
+
+                let index = display_ids.iter().position(|id| *id == display_id);
+
+                if index.is_none() {
+                    warn!("display id not found");
+                    continue;
+                }
+
+                all_colors[index.unwrap()] = Some(colors);
+
+                if all_colors.iter().all(|color| color.is_some()) {
+                    let flatten_colors = all_colors
+                        .clone()
+                        .into_iter()
+                        .flat_map(|c| c.unwrap())
+                        .collect::<Vec<_>>();
+
+                    match colors_tx.send(flatten_colors.clone()) {
+                        Ok(_) => {}
+                        Err(err) => {
+                            warn!("Failed to send colors: {}", err);
+                        }
+                    };
+
+                    let sorted_colors =
+                        ScreenshotManager::get_sorted_colors(&flatten_colors, &mappers);
+
+                    match sorted_colors_tx.send(sorted_colors) {
+                        Ok(_) => {}
+                        Err(err) => {
+                            warn!("Failed to send sorted colors: {}", err);
+                        }
+                    };
+
+                    _start = tokio::time::Instant::now();
+                }
+            }
         });
     }
 

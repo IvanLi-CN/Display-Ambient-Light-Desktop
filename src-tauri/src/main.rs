@@ -84,8 +84,7 @@ fn list_display_info() -> Result<String, String> {
         error!("can not list display info: {}", e);
         e.to_string()
     })?;
-    let displays: Vec<DisplayInfoWrapper> =
-        displays.iter().map(DisplayInfoWrapper).collect();
+    let displays: Vec<DisplayInfoWrapper> = displays.iter().map(DisplayInfoWrapper).collect();
     let json_str = to_string(&displays).map_err(|e| {
         error!("can not list display info: {}", e);
         e.to_string()
