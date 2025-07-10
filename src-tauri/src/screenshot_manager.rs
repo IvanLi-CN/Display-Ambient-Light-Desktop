@@ -5,12 +5,8 @@ use core_graphics::display::{
     kCGNullWindowID, kCGWindowImageDefault, kCGWindowListOptionOnScreenOnly, CGDisplay,
 };
 use core_graphics::geometry::{CGPoint, CGRect, CGSize};
-use paris::{info, warn};
-use screen_capture_kit::shareable_content::{SCDisplay, SCShareableContent};
-use screen_capture_kit::stream::SCStreamDelegate;
-use screen_capture_kit::stream::{
-    SCContentFilter, SCStream, SCStreamConfiguration, SCStreamOutput,
-};
+use paris::warn;
+// Unused imports removed - these are for future screen capture functionality
 use tauri::async_runtime::RwLock;
 use tokio::sync::{broadcast, watch, OnceCell};
 use tokio::task::yield_now;
@@ -162,7 +158,7 @@ impl ScreenshotManager {
                     let tx_for_send = tx.read().await;
                     let merged_screenshot_tx = merged_screenshot_tx.write().await;
 
-                    if let Err(err) = merged_screenshot_tx.send(screenshot.clone()) {
+                    if let Err(_err) = merged_screenshot_tx.send(screenshot.clone()) {
                         // log::warn!("merged_screenshot_tx.send failed: {}", err);
                     }
                     if let Err(err) = tx_for_send.send(screenshot.clone()) {
@@ -188,7 +184,7 @@ impl ScreenshotManager {
                     let tx_for_send = tx.read().await;
                     let merged_screenshot_tx = merged_screenshot_tx.write().await;
 
-                    if let Err(err) = merged_screenshot_tx.send(screenshot.clone()) {
+                    if let Err(_err) = merged_screenshot_tx.send(screenshot.clone()) {
                         // log::warn!("merged_screenshot_tx.send failed: {}", err);
                     }
                     if let Err(err) = tx_for_send.send(screenshot.clone()) {

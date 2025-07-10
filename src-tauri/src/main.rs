@@ -14,7 +14,7 @@ mod volume;
 use ambient_light::{Border, ColorCalibration, LedStripConfig, LedStripConfigGroup, LedType};
 use display::{DisplayManager, DisplayState};
 use display_info::DisplayInfo;
-use led_test_effects::{LedTestEffects, TestEffectConfig, TestEffectType};
+use led_test_effects::{LedTestEffects, TestEffectConfig};
 use paris::{error, info, warn};
 use rpc::{BoardInfo, UdpRpc};
 use screenshot::Screenshot;
@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::to_string;
 use std::sync::Arc;
 use tauri::http::{Request, Response};
-use tauri::{Emitter, Manager, Runtime};
+use tauri::{Emitter, Runtime};
 use tokio::sync::RwLock;
 use volume::VolumeManager;
 

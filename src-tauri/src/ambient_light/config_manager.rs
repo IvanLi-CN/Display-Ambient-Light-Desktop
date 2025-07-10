@@ -134,7 +134,7 @@ impl ConfigManager {
 
         for (index, strip) in config.clone().strips.iter().enumerate() {
             if strip.display_id == display_id && strip.border == border {
-                let mut mapper = config.mappers[index].borrow_mut();
+                let mapper = config.mappers[index].borrow_mut();
 
                 if target_start == mapper.start {
                     return Ok(());
@@ -179,7 +179,7 @@ impl ConfigManager {
 
         for (index, strip) in config.clone().strips.iter().enumerate() {
             if strip.display_id == display_id && strip.border == border {
-                let mut mapper = config.mappers[index].borrow_mut();
+                let mapper = config.mappers[index].borrow_mut();
 
                 let start = mapper.start;
                 mapper.start = mapper.end;

@@ -1,4 +1,4 @@
-use std::{borrow::Borrow, collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use paris::warn;
 use tauri::async_runtime::RwLock;
@@ -12,8 +12,8 @@ use crate::{
     ambient_light::{config, ConfigManager},
     led_color::LedColor,
     rpc::UdpRpc,
-    screenshot::{self, LedSamplePoints},
-    screenshot_manager::{self, ScreenshotManager},
+    screenshot::LedSamplePoints,
+    screenshot_manager::ScreenshotManager,
 };
 
 use itertools::Itertools;
@@ -55,7 +55,7 @@ impl LedColorsPublisher {
         &self,
         display_id: u32,
         sample_points: Vec<LedSamplePoints>,
-        bound_scale_factor: f32,
+        _bound_scale_factor: f32,
         mappers: Vec<SamplePointMapper>,
         display_colors_tx: broadcast::Sender<(u32, Vec<u8>)>,
         strips: Vec<LedStripConfig>,

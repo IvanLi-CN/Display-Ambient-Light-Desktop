@@ -4,9 +4,9 @@ use paris::{error, info, warn};
 use tokio::{io, net::UdpSocket, sync::RwLock, task::yield_now, time::timeout};
 
 use crate::{
-    ambient_light::{ConfigManager, LedStripConfig},
+    ambient_light::ConfigManager,
     rpc::DisplaySettingRequest,
-    volume::{self, VolumeManager},
+    volume::VolumeManager,
 };
 
 use super::{BoardConnectStatus, BoardInfo, BoardMessageChannels};

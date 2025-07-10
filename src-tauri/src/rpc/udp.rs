@@ -129,7 +129,7 @@ impl UdpRpc {
 
                     sender.send(tx_boards)?;
                 }
-                other_event => {
+                _other_event => {
                     // log::info!("{:?}", &other_event);
                 }
             }
