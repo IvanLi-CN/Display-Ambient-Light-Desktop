@@ -1,0 +1,41 @@
+# Lefthook configuration for Display Ambient Light Desktop
+# https://github.com/evilmartians/lefthook
+
+pre-commit:
+  parallel: true
+  commands:
+    # Frontend linting and formatting
+    frontend-lint:
+      glob: "*.{ts,tsx,js,jsx}"
+      run: pnpm exec tsc --noEmit
+      stage_fixed: true
+
+    # Rust formatting check
+    rust-fmt:
+      glob: "src-tauri/src/**/*.rs"
+      run: cd src-tauri && cargo fmt --all --check
+      stage_fixed: false
+
+    # Rust linting
+    rust-clippy:
+      glob: "src-tauri/src/**/*.rs"
+      run: cd src-tauri && cargo clippy --all-targets --all-features -- -D clippy::correctness -D clippy::suspicious -W clippy::complexity -W clippy::perf -W clippy::style
+      stage_fixed: false
+
+    # Rust tests
+    rust-test:
+      glob: "src-tauri/src/**/*.rs"
+      run: cd src-tauri && cargo test --all-features
+      stage_fixed: false
+
+pre-push:
+  parallel: false
+  commands:
+    # Build check before push
+    build-check:
+      run: |
+        echo "🔍 Checking frontend build..."
+        pnpm build
+        echo "🔍 Checking Rust build..."
+        cd src-tauri && cargo check --all-targets --all-features
+        echo "✅ All builds successful!"

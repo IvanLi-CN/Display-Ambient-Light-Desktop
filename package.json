@@ -26,7 +26,12 @@
     "dev": "vite",
     "build": "vite build",
     "serve": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "prepare": "lefthook install",
+    "lint": "tsc --noEmit",
+    "lint:rust": "cd src-tauri && cargo clippy --all-targets --all-features -- -D clippy::correctness -D clippy::suspicious -W clippy::complexity -W clippy::perf -W clippy::style",
+    "fmt:rust": "cd src-tauri && cargo fmt --all",
+    "test:rust": "cd src-tauri && cargo test --all-features"
   },
   "license": "MIT",
   "dependencies": {
@@ -47,6 +52,7 @@
     "@types/node": "^24.0.7",
     "autoprefixer": "^10.4.21",
     "daisyui": "^5.0.43",
+    "lefthook": "^1.12.1",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.11",
     "typescript": "^4.9.5",
