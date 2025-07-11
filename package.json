@@ -34,6 +34,7 @@
     "test:rust": "cd src-tauri && cargo test --all-features"
   },
   "license": "MIT",
+  "type": "module",
   "dependencies": {
     "@solid-primitives/i18n": "^2.2.1",
     "@solidjs/router": "^0.8.4",
