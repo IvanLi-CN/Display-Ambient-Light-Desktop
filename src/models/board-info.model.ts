@@ -4,6 +4,6 @@ export type BoardInfo = {
   address: string;
   port: number;
   ttl: number;
-  connect_status: 'Connected' | 'Disconnected' | { Connecting: number };
+  connect_status: 'Connected' | 'Disconnected' | 'Unknown' | { Connecting: number };
   checked_at: Date;
 };

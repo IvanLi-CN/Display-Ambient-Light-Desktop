@@ -7,7 +7,6 @@ import { invoke } from '@tauri-apps/api/core';
 import { setLedStripStore } from './stores/led-strip.store';
 import { LedStripConfigContainer } from './models/led-strip-config';
 import { InfoIndex } from './components/info/info-index';
-import { DisplayStateIndex } from './components/displays/display-state-index';
 import { useLanguage } from './i18n/index';
 import { AppVersion } from './models/app-version.model';
 
@@ -71,7 +70,6 @@ function App() {
             </div>
             <ul class="menu menu-sm dropdown-content z-[100] p-2 shadow bg-base-100 rounded-box w-52 border border-base-300">
               <li><A href="/info" class="text-base-content hover:bg-base-200">{t('nav.info')}</A></li>
-              <li><A href="/displays" class="text-base-content hover:bg-base-200">{t('nav.displays')}</A></li>
               <li><A href="/led-strips-configuration" class="text-base-content hover:bg-base-200">{t('nav.ledConfiguration')}</A></li>
               <li><A href="/white-balance" class="text-base-content hover:bg-base-200">{t('nav.whiteBalance')}</A></li>
               <li><A href="/led-strip-test" class="text-base-content hover:bg-base-200">{t('nav.ledTest')}</A></li>
@@ -82,7 +80,6 @@ function App() {
         <div class="navbar-center hidden lg:flex">
           <ul class="menu menu-horizontal px-1">
             <li><A href="/info" class="btn btn-ghost text-base-content hover:text-primary">{t('nav.info')}</A></li>
-            <li><A href="/displays" class="btn btn-ghost text-base-content hover:text-primary">{t('nav.displays')}</A></li>
             <li><A href="/led-strips-configuration" class="btn btn-ghost text-base-content hover:text-primary">{t('nav.ledConfiguration')}</A></li>
             <li><A href="/white-balance" class="btn btn-ghost text-base-content hover:text-primary">{t('nav.whiteBalance')}</A></li>
             <li><A href="/led-strip-test" class="btn btn-ghost text-base-content hover:text-primary">{t('nav.ledTest')}</A></li>
@@ -130,7 +127,6 @@ function App() {
         <Routes>
           <Route path="/" element={<Navigate href="/info" />} />
           <Route path="/info" component={InfoIndex} />
-          <Route path="/displays" component={DisplayStateIndex} />
           <Route path="/led-strips-configuration" component={LedStripConfiguration} />
           <Route path="/white-balance" component={WhiteBalance} />
           <Route path="/led-strip-test" element={<LedStripTest />} />

@@ -3,7 +3,7 @@ import { TranslationDict } from '../types';
 export const zhCN: TranslationDict = {
   nav: {
     title: '环境光控制',
-    info: '基本信息',
+    info: '系统信息',
     displays: '显示器信息',
     ledConfiguration: '灯条配置',
     whiteBalance: '白平衡',

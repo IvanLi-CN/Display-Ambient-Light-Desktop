@@ -475,7 +475,7 @@ export const WhiteBalance = () => {
                     <span class="label-text font-semibold text-base-content/70">{t('whiteBalance.whiteChannel')}</span>
                     <div class="badge badge-outline badge-sm">{t('whiteBalance.notEnabled')}</div>
                   </label>
-                  <ColorSlider class="from-yellow-50 to-cyan-50" disabled />
+                  <ColorSlider class="from-yellow-50 to-cyan-50 opacity-50 pointer-events-none" />
                 </div>
               </div>
 

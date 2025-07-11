@@ -24,7 +24,7 @@ export const DisplayInfoPanel: Component<DisplayInfoPanelProps> = (props) => {
   const { t } = useLanguage();
 
   return (
-    <div {...rootProps} class={'card bg-base-100/95 backdrop-blur shadow-lg border border-base-300 ' + rootProps.class}>
+    <div {...rootProps} class={'card bg-base-100/95 backdrop-blur shadow-lg border border-base-300 ' + (rootProps.class || '')}>
       <div class="card-body p-4">
         <div class="card-title text-sm mb-3 flex items-center justify-between">
           <span class="text-base-content">{t('displays.displayInfo')}</span>
