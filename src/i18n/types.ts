@@ -248,6 +248,14 @@ export interface TranslationDict {
     language: string;
     languageSelection: string;
     languageDescription: string;
+    theme: string;
+    themeSelection: string;
+    themeDescription: string;
+    themeLight: string;
+    themeDark: string;
+    themeAuto: string;
+    themeSuccess: string;
+    themeError: string;
     autoStart: string;
     autoStartDescription: string;
     autoStartEnabled: string;
@@ -257,6 +265,7 @@ export interface TranslationDict {
     general: string;
     system: string;
     about: string;
+    appearance: string;
   };
 
   about: {

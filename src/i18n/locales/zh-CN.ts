@@ -239,6 +239,14 @@ export const zhCN: TranslationDict = {
     language: '语言',
     languageSelection: '语言选择',
     languageDescription: '选择应用程序的显示语言',
+    theme: '主题',
+    themeSelection: '主题选择',
+    themeDescription: '选择应用程序的配色主题',
+    themeLight: '浅色主题',
+    themeDark: '深色主题',
+    themeAuto: '跟随系统',
+    themeSuccess: '主题设置成功',
+    themeError: '主题设置失败',
     autoStart: '开机自启',
     autoStartDescription: '系统启动时自动启动应用程序',
     autoStartEnabled: '已启用开机自启',
@@ -248,6 +256,7 @@ export const zhCN: TranslationDict = {
     general: '通用',
     system: '系统',
     about: '关于',
+    appearance: '外观',
   },
 
   about: {

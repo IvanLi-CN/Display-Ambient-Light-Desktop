@@ -2,6 +2,7 @@ import { render } from 'solid-js/web';
 import { createSignal, createEffect, onMount } from 'solid-js';
 import { invoke } from '@tauri-apps/api/core';
 import { LanguageProvider, useLanguage } from './i18n/index';
+import { themeStore } from './stores/theme.store';
 
 const AboutWindow = () => {
   const { t } = useLanguage();
@@ -29,7 +30,7 @@ const AboutWindow = () => {
   };
 
   return (
-    <div class="min-h-screen bg-base-200 flex items-center justify-center p-4">
+    <div class="min-h-screen bg-base-200 flex items-center justify-center p-4" data-theme={themeStore.currentTheme()}>
       <div class="w-full max-w-sm">
         <div class="bg-base-100 rounded-lg shadow-xl p-5">
           {/* Header */}

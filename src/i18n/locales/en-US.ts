@@ -239,6 +239,14 @@ export const enUS: TranslationDict = {
     language: 'Language',
     languageSelection: 'Language Selection',
     languageDescription: 'Select the display language for the application',
+    theme: 'Theme',
+    themeSelection: 'Theme Selection',
+    themeDescription: 'Select the color theme for the application',
+    themeLight: 'Light Theme',
+    themeDark: 'Dark Theme',
+    themeAuto: 'Follow System',
+    themeSuccess: 'Theme setting saved successfully',
+    themeError: 'Failed to save theme setting',
     autoStart: 'Auto Start',
     autoStartDescription: 'Automatically start the application when the system boots',
     autoStartEnabled: 'Auto start enabled',
@@ -248,6 +256,7 @@ export const enUS: TranslationDict = {
     general: 'General',
     system: 'System',
     about: 'About',
+    appearance: 'Appearance',
   },
 
   about: {
