@@ -95,7 +95,7 @@ export const Settings = () => {
         <AmbientLightControl />
 
         {/* General Settings */}
-        <div class="card bg-base-100 shadow-lg">
+        <div class="settings-card">
           <div class="card-body">
             <h2 class="card-title text-xl mb-4 flex items-center">
               <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -132,7 +132,7 @@ export const Settings = () => {
         </div>
 
         {/* System Settings */}
-        <div class="card bg-base-100 shadow-lg">
+        <div class="settings-card">
           <div class="card-body">
             <h2 class="card-title text-xl mb-4 flex items-center">
               <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -143,8 +143,8 @@ export const Settings = () => {
 
             {/* Auto Start Setting */}
             <div class="form-control">
-              <label class="label cursor-pointer">
-                <div class="flex flex-col items-start">
+              <div class="toggle-right-container cursor-pointer">
+                <div class="flex flex-col items-start flex-1">
                   <span class="label-text text-base font-medium">{t('settings.autoStart')}</span>
                   <span class="text-sm text-base-content/70 mt-1">{t('settings.autoStartDescription')}</span>
                 </div>
@@ -155,13 +155,13 @@ export const Settings = () => {
                   onChange={handleAutoStartToggle}
                   disabled={loading()}
                 />
-              </label>
+              </div>
             </div>
           </div>
         </div>
 
         {/* About Section */}
-        <div class="card bg-base-100 shadow-lg">
+        <div class="settings-card">
           <div class="card-body">
             <div class="flex items-center justify-between">
               <div class="flex items-center">

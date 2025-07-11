@@ -65,7 +65,7 @@ export const AmbientLightControl = () => {
   };
 
   return (
-    <div class="card bg-base-100 shadow-lg border border-base-300">
+    <div class="settings-card">
       <div class="card-body p-6">
         <div class="flex items-center justify-between mb-6">
           <div class="flex items-center gap-3">
@@ -103,7 +103,7 @@ export const AmbientLightControl = () => {
 
         {/* Main Control */}
         <div class="bg-base-200 rounded-lg p-4">
-          <div class="flex items-center justify-between">
+          <div class="ambient-control-toggle toggle-right-container cursor-pointer">
             <div class="flex-1">
               <div class="flex items-center gap-3 mb-2">
                 <span class="text-base font-medium text-base-content">
@@ -121,15 +121,13 @@ export const AmbientLightControl = () => {
               </p>
             </div>
 
-            <div class="flex-shrink-0 ml-4">
-              <input
-                type="checkbox"
-                class="toggle toggle-primary toggle-lg"
-                checked={ambientLightEnabled()}
-                disabled={loading()}
-                onChange={handleAmbientLightToggle}
-              />
-            </div>
+            <input
+              type="checkbox"
+              class="toggle toggle-primary toggle-lg"
+              checked={ambientLightEnabled()}
+              disabled={loading()}
+              onChange={handleAmbientLightToggle}
+            />
           </div>
         </div>
       </div>

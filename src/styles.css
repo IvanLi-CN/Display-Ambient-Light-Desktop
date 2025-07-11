@@ -1,6 +1,43 @@
 @import "tailwindcss";
 @config "../tailwind.config.js";
 
+/* Remove unwanted selection/debug borders */
+* {
+  outline: none !important;
+}
+
+*:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Remove any potential debug/selection borders */
+*[style*="border"] {
+  border: none !important;
+}
+
+/* Force remove red borders that might be added by debugging tools */
+* {
+  border: none !important;
+  box-shadow: none !important;
+}
+
+*[style*="border: 1px solid red"],
+*[style*="border: 2px solid red"],
+*[style*="border: 1px solid rgb(255, 0, 0)"],
+*[style*="border: 2px solid rgb(255, 0, 0)"] {
+  border: none !important;
+}
+
+/* Override any inspector/debug styles */
+.__web-inspector-hide-shortcut__,
+*[data-inspector],
+*[data-debug] {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
 /* Custom responsive styles for small windows */
 @media (max-width: 640px) {
   .container {
@@ -21,4 +58,51 @@
   .led-control-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Settings page card styles */
+.settings-card {
+  @apply card bg-base-100 shadow-lg border-0;
+  transition: all 0.2s ease-in-out;
+}
+
+.settings-card:hover {
+  @apply shadow-xl;
+  transform: translateY(-1px);
+}
+
+/* Ensure consistent card appearance */
+.card {
+  border: none !important;
+  outline: none !important;
+}
+
+.card:focus,
+.card:focus-visible {
+  outline: none !important;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1) !important;
+}
+
+/* Force toggle switches to align right */
+.toggle-right-container {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  width: 100% !important;
+}
+
+.toggle-right-container .toggle {
+  margin-left: auto !important;
+  flex-shrink: 0 !important;
+}
+
+/* Specific styles for ambient light control */
+.ambient-control-toggle {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+}
+
+.ambient-control-toggle .toggle {
+  margin-left: auto !important;
 }
