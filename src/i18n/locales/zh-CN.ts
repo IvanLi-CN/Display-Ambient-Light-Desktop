@@ -8,6 +8,7 @@ export const zhCN: TranslationDict = {
     ledConfiguration: '灯条配置',
     whiteBalance: '白平衡',
     ledTest: '灯带测试',
+    settings: '设置',
   },
   
   common: {
@@ -231,5 +232,20 @@ export const zhCN: TranslationDict = {
     deviceNotFound: '设备未找到',
     networkError: '网络错误',
     unknownError: '未知错误',
+  },
+
+  settings: {
+    title: '设置',
+    language: '语言',
+    languageSelection: '语言选择',
+    languageDescription: '选择应用程序的显示语言',
+    autoStart: '开机自启',
+    autoStartDescription: '系统启动时自动启动应用程序',
+    autoStartEnabled: '已启用开机自启',
+    autoStartDisabled: '已禁用开机自启',
+    autoStartSuccess: '开机自启设置成功',
+    autoStartError: '开机自启设置失败',
+    general: '通用',
+    system: '系统',
   },
 };

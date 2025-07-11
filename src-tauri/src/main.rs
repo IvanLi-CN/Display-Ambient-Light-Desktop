@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod ambient_light;
+mod auto_start;
 mod display;
 mod led_color;
 mod led_test_effects;
@@ -473,6 +474,30 @@ async fn get_displays() -> Vec<DisplayState> {
     display_manager.get_displays().await
 }
 
+#[tauri::command]
+fn is_auto_start_enabled() -> Result<bool, String> {
+    auto_start::AutoStartManager::is_enabled().map_err(|e| {
+        error!("Failed to check auto start status: {}", e);
+        e.to_string()
+    })
+}
+
+#[tauri::command]
+fn set_auto_start_enabled(enabled: bool) -> Result<(), String> {
+    auto_start::AutoStartManager::set_enabled(enabled).map_err(|e| {
+        error!("Failed to set auto start: {}", e);
+        e.to_string()
+    })
+}
+
+#[tauri::command]
+fn get_auto_start_config() -> Result<auto_start::AutoStartConfig, String> {
+    auto_start::AutoStartManager::get_config().map_err(|e| {
+        error!("Failed to get auto start config: {}", e);
+        e.to_string()
+    })
+}
+
 // Protocol handler for ambient-light://
 fn handle_ambient_light_protocol<R: Runtime>(
     _ctx: tauri::UriSchemeContext<R>,
@@ -639,7 +664,10 @@ async fn main() {
             set_color_calibration,
             read_config,
             get_boards,
-            get_displays
+            get_displays,
+            is_auto_start_enabled,
+            set_auto_start_enabled,
+            get_auto_start_config
         ])
         .register_uri_scheme_protocol("ambient-light", handle_ambient_light_protocol)
         .setup(move |app| {

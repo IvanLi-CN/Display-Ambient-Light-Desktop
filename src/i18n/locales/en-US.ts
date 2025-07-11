@@ -8,6 +8,7 @@ export const enUS: TranslationDict = {
     ledConfiguration: 'LED Configuration',
     whiteBalance: 'White Balance',
     ledTest: 'LED Test',
+    settings: 'Settings',
   },
   
   common: {
@@ -231,5 +232,20 @@ export const enUS: TranslationDict = {
     deviceNotFound: 'Device not found',
     networkError: 'Network error',
     unknownError: 'Unknown error',
+  },
+
+  settings: {
+    title: 'Settings',
+    language: 'Language',
+    languageSelection: 'Language Selection',
+    languageDescription: 'Select the display language for the application',
+    autoStart: 'Auto Start',
+    autoStartDescription: 'Automatically start the application when the system boots',
+    autoStartEnabled: 'Auto start enabled',
+    autoStartDisabled: 'Auto start disabled',
+    autoStartSuccess: 'Auto start setting saved successfully',
+    autoStartError: 'Failed to save auto start setting',
+    general: 'General',
+    system: 'System',
   },
 };

@@ -2,6 +2,7 @@ import { Routes, Route, useLocation, A, Navigate } from '@solidjs/router';
 import { LedStripConfiguration } from './components/led-strip-configuration/led-strip-configuration';
 import { WhiteBalance } from './components/white-balance/white-balance';
 import { LedStripTest } from './components/led-strip-test/led-strip-test';
+import { Settings } from './components/settings/settings';
 import { createEffect, createSignal } from 'solid-js';
 import { invoke } from '@tauri-apps/api/core';
 import { setLedStripStore } from './stores/led-strip.store';
@@ -13,7 +14,7 @@ import { AppVersion } from './models/app-version.model';
 function App() {
   const location = useLocation();
   const [previousPath, setPreviousPath] = createSignal<string>('');
-  const { t, locale, setLocale } = useLanguage();
+  const { t } = useLanguage();
   const [appVersion, setAppVersion] = createSignal<AppVersion>({ version: '1.0.0', is_dev: false });
 
   // Get app version on mount
@@ -73,6 +74,7 @@ function App() {
               <li><A href="/led-strips-configuration" class="text-base-content hover:bg-base-200">{t('nav.ledConfiguration')}</A></li>
               <li><A href="/white-balance" class="text-base-content hover:bg-base-200">{t('nav.whiteBalance')}</A></li>
               <li><A href="/led-strip-test" class="text-base-content hover:bg-base-200">{t('nav.ledTest')}</A></li>
+              <li><A href="/settings" class="text-base-content hover:bg-base-200">{t('nav.settings')}</A></li>
             </ul>
           </div>
           <a class="btn btn-ghost text-xl text-primary font-bold">{t('nav.title')}</a>
@@ -83,33 +85,11 @@ function App() {
             <li><A href="/led-strips-configuration" class="btn btn-ghost text-base-content hover:text-primary">{t('nav.ledConfiguration')}</A></li>
             <li><A href="/white-balance" class="btn btn-ghost text-base-content hover:text-primary">{t('nav.whiteBalance')}</A></li>
             <li><A href="/led-strip-test" class="btn btn-ghost text-base-content hover:text-primary">{t('nav.ledTest')}</A></li>
+            <li><A href="/settings" class="btn btn-ghost text-base-content hover:text-primary">{t('nav.settings')}</A></li>
           </ul>
         </div>
         <div class="navbar-end">
-          <div class="dropdown dropdown-end dropdown-hover">
-            <div tabindex="0" role="button" class="btn btn-ghost btn-sm">
-              {locale() === 'zh-CN' ? '中文' : 'English'}
-            </div>
-            <ul class="dropdown-content z-[100] menu p-2 shadow bg-base-100 rounded-box w-32 border border-base-300">
-              <li>
-                <button
-                  class={`${locale() === 'zh-CN' ? 'active' : ''}`}
-                  onClick={() => setLocale('zh-CN')}
-                >
-                  中文
-                </button>
-              </li>
-              <li>
-                <button
-                  class={`${locale() === 'en-US' ? 'active' : ''}`}
-                  onClick={() => setLocale('en-US')}
-                >
-                  English
-                </button>
-              </li>
-            </ul>
-          </div>
-          <div class="flex items-center gap-2 ml-2">
+          <div class="flex items-center gap-2">
             <div class="badge badge-primary badge-outline">
               v{appVersion().version}
             </div>
@@ -130,6 +110,7 @@ function App() {
           <Route path="/led-strips-configuration" component={LedStripConfiguration} />
           <Route path="/white-balance" component={WhiteBalance} />
           <Route path="/led-strip-test" element={<LedStripTest />} />
+          <Route path="/settings" component={Settings} />
         </Routes>
       </main>
     </div>

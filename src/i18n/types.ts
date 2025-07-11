@@ -9,6 +9,7 @@ export interface TranslationDict {
     ledConfiguration: string;
     whiteBalance: string;
     ledTest: string;
+    settings: string;
   };
   
   // Common UI elements
@@ -239,5 +240,21 @@ export interface TranslationDict {
     deviceNotFound: string;
     networkError: string;
     unknownError: string;
+  };
+
+  // Settings page
+  settings: {
+    title: string;
+    language: string;
+    languageSelection: string;
+    languageDescription: string;
+    autoStart: string;
+    autoStartDescription: string;
+    autoStartEnabled: string;
+    autoStartDisabled: string;
+    autoStartSuccess: string;
+    autoStartError: string;
+    general: string;
+    system: string;
   };
 }
