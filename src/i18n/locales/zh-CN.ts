@@ -247,6 +247,20 @@ export const zhCN: TranslationDict = {
     autoStartError: '开机自启设置失败',
     general: '通用',
     system: '系统',
+    about: '关于',
+  },
+
+  about: {
+    title: '关于环境光控制',
+    version: '版本',
+    author: '作者',
+    description: '基于屏幕内容控制环境光的桌面应用程序，支持 WS2812B 和 SK6812 LED 灯带的实时颜色同步。',
+    repository: '项目仓库',
+    license: '许可证',
+    homepage: '项目主页',
+    close: '关闭',
+    openRepository: '打开仓库',
+    openHomepage: '打开主页',
   },
 
   tray: {

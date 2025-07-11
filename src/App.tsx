@@ -26,6 +26,8 @@ function App() {
     });
   });
 
+
+
   // Monitor route changes and cleanup LED tests when leaving the test page
   createEffect(() => {
     const currentPath = location.pathname;

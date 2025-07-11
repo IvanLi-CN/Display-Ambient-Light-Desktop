@@ -90,7 +90,8 @@ impl LedColorsPublisher {
                 };
 
                 let ambient_light_enabled = {
-                    let state_manager = crate::ambient_light_state::AmbientLightStateManager::global().await;
+                    let state_manager =
+                        crate::ambient_light_state::AmbientLightStateManager::global().await;
                     state_manager.is_enabled().await
                 };
 

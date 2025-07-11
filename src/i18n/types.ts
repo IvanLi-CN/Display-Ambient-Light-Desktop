@@ -256,6 +256,20 @@ export interface TranslationDict {
     autoStartError: string;
     general: string;
     system: string;
+    about: string;
+  };
+
+  about: {
+    title: string;
+    version: string;
+    author: string;
+    description: string;
+    repository: string;
+    license: string;
+    homepage: string;
+    close: string;
+    openRepository: string;
+    openHomepage: string;
   };
 
   // System tray menu

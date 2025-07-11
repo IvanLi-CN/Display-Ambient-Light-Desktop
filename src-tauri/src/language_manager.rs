@@ -1,9 +1,9 @@
-use std::sync::Arc;
-use tokio::sync::{OnceCell, RwLock};
-use serde::{Deserialize, Serialize};
 use dirs::config_dir;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Arc;
+use tokio::sync::{OnceCell, RwLock};
 
 const CONFIG_FILE_NAME: &str = "cc.ivanli.ambient_light/language.toml";
 
@@ -23,15 +23,15 @@ impl Default for LanguageConfig {
 impl LanguageConfig {
     /// Get the config file path
     fn get_config_path() -> anyhow::Result<PathBuf> {
-        let config_dir = config_dir()
-            .ok_or_else(|| anyhow::anyhow!("Failed to get config directory"))?;
+        let config_dir =
+            config_dir().ok_or_else(|| anyhow::anyhow!("Failed to get config directory"))?;
         Ok(config_dir.join(CONFIG_FILE_NAME))
     }
 
     /// Read configuration from file
     pub async fn read_config() -> anyhow::Result<Self> {
         let config_path = Self::get_config_path()?;
-        
+
         if !config_path.exists() {
             // If config file doesn't exist, create default config
             let default_config = Self::default();
@@ -47,7 +47,7 @@ impl LanguageConfig {
     /// Write configuration to file
     pub async fn write_config(&self) -> anyhow::Result<()> {
         let config_path = Self::get_config_path()?;
-        
+
         // Create parent directory if it doesn't exist
         if let Some(parent) = config_path.parent() {
             fs::create_dir_all(parent)?;
@@ -114,9 +114,10 @@ impl TrayTranslations {
             ("zh-CN", "led_test") => "灯带测试",
             ("zh-CN", "settings") => "设置",
             ("zh-CN", "auto_start") => "开机自启",
+            ("zh-CN", "about") => "关于",
             ("zh-CN", "show_window") => "显示窗口",
             ("zh-CN", "quit") => "退出",
-            
+
             // English translations
             ("en-US", "ambient_light") => "Ambient Light",
             ("en-US", "info") => "System Info",
@@ -125,9 +126,10 @@ impl TrayTranslations {
             ("en-US", "led_test") => "LED Test",
             ("en-US", "settings") => "Settings",
             ("en-US", "auto_start") => "Auto Start",
+            ("en-US", "about") => "About",
             ("en-US", "show_window") => "Show Window",
             ("en-US", "quit") => "Quit",
-            
+
             // Default to English
             _ => match key {
                 "ambient_light" => "Ambient Light",
@@ -137,10 +139,11 @@ impl TrayTranslations {
                 "led_test" => "LED Test",
                 "settings" => "Settings",
                 "auto_start" => "Auto Start",
+                "about" => "About",
                 "show_window" => "Show Window",
                 "quit" => "Quit",
                 _ => "Unknown",
-            }
+            },
         }
     }
 }

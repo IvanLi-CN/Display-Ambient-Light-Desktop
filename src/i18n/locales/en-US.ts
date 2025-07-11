@@ -247,6 +247,20 @@ export const enUS: TranslationDict = {
     autoStartError: 'Failed to save auto start setting',
     general: 'General',
     system: 'System',
+    about: 'About',
+  },
+
+  about: {
+    title: 'About Ambient Light Control',
+    version: 'Version',
+    author: 'Author',
+    description: 'A desktop application for controlling ambient lighting based on screen content, supporting WS2812B and SK6812 LED strips with real-time color synchronization.',
+    repository: 'Repository',
+    license: 'License',
+    homepage: 'Homepage',
+    close: 'Close',
+    openRepository: 'Open Repository',
+    openHomepage: 'Open Homepage',
   },
 
   tray: {

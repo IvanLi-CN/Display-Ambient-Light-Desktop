@@ -23,10 +23,10 @@ use rpc::{BoardInfo, UdpRpc};
 use screenshot::Screenshot;
 use screenshot_manager::ScreenshotManager;
 use tauri::{
-    menu::{Menu, MenuItem, CheckMenuItem, PredefinedMenuItem},
-    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    Manager, Runtime, Emitter,
     http::{Request, Response},
+    menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    Emitter, Manager, Runtime,
 };
 
 use serde::{Deserialize, Serialize};
@@ -557,7 +557,10 @@ async fn update_tray_menu_internal<R: Runtime>(app_handle: &tauri::AppHandle<R>)
     let ambient_light_enabled = state_manager.is_enabled().await;
     let auto_start_enabled = auto_start::AutoStartManager::is_enabled().unwrap_or(false);
 
-    info!("Updating menu item states - Ambient light: {}, Auto start: {}", ambient_light_enabled, auto_start_enabled);
+    info!(
+        "Updating menu item states - Ambient light: {}, Auto start: {}",
+        ambient_light_enabled, auto_start_enabled
+    );
 
     // Recreate the menu with updated states
     if let Ok(new_menu) = create_tray_menu(app_handle).await {
@@ -589,12 +592,70 @@ async fn test_tray_visibility(app_handle: tauri::AppHandle) -> Result<String, St
     }
 }
 
+#[tauri::command]
+async fn get_app_version_string() -> Result<String, String> {
+    Ok(env!("CARGO_PKG_VERSION").to_string())
+}
+
+#[tauri::command]
+async fn open_external_url(url: String, app_handle: tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+
+    // Validate URL to prevent security issues
+    if !url.starts_with("http://") && !url.starts_with("https://") {
+        return Err("Invalid URL scheme".to_string());
+    }
+
+    // Use opener plugin to open URL
+    app_handle
+        .opener()
+        .open_url(url, None::<String>)
+        .map_err(|e| format!("Failed to open URL: {}", e))
+}
+
+#[tauri::command]
+async fn show_about_window<R: tauri::Runtime>(
+    app_handle: tauri::AppHandle<R>,
+) -> Result<(), String> {
+    use tauri::WebviewWindowBuilder;
+
+    // Check if about window already exists
+    if let Some(window) = app_handle.get_webview_window("about") {
+        let _ = window.show();
+        let _ = window.set_focus();
+        return Ok(());
+    }
+
+    // Create new about window
+    let about_window = WebviewWindowBuilder::new(
+        &app_handle,
+        "about",
+        tauri::WebviewUrl::App("about.html".into()),
+    )
+    .title("关于环境光控制")
+    .inner_size(420.0, 450.0)
+    .min_inner_size(400.0, 430.0)
+    .max_inner_size(450.0, 480.0)
+    .resizable(false)
+    .center()
+    .build()
+    .map_err(|e| format!("Failed to create about window: {e}"))?;
+
+    let _ = about_window.show();
+    let _ = about_window.set_focus();
+
+    Ok(())
+}
+
 async fn create_tray_menu<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<Menu<R>> {
     let state_manager = ambient_light_state::AmbientLightStateManager::global().await;
     let ambient_light_enabled = state_manager.is_enabled().await;
     let auto_start_enabled = auto_start::AutoStartManager::is_enabled().unwrap_or(false);
 
-    info!("Creating tray menu - Ambient light: {}, Auto start: {}", ambient_light_enabled, auto_start_enabled);
+    info!(
+        "Creating tray menu - Ambient light: {}, Auto start: {}",
+        ambient_light_enabled, auto_start_enabled
+    );
 
     // Get current language
     let language_manager = language_manager::LanguageManager::global().await;
@@ -614,8 +675,20 @@ async fn create_tray_menu<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Resul
     let separator1 = PredefinedMenuItem::separator(app)?;
 
     let info_item = MenuItem::with_id(app, "show_info", t("info"), true, None::<&str>)?;
-    let led_config_item = MenuItem::with_id(app, "show_led_config", t("led_configuration"), true, None::<&str>)?;
-    let white_balance_item = MenuItem::with_id(app, "show_white_balance", t("white_balance"), true, None::<&str>)?;
+    let led_config_item = MenuItem::with_id(
+        app,
+        "show_led_config",
+        t("led_configuration"),
+        true,
+        None::<&str>,
+    )?;
+    let white_balance_item = MenuItem::with_id(
+        app,
+        "show_white_balance",
+        t("white_balance"),
+        true,
+        None::<&str>,
+    )?;
     let led_test_item = MenuItem::with_id(app, "show_led_test", t("led_test"), true, None::<&str>)?;
     let settings_item = MenuItem::with_id(app, "show_settings", t("settings"), true, None::<&str>)?;
 
@@ -632,6 +705,7 @@ async fn create_tray_menu<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Resul
 
     let separator3 = PredefinedMenuItem::separator(app)?;
 
+    let about_item = MenuItem::with_id(app, "show_about", t("about"), true, None::<&str>)?;
     let show_item = MenuItem::with_id(app, "show_window", t("show_window"), true, None::<&str>)?;
     let quit_item = MenuItem::with_id(app, "quit", t("quit"), true, None::<&str>)?;
 
@@ -649,6 +723,7 @@ async fn create_tray_menu<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Resul
             &separator2,
             &auto_start_item,
             &separator3,
+            &about_item,
             &show_item,
             &quit_item,
         ],
@@ -666,7 +741,8 @@ async fn handle_menu_event<R: Runtime>(app: &tauri::AppHandle<R>, event: tauri::
                 // Emit event to notify frontend of state change
                 let state_manager = ambient_light_state::AmbientLightStateManager::global().await;
                 let current_state = state_manager.get_state().await;
-                app.emit("ambient_light_state_changed", current_state).unwrap();
+                app.emit("ambient_light_state_changed", current_state)
+                    .unwrap();
 
                 // Immediately update tray menu to reflect new state
                 update_tray_menu_internal(app).await;
@@ -712,6 +788,11 @@ async fn handle_menu_event<R: Runtime>(app: &tauri::AppHandle<R>, event: tauri::
                 info!("Auto start toggled to: {}", new_state);
                 // Immediately update tray menu to reflect new state
                 update_tray_menu_internal(app).await;
+            }
+        }
+        "show_about" => {
+            if let Err(e) = show_about_window(app.clone()).await {
+                error!("Failed to show about window: {}", e);
             }
         }
         "show_window" => {
@@ -892,6 +973,7 @@ async fn main() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             greet,
             get_app_version,
@@ -925,7 +1007,10 @@ async fn main() {
             get_current_language,
             set_current_language,
             update_tray_menu,
-            test_tray_visibility
+            test_tray_visibility,
+            get_app_version_string,
+            open_external_url,
+            show_about_window
         ])
         .register_uri_scheme_protocol("ambient-light", handle_ambient_light_protocol)
         .on_menu_event(|app, event| {

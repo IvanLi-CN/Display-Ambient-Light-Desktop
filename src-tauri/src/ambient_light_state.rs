@@ -1,10 +1,10 @@
-use std::sync::Arc;
-use tokio::sync::{OnceCell, RwLock};
-use serde::{Deserialize, Serialize};
-use paris::{info, warn};
 use dirs::config_dir;
+use paris::{info, warn};
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Arc;
+use tokio::sync::{OnceCell, RwLock};
 
 const CONFIG_FILE_NAME: &str = "cc.ivanli.ambient_light/ambient_light_state.toml";
 
@@ -24,15 +24,15 @@ impl Default for AmbientLightState {
 impl AmbientLightState {
     /// Get the config file path
     fn get_config_path() -> anyhow::Result<PathBuf> {
-        let config_dir = config_dir()
-            .ok_or_else(|| anyhow::anyhow!("Failed to get config directory"))?;
+        let config_dir =
+            config_dir().ok_or_else(|| anyhow::anyhow!("Failed to get config directory"))?;
         Ok(config_dir.join(CONFIG_FILE_NAME))
     }
 
     /// Read configuration from file
     pub async fn read_config() -> anyhow::Result<Self> {
         let config_path = Self::get_config_path()?;
-        
+
         if !config_path.exists() {
             // If config file doesn't exist, create default config
             let default_config = Self::default();
@@ -48,7 +48,7 @@ impl AmbientLightState {
     /// Write configuration to file
     pub async fn write_config(&self) -> anyhow::Result<()> {
         let config_path = Self::get_config_path()?;
-        
+
         // Create parent directory if it doesn't exist
         if let Some(parent) = config_path.parent() {
             fs::create_dir_all(parent)?;
@@ -66,14 +66,18 @@ pub struct AmbientLightStateManager {
 
 impl AmbientLightStateManager {
     pub async fn global() -> &'static Self {
-        static AMBIENT_LIGHT_STATE_MANAGER: OnceCell<AmbientLightStateManager> = OnceCell::const_new();
+        static AMBIENT_LIGHT_STATE_MANAGER: OnceCell<AmbientLightStateManager> =
+            OnceCell::const_new();
 
         AMBIENT_LIGHT_STATE_MANAGER
             .get_or_init(|| async {
                 let state = match AmbientLightState::read_config().await {
                     Ok(state) => state,
                     Err(e) => {
-                        warn!("Failed to read ambient light state config: {}, using default", e);
+                        warn!(
+                            "Failed to read ambient light state config: {}, using default",
+                            e
+                        );
                         AmbientLightState::default()
                     }
                 };
@@ -106,7 +110,10 @@ impl AmbientLightStateManager {
         let current_state = self.get_state().await;
         current_state.write_config().await?;
 
-        info!("Ambient light state changed to: {}", if enabled { "enabled" } else { "disabled" });
+        info!(
+            "Ambient light state changed to: {}",
+            if enabled { "enabled" } else { "disabled" }
+        );
         Ok(())
     }
 

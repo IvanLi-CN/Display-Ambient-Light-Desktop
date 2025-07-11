@@ -160,7 +160,37 @@ export const Settings = () => {
           </div>
         </div>
 
-
+        {/* About Section */}
+        <div class="card bg-base-100 shadow-lg">
+          <div class="card-body">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center">
+                <svg class="w-6 h-6 mr-3 text-base-content/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <div>
+                  <h3 class="text-lg font-medium text-base-content">{t('settings.about')}</h3>
+                  <p class="text-sm text-base-content/70">Ambient Light Control v2.0.0-alpha</p>
+                </div>
+              </div>
+              <button
+                class="btn btn-outline btn-sm"
+                onClick={async () => {
+                  try {
+                    await invoke('show_about_window');
+                  } catch (error) {
+                    console.error('Failed to show about window:', error);
+                  }
+                }}
+              >
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                {t('settings.about')}
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
