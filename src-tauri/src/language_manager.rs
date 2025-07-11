@@ -69,10 +69,8 @@ impl LanguageManager {
 
         LANGUAGE_MANAGER
             .get_or_init(|| async {
-                let config = match LanguageConfig::read_config().await {
-                    Ok(config) => config,
-                    Err(_) => LanguageConfig::default(),
-                };
+                let config: LanguageConfig =
+                    (LanguageConfig::read_config().await).unwrap_or_default();
 
                 Self {
                     config: Arc::new(RwLock::new(config)),
