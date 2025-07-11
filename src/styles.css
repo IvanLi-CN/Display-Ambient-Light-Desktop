@@ -1,27 +1,9 @@
 @import "tailwindcss";
-@config "../tailwind.config.js";
-
-/* Remove unwanted selection/debug borders */
-* {
-  outline: none !important;
+@plugin "daisyui" {
+  themes: all;
 }
 
-*:focus {
-  outline: none !important;
-  box-shadow: none !important;
-}
-
-/* Remove any potential debug/selection borders */
-*[style*="border"] {
-  border: none !important;
-}
-
-/* Force remove red borders that might be added by debugging tools */
-* {
-  border: none !important;
-  box-shadow: none !important;
-}
-
+/* Remove unwanted selection/debug borders - but preserve theme styles */
 *[style*="border: 1px solid red"],
 *[style*="border: 2px solid red"],
 *[style*="border: 1px solid rgb(255, 0, 0)"],
@@ -29,7 +11,7 @@
   border: none !important;
 }
 
-/* Override any inspector/debug styles */
+/* Override any inspector/debug styles only */
 .__web-inspector-hide-shortcut__,
 *[data-inspector],
 *[data-debug] {

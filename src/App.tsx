@@ -10,7 +10,8 @@ import { LedStripConfigContainer } from './models/led-strip-config';
 import { InfoIndex } from './components/info/info-index';
 import { useLanguage } from './i18n/index';
 import { AppVersion } from './models/app-version.model';
-import { themeStore } from './stores/theme.store';
+// Import theme store to ensure it's initialized
+import './stores/theme.store';
 
 function App() {
   const location = useLocation();
@@ -62,7 +63,7 @@ function App() {
   });
 
   return (
-    <div class="h-screen bg-base-100 flex flex-col" data-theme={themeStore.currentTheme()}>
+    <div class="h-screen bg-base-100 flex flex-col">
       {/* Fixed Navigation */}
       <div class="navbar bg-base-200 shadow-lg flex-shrink-0 z-50">
         <div class="navbar-start">

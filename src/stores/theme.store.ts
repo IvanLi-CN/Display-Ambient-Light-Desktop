@@ -2,7 +2,7 @@ import { createSignal, createEffect } from 'solid-js';
 
 export type Theme = 'light' | 'dark' | 'auto';
 
-// Available DaisyUI themes
+// Available DaisyUI themes (DaisyUI 5.0)
 export const AVAILABLE_THEMES = [
   'light',
   'dark',
@@ -36,6 +36,9 @@ export const AVAILABLE_THEMES = [
   'dim',
   'nord',
   'sunset',
+  'caramellatte',
+  'abyss',
+  'silk',
 ] as const;
 
 export type DaisyUITheme = typeof AVAILABLE_THEMES[number];
@@ -46,24 +49,32 @@ const [systemTheme, setSystemTheme] = createSignal<'light' | 'dark'>('dark');
 
 // Initialize theme from localStorage
 const initializeTheme = () => {
-  const savedTheme = localStorage.getItem('app-theme') as DaisyUITheme;
-  if (savedTheme && AVAILABLE_THEMES.includes(savedTheme)) {
-    setCurrentTheme(savedTheme);
+  try {
+    const savedTheme = localStorage.getItem('app-theme') as DaisyUITheme;
+    if (savedTheme && AVAILABLE_THEMES.includes(savedTheme)) {
+      setCurrentTheme(savedTheme);
+    }
+
+    // Detect system theme
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    setSystemTheme(mediaQuery.matches ? 'dark' : 'light');
+
+    // Listen for system theme changes
+    mediaQuery.addEventListener('change', (e) => {
+      setSystemTheme(e.matches ? 'dark' : 'light');
+    });
+  } catch (error) {
+    console.warn('Failed to initialize theme:', error);
   }
-  
-  // Detect system theme
-  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-  setSystemTheme(mediaQuery.matches ? 'dark' : 'light');
-  
-  // Listen for system theme changes
-  mediaQuery.addEventListener('change', (e) => {
-    setSystemTheme(e.matches ? 'dark' : 'light');
-  });
 };
 
 // Apply theme to document
 const applyTheme = (theme: DaisyUITheme) => {
-  document.documentElement.setAttribute('data-theme', theme);
+  try {
+    document.documentElement.setAttribute('data-theme', theme);
+  } catch (error) {
+    console.warn('Failed to apply theme:', error);
+  }
 };
 
 // Save theme to localStorage
@@ -74,8 +85,10 @@ createEffect(() => {
 });
 
 // Initialize on first load
-initializeTheme();
-applyTheme(currentTheme());
+if (typeof window !== 'undefined') {
+  initializeTheme();
+  applyTheme(currentTheme());
+}
 
 export const themeStore = {
   currentTheme,
