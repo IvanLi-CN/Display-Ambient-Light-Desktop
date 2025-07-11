@@ -1,6 +1,5 @@
 import { defineConfig } from "vite";
 import solidPlugin from "vite-plugin-solid";
-// @ts-ignore
 import tailwindcss from "@tailwindcss/vite";
 
 const mobile =
@@ -31,7 +30,7 @@ export default defineConfig(() => {
     // Tauri supports es2021
     target: process.env.TAURI_PLATFORM == "windows" ? "chrome105" : "safari13",
     // don't minify for debug builds
-    minify: !process.env.TAURI_DEBUG ? "esbuild" as const : false,
+    minify: !process.env.TAURI_DEBUG ? "esbuild" : false,
     // produce sourcemaps for debug builds
     sourcemap: !!process.env.TAURI_DEBUG,
   },
