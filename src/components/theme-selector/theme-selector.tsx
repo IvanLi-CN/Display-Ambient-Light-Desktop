@@ -1,4 +1,4 @@
-import { createSignal, For } from 'solid-js';
+import { createSignal, For, onMount, onCleanup } from 'solid-js';
 import { themeStore, DaisyUITheme, AVAILABLE_THEMES } from '../../stores/theme.store';
 import { useLanguage } from '../../i18n/index';
 
@@ -60,26 +60,40 @@ const groupThemesByCategory = (themes: readonly DaisyUITheme[], t: any) => {
 export const ThemeSelector = () => {
   const { t } = useLanguage();
   const [isOpen, setIsOpen] = createSignal(false);
-  
+  let containerRef: HTMLDivElement | undefined;
+
   const groupedThemes = () => groupThemesByCategory(AVAILABLE_THEMES, t);
-  
+
   const handleThemeChange = (theme: DaisyUITheme) => {
     themeStore.setCurrentTheme(theme);
     setIsOpen(false);
   };
-  
+
   const currentThemeInfo = () => getThemeInfo(themeStore.currentTheme(), t);
-  
+
+  // Close dropdown when clicking outside
+  const handleClickOutside = (event: MouseEvent) => {
+    if (containerRef && !containerRef.contains(event.target as Node)) {
+      setIsOpen(false);
+    }
+  };
+
+  onMount(() => {
+    document.addEventListener('click', handleClickOutside);
+  });
+
+  onCleanup(() => {
+    document.removeEventListener('click', handleClickOutside);
+  });
+
   return (
     <div class="form-control w-full">
       <label class="label">
         <span class="label-text text-base font-medium">{t('settings.theme')}</span>
       </label>
-      
-      <div class="dropdown dropdown-end w-full">
-        <div 
-          tabindex="0" 
-          role="button" 
+
+      <div class="relative w-full" ref={containerRef}>
+        <button
           class="btn btn-outline w-full justify-between"
           onClick={() => setIsOpen(!isOpen())}
         >
@@ -91,13 +105,18 @@ export const ThemeSelector = () => {
             </div>
             <span>{currentThemeInfo().name}</span>
           </div>
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg
+            class={`w-4 h-4 transition-transform ${isOpen() ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
           </svg>
-        </div>
-        
+        </button>
+
         {isOpen() && (
-          <div class="dropdown-content z-[1000] menu p-2 shadow-lg bg-base-100 rounded-box w-80 max-h-96 overflow-y-auto border border-base-300">
+          <div class="absolute top-full left-0 right-0 z-[1000] mt-1 menu p-2 shadow-lg bg-base-100 rounded-box max-h-96 overflow-y-auto border border-base-300">
             <For each={Object.entries(groupedThemes())}>
               {([category, themes]) => (
                 <div class="mb-2">
@@ -140,7 +159,7 @@ export const ThemeSelector = () => {
           </div>
         )}
       </div>
-      
+
       <label class="label">
         <span class="label-text-alt text-base-content/60">{t('settings.themeDescription')}</span>
       </label>
