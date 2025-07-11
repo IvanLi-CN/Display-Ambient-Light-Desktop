@@ -181,9 +181,9 @@ export const LedCountControlPanel: Component<LedCountControlPanelProps> = (props
   return (
     <div {...rootProps} class={'card bg-base-200 shadow-lg border border-base-300 ' + (rootProps.class || '')}>
       <div class="card-body p-3">
-        <div class="card-title text-sm mb-2 flex items-center justify-between">
-          <span>{t('ledConfig.ledCountControl')}</span>
-          <div class="badge badge-info badge-outline text-xs">{t('ledConfig.display')} {localProps.display.id}</div>
+        <div class="card-title text-sm mb-2 flex items-center justify-between gap-2">
+          <span class="flex-1 min-w-0">{t('ledConfig.ledCountControl')}</span>
+          <div class="badge badge-info badge-outline text-xs whitespace-nowrap">{t('ledConfig.display')} {localProps.display.id}</div>
         </div>
 
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">

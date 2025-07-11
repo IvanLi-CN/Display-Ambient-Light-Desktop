@@ -17,7 +17,7 @@ export const DisplayInfoItem: ParentComponent<DisplayInfoItemProps> = (props) =>
 
 type DisplayInfoPanelProps = {
   display: DisplayInfo;
-} & JSX.HTMLAttributes<HTMLElement>;
+} & JSX.HTMLAttributes<HTMLDivElement>;
 
 export const DisplayInfoPanel: Component<DisplayInfoPanelProps> = (props) => {
   const [localProps, rootProps] = splitProps(props, ['display']);
@@ -26,10 +26,10 @@ export const DisplayInfoPanel: Component<DisplayInfoPanelProps> = (props) => {
   return (
     <div {...rootProps} class={'card bg-base-100/95 backdrop-blur shadow-lg border border-base-300 ' + (rootProps.class || '')}>
       <div class="card-body p-4">
-        <div class="card-title text-sm mb-3 flex items-center justify-between">
-          <span class="text-base-content">{t('displays.displayInfo')}</span>
+        <div class="card-title text-sm mb-3 flex items-center justify-between gap-2">
+          <span class="text-base-content flex-1 min-w-0">{t('displays.displayInfo')}</span>
           {localProps.display.is_primary && (
-            <div class="badge badge-primary badge-sm">{t('displays.isPrimary')}</div>
+            <div class="badge badge-primary badge-sm whitespace-nowrap">{t('displays.isPrimary')}</div>
           )}
         </div>
         <div class="space-y-1">

@@ -58,19 +58,19 @@ export const BoardInfoPanel: Component<{ board: BoardInfo }> = (props) => {
     const originalStatus = props.board.connect_status;
 
     if (originalStatus === 'Connected') {
-      return 'badge badge-success badge-sm';
+      return 'badge badge-success badge-sm whitespace-nowrap';
     } else if (typeof originalStatus === 'object' && 'Connecting' in originalStatus) {
-      return 'badge badge-warning badge-sm';
+      return 'badge badge-warning badge-sm whitespace-nowrap';
     } else {
-      return 'badge badge-error badge-sm';
+      return 'badge badge-error badge-sm whitespace-nowrap';
     }
   });
 
   return (
     <div class="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow duration-200">
       <div class="card-body p-4">
-        <div class="card-title text-base mb-3 flex items-center justify-between">
-          <span class="truncate">{props.board.fullname}</span>
+        <div class="card-title text-base mb-3 flex items-center justify-between gap-2">
+          <span class="truncate flex-1 min-w-0">{props.board.fullname}</span>
           <div class={statusBadgeClass()}>{connectStatus()}</div>
         </div>
         <div class="space-y-2">

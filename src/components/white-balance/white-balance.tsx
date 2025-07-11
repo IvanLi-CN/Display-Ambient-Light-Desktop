@@ -228,9 +228,9 @@ export const WhiteBalance = () => {
             {/* 颜色测试区域 */}
             <div class="card bg-base-200 shadow-lg">
               <div class="card-body p-4">
-                <div class="card-title text-base mb-3">
-                  <span>{t('whiteBalance.colorTest')}</span>
-                  <div class="badge badge-info badge-outline">{t('whiteBalance.clickToTest')}</div>
+                <div class="card-title text-base mb-3 flex items-center justify-between gap-2">
+                  <span class="flex-1 min-w-0">{t('whiteBalance.colorTest')}</span>
+                  <div class="badge badge-info badge-outline whitespace-nowrap">{t('whiteBalance.clickToTest')}</div>
                 </div>
                 <div
                   class="aspect-square rounded-lg overflow-hidden border border-base-300"
@@ -388,15 +388,15 @@ export const WhiteBalance = () => {
           >
             <div class="card-body p-4">
               <div
-                class="card-title text-base mb-3 flex justify-between items-center cursor-move"
+                class="card-title text-base mb-3 flex justify-between items-center cursor-move gap-2"
                 onMouseDown={handleMouseDown}
               >
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-1 min-w-0">
                   <span class="text-xs opacity-60">⋮⋮</span>
                   <span>{t('whiteBalance.rgbAdjustment')}</span>
-                  <div class="badge badge-secondary badge-outline">{t('whiteBalance.draggable')}</div>
+                  <div class="badge badge-secondary badge-outline whitespace-nowrap">{t('whiteBalance.draggable')}</div>
                 </div>
-                <button class="btn btn-ghost btn-xs cursor-pointer" onClick={toggleFullscreen} title={t('whiteBalance.exitFullscreen')}>
+                <button class="btn btn-ghost btn-xs cursor-pointer flex-shrink-0" onClick={toggleFullscreen} title={t('whiteBalance.exitFullscreen')}>
                   <BsFullscreenExit size={14} />
                 </button>
               </div>

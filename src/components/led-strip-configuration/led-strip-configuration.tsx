@@ -122,9 +122,9 @@ export const LedStripConfiguration = () => {
           {/* LED Strip Sorter Panel */}
           <div class="card bg-base-200 shadow-lg">
             <div class="card-body p-3">
-              <div class="card-title text-sm mb-2">
-                <span>{t('ledConfig.stripSorting')}</span>
-                <div class="badge badge-info badge-outline text-xs">{t('ledConfig.realtimePreview')}</div>
+              <div class="card-title text-sm mb-2 flex items-center justify-between gap-2">
+                <span class="flex-1 min-w-0">{t('ledConfig.stripSorting')}</span>
+                <div class="badge badge-info badge-outline text-xs whitespace-nowrap">{t('ledConfig.realtimePreview')}</div>
               </div>
               <LedStripPartsSorter />
               <div class="text-xs text-base-content/50 mt-2">
@@ -136,9 +136,9 @@ export const LedStripConfiguration = () => {
           {/* Display Configuration Panel - Auto height based on content */}
           <div class="card bg-base-200 shadow-lg">
             <div class="card-body p-3">
-              <div class="card-title text-sm mb-2">
-                <span>{t('ledConfig.displayConfiguration')}</span>
-                <div class="badge badge-secondary badge-outline text-xs">{t('ledConfig.visualEditor')}</div>
+              <div class="card-title text-sm mb-2 flex items-center justify-between gap-2">
+                <span class="flex-1 min-w-0">{t('ledConfig.displayConfiguration')}</span>
+                <div class="badge badge-secondary badge-outline text-xs whitespace-nowrap">{t('ledConfig.visualEditor')}</div>
               </div>
               <div class="mb-3">
                 <DisplayListContainer>

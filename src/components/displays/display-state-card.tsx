@@ -24,9 +24,9 @@ export const DisplayStateCard: Component<DisplayStateCardProps> = (props) => {
   return (
     <div class="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow duration-200">
       <div class="card-body p-4">
-        <div class="card-title text-base mb-3 flex items-center justify-between">
-          <span>{t('displays.title')}</span>
-          <div class="badge badge-primary badge-outline">{t('common.realtime')}</div>
+        <div class="card-title text-base mb-3 flex items-center justify-between gap-2">
+          <span class="flex-1 min-w-0">{t('displays.title')}</span>
+          <div class="badge badge-primary badge-outline whitespace-nowrap">{t('common.realtime')}</div>
         </div>
 
         <div class="grid grid-cols-1 gap-3">
