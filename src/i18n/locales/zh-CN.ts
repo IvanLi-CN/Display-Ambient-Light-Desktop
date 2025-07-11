@@ -248,4 +248,31 @@ export const zhCN: TranslationDict = {
     general: '通用',
     system: '系统',
   },
+
+  tray: {
+    ambientLight: '氛围灯',
+    ambientLightEnabled: '氛围灯已启用',
+    ambientLightDisabled: '氛围灯已禁用',
+    info: '系统信息',
+    ledConfiguration: '灯条配置',
+    whiteBalance: '白平衡',
+    ledTest: '灯带测试',
+    settings: '设置',
+    autoStart: '开机自启',
+    quit: '退出',
+    show: '显示窗口',
+    hide: '隐藏窗口',
+  },
+
+  ambientLight: {
+    title: '氛围灯控制',
+    enabled: '已启用',
+    disabled: '已禁用',
+    statusEnabled: '氛围灯已启用',
+    statusDisabled: '氛围灯已禁用',
+    description: '控制屏幕录制和LED数据传输',
+    descriptionEnabled: '屏幕录制和LED数据传输正在运行',
+    descriptionDisabled: '屏幕录制和LED数据传输已暂停',
+    toggleFailed: '切换氛围灯状态失败',
+  },
 };

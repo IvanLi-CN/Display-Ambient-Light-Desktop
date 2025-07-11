@@ -153,18 +153,25 @@ impl ScreenshotManager {
 
         // Implement screen capture using screen-capture-kit
         loop {
-            match Self::capture_display_screenshot(display_id, scale_factor).await {
-                Ok(screenshot) => {
-                    let tx_for_send = tx.read().await;
-                    let merged_screenshot_tx = merged_screenshot_tx.write().await;
+            // Check if ambient light is enabled before capturing screenshots
+            let ambient_light_enabled = {
+                let state_manager = crate::ambient_light_state::AmbientLightStateManager::global().await;
+                state_manager.is_enabled().await
+            };
 
-                    if let Err(_err) = merged_screenshot_tx.send(screenshot.clone()) {
-                        // log::warn!("merged_screenshot_tx.send failed: {}", err);
+            if ambient_light_enabled {
+                match Self::capture_display_screenshot(display_id, scale_factor).await {
+                    Ok(screenshot) => {
+                        let tx_for_send = tx.read().await;
+                        let merged_screenshot_tx = merged_screenshot_tx.write().await;
+
+                        if let Err(_err) = merged_screenshot_tx.send(screenshot.clone()) {
+                            // log::warn!("merged_screenshot_tx.send failed: {}", err);
+                        }
+                        if let Err(err) = tx_for_send.send(screenshot.clone()) {
+                            log::warn!("display {} screenshot_tx.send failed: {}", display_id, err);
+                        }
                     }
-                    if let Err(err) = tx_for_send.send(screenshot.clone()) {
-                        log::warn!("display {} screenshot_tx.send failed: {}", display_id, err);
-                    }
-                }
                 Err(err) => {
                     warn!(
                         "Failed to capture screenshot for display {}: {}",
@@ -192,9 +199,15 @@ impl ScreenshotManager {
                     }
                 }
             }
+            } else {
+                // If ambient light is disabled, sleep longer to reduce CPU usage
+                sleep(Duration::from_millis(1000)).await;
+            }
 
-            // Sleep for a frame duration (5 FPS for much better CPU performance)
-            sleep(Duration::from_millis(200)).await;
+            // Sleep for a frame duration (5 FPS for much better CPU performance when enabled)
+            if ambient_light_enabled {
+                sleep(Duration::from_millis(200)).await;
+            }
             yield_now().await;
         }
     }

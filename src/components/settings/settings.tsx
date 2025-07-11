@@ -1,6 +1,7 @@
 import { createSignal, createEffect, onMount } from 'solid-js';
 import { invoke } from '@tauri-apps/api/core';
 import { useLanguage } from '../../i18n/index';
+import { AmbientLightControl } from '../ambient-light-control/ambient-light-control';
 
 interface AutoStartConfig {
   enabled: boolean;
@@ -23,9 +24,22 @@ export const Settings = () => {
   });
 
   // Handle language change
-  const handleLanguageChange = (newLocale: 'zh-CN' | 'en-US') => {
-    setLocale(newLocale);
-    showMessage('success', t('settings.languageDescription'));
+  const handleLanguageChange = async (newLocale: 'zh-CN' | 'en-US') => {
+    try {
+      // Update frontend language
+      setLocale(newLocale);
+
+      // Update backend language setting
+      await invoke('set_current_language', { language: newLocale });
+
+      // Update tray menu with new language
+      await invoke('update_tray_menu');
+
+      showMessage('success', t('settings.languageDescription'));
+    } catch (error) {
+      console.error('Failed to change language:', error);
+      showMessage('error', 'Failed to change language');
+    }
   };
 
   // Handle auto start toggle
@@ -35,6 +49,10 @@ export const Settings = () => {
       const newState = !autoStartEnabled();
       await invoke('set_auto_start_enabled', { enabled: newState });
       setAutoStartEnabled(newState);
+
+      // Update tray menu to reflect new state
+      await invoke('update_tray_menu');
+
       showMessage('success', newState ? t('settings.autoStartEnabled') : t('settings.autoStartDisabled'));
     } catch (error) {
       console.error('Failed to toggle auto start:', error);
@@ -49,6 +67,8 @@ export const Settings = () => {
     setMessage({ type, text });
     setTimeout(() => setMessage(null), 3000);
   };
+
+
 
   return (
     <div class="container mx-auto p-6 max-w-4xl">
@@ -71,6 +91,9 @@ export const Settings = () => {
       )}
 
       <div class="grid gap-6">
+        {/* Ambient Light Control */}
+        <AmbientLightControl />
+
         {/* General Settings */}
         <div class="card bg-base-100 shadow-lg">
           <div class="card-body">
@@ -136,6 +159,8 @@ export const Settings = () => {
             </div>
           </div>
         </div>
+
+
       </div>
     </div>
   );

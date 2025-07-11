@@ -257,4 +257,33 @@ export interface TranslationDict {
     general: string;
     system: string;
   };
+
+  // System tray menu
+  tray: {
+    ambientLight: string;
+    ambientLightEnabled: string;
+    ambientLightDisabled: string;
+    info: string;
+    ledConfiguration: string;
+    whiteBalance: string;
+    ledTest: string;
+    settings: string;
+    autoStart: string;
+    quit: string;
+    show: string;
+    hide: string;
+  };
+
+  // Ambient light control
+  ambientLight: {
+    title: string;
+    enabled: string;
+    disabled: string;
+    statusEnabled: string;
+    statusDisabled: string;
+    description: string;
+    descriptionEnabled: string;
+    descriptionDisabled: string;
+    toggleFailed: string;
+  };
 }

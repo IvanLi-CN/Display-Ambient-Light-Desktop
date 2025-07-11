@@ -2,6 +2,7 @@ import { createSignal, createContext, useContext, ParentComponent, createEffect 
 import { Language, TranslationDict } from './types';
 import { zhCN } from './locales/zh-CN';
 import { enUS } from './locales/en-US';
+import { invoke } from '@tauri-apps/api/core';
 
 // Available translations
 const translations: Record<Language, TranslationDict> = {
@@ -39,11 +40,20 @@ const LanguageContext = createContext<LanguageContextType>();
 
 // Language provider component
 export const LanguageProvider: ParentComponent = (props) => {
-  // Load saved language preference from localStorage
-  createEffect(() => {
-    const savedLang = localStorage.getItem('app-language') as Language;
-    if (savedLang && (savedLang === 'zh-CN' || savedLang === 'en-US')) {
-      setLocale(savedLang);
+  // Load saved language preference from backend on startup
+  createEffect(async () => {
+    try {
+      const backendLang = await invoke<string>('get_current_language');
+      if (backendLang && (backendLang === 'zh-CN' || backendLang === 'en-US')) {
+        setLocale(backendLang as Language);
+      }
+    } catch (error) {
+      console.error('Failed to load language from backend:', error);
+      // Fallback to localStorage
+      const savedLang = localStorage.getItem('app-language') as Language;
+      if (savedLang && (savedLang === 'zh-CN' || savedLang === 'en-US')) {
+        setLocale(savedLang);
+      }
     }
   });
 

@@ -83,13 +83,18 @@ impl LedColorsPublisher {
 
                 let mappers = mappers.clone();
 
-                // Check if test mode is active before sending normal colors
+                // Check if test mode is active and ambient light is enabled before sending normal colors
                 let test_mode_active = {
                     let publisher = LedColorsPublisher::global().await;
                     *publisher.test_mode_active.read().await
                 };
 
-                if !test_mode_active {
+                let ambient_light_enabled = {
+                    let state_manager = crate::ambient_light_state::AmbientLightStateManager::global().await;
+                    state_manager.is_enabled().await
+                };
+
+                if !test_mode_active && ambient_light_enabled {
                     match Self::send_colors_by_display(colors, mappers, &strips, &color_calibration)
                         .await
                     {

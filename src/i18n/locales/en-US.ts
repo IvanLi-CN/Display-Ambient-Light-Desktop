@@ -248,4 +248,31 @@ export const enUS: TranslationDict = {
     general: 'General',
     system: 'System',
   },
+
+  tray: {
+    ambientLight: 'Ambient Light',
+    ambientLightEnabled: 'Ambient Light Enabled',
+    ambientLightDisabled: 'Ambient Light Disabled',
+    info: 'System Info',
+    ledConfiguration: 'LED Configuration',
+    whiteBalance: 'White Balance',
+    ledTest: 'LED Test',
+    settings: 'Settings',
+    autoStart: 'Auto Start',
+    quit: 'Quit',
+    show: 'Show Window',
+    hide: 'Hide Window',
+  },
+
+  ambientLight: {
+    title: 'Ambient Light Control',
+    enabled: 'Enabled',
+    disabled: 'Disabled',
+    statusEnabled: 'Ambient Light Enabled',
+    statusDisabled: 'Ambient Light Disabled',
+    description: 'Control screen recording and LED data transmission',
+    descriptionEnabled: 'Screen recording and LED data transmission are active',
+    descriptionDisabled: 'Screen recording and LED data transmission are paused',
+    toggleFailed: 'Failed to toggle ambient light',
+  },
 };

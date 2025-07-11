@@ -2,8 +2,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod ambient_light;
+mod ambient_light_state;
 mod auto_start;
 mod display;
+mod language_manager;
 mod led_color;
 mod led_test_effects;
 mod rpc;
@@ -20,12 +22,16 @@ use paris::{error, info, warn};
 use rpc::{BoardInfo, UdpRpc};
 use screenshot::Screenshot;
 use screenshot_manager::ScreenshotManager;
+use tauri::{
+    menu::{Menu, MenuItem, CheckMenuItem, PredefinedMenuItem},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    Manager, Runtime, Emitter,
+    http::{Request, Response},
+};
 
 use serde::{Deserialize, Serialize};
 use serde_json::to_string;
 use std::sync::Arc;
-use tauri::http::{Request, Response};
-use tauri::{Emitter, Runtime};
 use tokio::sync::RwLock;
 use volume::VolumeManager;
 
@@ -498,6 +504,250 @@ fn get_auto_start_config() -> Result<auto_start::AutoStartConfig, String> {
     })
 }
 
+#[tauri::command]
+async fn is_ambient_light_enabled() -> Result<bool, String> {
+    let state_manager = ambient_light_state::AmbientLightStateManager::global().await;
+    Ok(state_manager.is_enabled().await)
+}
+
+#[tauri::command]
+async fn set_ambient_light_enabled(enabled: bool) -> Result<(), String> {
+    let state_manager = ambient_light_state::AmbientLightStateManager::global().await;
+    state_manager.set_enabled(enabled).await.map_err(|e| {
+        error!("Failed to set ambient light state: {}", e);
+        e.to_string()
+    })
+}
+
+#[tauri::command]
+async fn toggle_ambient_light() -> Result<bool, String> {
+    let state_manager = ambient_light_state::AmbientLightStateManager::global().await;
+    state_manager.toggle().await.map_err(|e| {
+        error!("Failed to toggle ambient light state: {}", e);
+        e.to_string()
+    })
+}
+
+#[tauri::command]
+async fn get_ambient_light_state() -> Result<ambient_light_state::AmbientLightState, String> {
+    let state_manager = ambient_light_state::AmbientLightStateManager::global().await;
+    Ok(state_manager.get_state().await)
+}
+
+#[tauri::command]
+async fn get_current_language() -> Result<String, String> {
+    let language_manager = language_manager::LanguageManager::global().await;
+    Ok(language_manager.get_language().await)
+}
+
+#[tauri::command]
+async fn set_current_language(language: String) -> Result<(), String> {
+    let language_manager = language_manager::LanguageManager::global().await;
+    language_manager.set_language(language).await.map_err(|e| {
+        error!("Failed to set language: {}", e);
+        e.to_string()
+    })
+}
+
+async fn update_tray_menu_internal<R: Runtime>(app_handle: &tauri::AppHandle<R>) {
+    info!("Updating tray menu...");
+
+    // Get current states
+    let state_manager = ambient_light_state::AmbientLightStateManager::global().await;
+    let ambient_light_enabled = state_manager.is_enabled().await;
+    let auto_start_enabled = auto_start::AutoStartManager::is_enabled().unwrap_or(false);
+
+    info!("Updating menu item states - Ambient light: {}, Auto start: {}", ambient_light_enabled, auto_start_enabled);
+
+    // Recreate the menu with updated states
+    if let Ok(new_menu) = create_tray_menu(app_handle).await {
+        if let Some(tray) = app_handle.tray_by_id("main") {
+            match tray.set_menu(Some(new_menu)) {
+                Ok(_) => info!("Tray menu updated successfully with new checked states"),
+                Err(e) => error!("Failed to update tray menu: {}", e),
+            }
+        } else {
+            error!("Tray not found when trying to update menu");
+        }
+    } else {
+        error!("Failed to create new tray menu");
+    }
+}
+
+#[tauri::command]
+async fn update_tray_menu(app_handle: tauri::AppHandle) -> Result<(), String> {
+    update_tray_menu_internal(&app_handle).await;
+    Ok(())
+}
+
+#[tauri::command]
+async fn test_tray_visibility(app_handle: tauri::AppHandle) -> Result<String, String> {
+    if let Some(_tray) = app_handle.tray_by_id("main") {
+        Ok("Tray icon exists and is accessible".to_string())
+    } else {
+        Err("Tray icon not found".to_string())
+    }
+}
+
+async fn create_tray_menu<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<Menu<R>> {
+    let state_manager = ambient_light_state::AmbientLightStateManager::global().await;
+    let ambient_light_enabled = state_manager.is_enabled().await;
+    let auto_start_enabled = auto_start::AutoStartManager::is_enabled().unwrap_or(false);
+
+    info!("Creating tray menu - Ambient light: {}, Auto start: {}", ambient_light_enabled, auto_start_enabled);
+
+    // Get current language
+    let language_manager = language_manager::LanguageManager::global().await;
+    let current_language = language_manager.get_language().await;
+    let t = |key: &str| language_manager::TrayTranslations::get_text(&current_language, key);
+
+    // Create menu items
+    let ambient_light_item = CheckMenuItem::with_id(
+        app,
+        "toggle_ambient_light",
+        t("ambient_light").to_string(),
+        true,
+        ambient_light_enabled,
+        None::<&str>,
+    )?;
+
+    let separator1 = PredefinedMenuItem::separator(app)?;
+
+    let info_item = MenuItem::with_id(app, "show_info", t("info"), true, None::<&str>)?;
+    let led_config_item = MenuItem::with_id(app, "show_led_config", t("led_configuration"), true, None::<&str>)?;
+    let white_balance_item = MenuItem::with_id(app, "show_white_balance", t("white_balance"), true, None::<&str>)?;
+    let led_test_item = MenuItem::with_id(app, "show_led_test", t("led_test"), true, None::<&str>)?;
+    let settings_item = MenuItem::with_id(app, "show_settings", t("settings"), true, None::<&str>)?;
+
+    let separator2 = PredefinedMenuItem::separator(app)?;
+
+    let auto_start_item = CheckMenuItem::with_id(
+        app,
+        "toggle_auto_start",
+        t("auto_start").to_string(),
+        true,
+        auto_start_enabled,
+        None::<&str>,
+    )?;
+
+    let separator3 = PredefinedMenuItem::separator(app)?;
+
+    let show_item = MenuItem::with_id(app, "show_window", t("show_window"), true, None::<&str>)?;
+    let quit_item = MenuItem::with_id(app, "quit", t("quit"), true, None::<&str>)?;
+
+    // Build the menu
+    let menu = Menu::with_items(
+        app,
+        &[
+            &ambient_light_item,
+            &separator1,
+            &info_item,
+            &led_config_item,
+            &white_balance_item,
+            &led_test_item,
+            &settings_item,
+            &separator2,
+            &auto_start_item,
+            &separator3,
+            &show_item,
+            &quit_item,
+        ],
+    )?;
+
+    Ok(menu)
+}
+
+async fn handle_menu_event<R: Runtime>(app: &tauri::AppHandle<R>, event: tauri::menu::MenuEvent) {
+    match event.id().as_ref() {
+        "toggle_ambient_light" => {
+            if let Ok(new_state) = toggle_ambient_light().await {
+                info!("Ambient light toggled to: {}", new_state);
+
+                // Emit event to notify frontend of state change
+                let state_manager = ambient_light_state::AmbientLightStateManager::global().await;
+                let current_state = state_manager.get_state().await;
+                app.emit("ambient_light_state_changed", current_state).unwrap();
+
+                // Immediately update tray menu to reflect new state
+                update_tray_menu_internal(app).await;
+            }
+        }
+        "show_info" => {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+                let _ = window.eval("window.location.hash = '#/info'");
+            }
+        }
+        "show_led_config" => {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+                let _ = window.eval("window.location.hash = '#/led-strips-configuration'");
+            }
+        }
+        "show_white_balance" => {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+                let _ = window.eval("window.location.hash = '#/white-balance'");
+            }
+        }
+        "show_led_test" => {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+                let _ = window.eval("window.location.hash = '#/led-strip-test'");
+            }
+        }
+        "show_settings" => {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+                let _ = window.eval("window.location.hash = '#/settings'");
+            }
+        }
+        "toggle_auto_start" => {
+            if let Ok(new_state) = auto_start::AutoStartManager::toggle() {
+                info!("Auto start toggled to: {}", new_state);
+                // Immediately update tray menu to reflect new state
+                update_tray_menu_internal(app).await;
+            }
+        }
+        "show_window" => {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }
+        "quit" => {
+            app.exit(0);
+        }
+        _ => {}
+    }
+}
+
+async fn handle_tray_event<R: Runtime>(app: &tauri::AppHandle<R>, event: TrayIconEvent) {
+    match event {
+        TrayIconEvent::Click {
+            button: MouseButton::Left,
+            button_state: MouseButtonState::Up,
+            ..
+        } => {
+            // Left click to show/hide window
+            if let Some(window) = app.get_webview_window("main") {
+                if window.is_visible().unwrap_or(false) {
+                    let _ = window.hide();
+                } else {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
 // Protocol handler for ambient-light://
 fn handle_ambient_light_protocol<R: Runtime>(
     _ctx: tauri::UriSchemeContext<R>,
@@ -667,10 +917,51 @@ async fn main() {
             get_displays,
             is_auto_start_enabled,
             set_auto_start_enabled,
-            get_auto_start_config
+            get_auto_start_config,
+            is_ambient_light_enabled,
+            set_ambient_light_enabled,
+            toggle_ambient_light,
+            get_ambient_light_state,
+            get_current_language,
+            set_current_language,
+            update_tray_menu,
+            test_tray_visibility
         ])
         .register_uri_scheme_protocol("ambient-light", handle_ambient_light_protocol)
+        .on_menu_event(|app, event| {
+            let app_handle = app.clone();
+            tauri::async_runtime::spawn(async move {
+                handle_menu_event(&app_handle, event).await;
+            });
+        })
         .setup(move |app| {
+            // Setup system tray
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let menu = create_tray_menu(&app_handle).await.unwrap();
+
+                // Try to create tray icon with explicit icon path
+                let tray_result = TrayIconBuilder::with_id("main")
+                    .menu(&menu)
+                    .icon(app_handle.default_window_icon().unwrap().clone())
+                    .on_tray_icon_event(move |tray, event| {
+                        let app_handle = tray.app_handle().clone();
+                        tauri::async_runtime::spawn(async move {
+                            handle_tray_event(&app_handle, event).await;
+                        });
+                    })
+                    .build(&app_handle);
+
+                match tray_result {
+                    Ok(_tray) => {
+                        info!("System tray created successfully");
+                    }
+                    Err(e) => {
+                        error!("Failed to create system tray: {}", e);
+                    }
+                }
+            });
+
             let app_handle = app.handle().clone();
             tokio::spawn(async move {
                 let config_manager = ambient_light::ConfigManager::global().await;
@@ -758,6 +1049,25 @@ async fn main() {
                     log::info!("displays changed. emit displays_changed event.");
 
                     app_handle.emit("displays_changed", displays).unwrap();
+                }
+            });
+
+            // Start screenshot manager
+            tokio::spawn(async move {
+                let screenshot_manager = ScreenshotManager::global().await;
+                screenshot_manager.start().await.unwrap();
+            });
+
+            // Start LED colors publisher
+            tokio::spawn(async move {
+                let publisher = ambient_light::LedColorsPublisher::global().await;
+                publisher.start().await;
+            });
+
+            // Start WebSocket server for screen streaming
+            tokio::spawn(async move {
+                if let Err(e) = start_websocket_server().await {
+                    error!("Failed to start WebSocket server: {}", e);
                 }
             });
 
