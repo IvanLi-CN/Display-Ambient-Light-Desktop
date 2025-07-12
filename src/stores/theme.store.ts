@@ -1,4 +1,5 @@
 import { createSignal, createEffect } from 'solid-js';
+import { userPreferencesStore } from './user-preferences.store';
 
 export type Theme = 'light' | 'dark' | 'auto';
 
@@ -46,13 +47,18 @@ export type DaisyUITheme = typeof AVAILABLE_THEMES[number];
 // Theme store
 const [currentTheme, setCurrentTheme] = createSignal<DaisyUITheme>('dark');
 const [systemTheme, setSystemTheme] = createSignal<'light' | 'dark'>('dark');
+const [isInitialized, setIsInitialized] = createSignal(false);
 
-// Initialize theme from localStorage
-const initializeTheme = () => {
+// Initialize theme from backend
+const initializeTheme = async () => {
   try {
-    const savedTheme = localStorage.getItem('app-theme') as DaisyUITheme;
-    if (savedTheme && AVAILABLE_THEMES.includes(savedTheme)) {
-      setCurrentTheme(savedTheme);
+    // Initialize user preferences first
+    await userPreferencesStore.initializePreferences();
+
+    // Get theme from backend
+    const savedTheme = await userPreferencesStore.getTheme();
+    if (savedTheme && AVAILABLE_THEMES.includes(savedTheme as DaisyUITheme)) {
+      setCurrentTheme(savedTheme as DaisyUITheme);
     }
 
     // Detect system theme
@@ -63,8 +69,12 @@ const initializeTheme = () => {
     mediaQuery.addEventListener('change', (e) => {
       setSystemTheme(e.matches ? 'dark' : 'light');
     });
+
+    // Mark as initialized
+    setIsInitialized(true);
   } catch (error) {
     console.warn('Failed to initialize theme:', error);
+    setIsInitialized(true); // Still mark as initialized to allow saving
   }
 };
 
@@ -77,17 +87,30 @@ const applyTheme = (theme: DaisyUITheme) => {
   }
 };
 
-// Save theme to localStorage
+// Save theme to backend (only after initialization)
 createEffect(() => {
   const theme = currentTheme();
-  localStorage.setItem('app-theme', theme);
+  const initialized = isInitialized();
+
+  // Always apply theme to UI
   applyTheme(theme);
+
+  // Only save to backend after initialization to avoid overwriting loaded theme
+  if (initialized) {
+    userPreferencesStore.updateTheme(theme).catch(error => {
+      console.error('Failed to save theme to backend:', error);
+    });
+  }
 });
 
 // Initialize on first load
 if (typeof window !== 'undefined') {
-  initializeTheme();
-  applyTheme(currentTheme());
+  initializeTheme().then(() => {
+    applyTheme(currentTheme());
+  }).catch(error => {
+    console.error('Failed to initialize theme:', error);
+    applyTheme(currentTheme()); // Apply default theme
+  });
 }
 
 export const themeStore = {

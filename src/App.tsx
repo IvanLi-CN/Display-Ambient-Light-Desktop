@@ -12,6 +12,8 @@ import { useLanguage } from './i18n/index';
 import { AppVersion } from './models/app-version.model';
 // Import theme store to ensure it's initialized
 import './stores/theme.store';
+// Import user preferences store to ensure it's initialized
+import { userPreferencesStore } from './stores/user-preferences.store';
 
 function App() {
   const location = useLocation();
@@ -25,6 +27,13 @@ function App() {
       setAppVersion(version);
     }).catch((error) => {
       console.error('Failed to get app version:', error);
+    });
+  });
+
+  // Initialize user preferences on mount
+  createEffect(() => {
+    userPreferencesStore.initializePreferences().catch((error) => {
+      console.error('Failed to initialize user preferences:', error);
     });
   });
 

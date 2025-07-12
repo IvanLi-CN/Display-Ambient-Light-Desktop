@@ -257,6 +257,7 @@ export const enUS: TranslationDict = {
     system: 'System',
     about: 'About',
     appearance: 'Appearance',
+
   },
 
   about: {

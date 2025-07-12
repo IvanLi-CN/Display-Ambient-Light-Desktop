@@ -6,7 +6,7 @@ import {
   onMount,
   ParentComponent,
 } from 'solid-js';
-import { displayStore, setDisplayStore } from '../../stores/display.store';
+import { displayStore, updateViewScale } from '../../stores/display.store';
 import background from '../../assets/transparent-grid-background.svg?url';
 
 export const DisplayListContainer: ParentComponent = (props) => {
@@ -25,12 +25,12 @@ export const DisplayListContainer: ParentComponent = (props) => {
     bottom: 100,
   });
 
-  const resetSize = () => {
+  const resetSize = async () => {
     const _bound = bound();
 
-    setDisplayStore({
-      viewScale: root.clientWidth / (_bound.right - _bound.left),
-    });
+    // Calculate and update view scale with persistence
+    const newViewScale = root.clientWidth / (_bound.right - _bound.left);
+    await updateViewScale(newViewScale);
 
     setOlStyle({
       top: `${-_bound.top * displayStore.viewScale}px`,
@@ -63,7 +63,9 @@ export const DisplayListContainer: ParentComponent = (props) => {
     });
     let observer: ResizeObserver;
     onMount(() => {
-      observer = new ResizeObserver(resetSize);
+      observer = new ResizeObserver(() => {
+        resetSize().catch(console.error);
+      });
       observer.observe(root);
     });
 

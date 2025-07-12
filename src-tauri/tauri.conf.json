@@ -24,8 +24,8 @@
         "fullscreen": false,
         "resizable": true,
         "title": "Ambient Light Control",
-        "width": 800,
-        "height": 600
+        "width": 1400,
+        "height": 1000
       }
     ],
     "trayIcon": {

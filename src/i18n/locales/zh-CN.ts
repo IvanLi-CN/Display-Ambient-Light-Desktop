@@ -257,6 +257,7 @@ export const zhCN: TranslationDict = {
     system: '系统',
     about: '关于',
     appearance: '外观',
+
   },
 
   about: {

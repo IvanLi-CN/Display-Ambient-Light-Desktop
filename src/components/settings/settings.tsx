@@ -4,6 +4,7 @@ import { useLanguage } from '../../i18n/index';
 import { AmbientLightControl } from '../ambient-light-control/ambient-light-control';
 import { ThemeSelector } from '../theme-selector/theme-selector';
 
+
 interface AutoStartConfig {
   enabled: boolean;
 }
@@ -14,7 +15,9 @@ export const Settings = () => {
   const [loading, setLoading] = createSignal(false);
   const [message, setMessage] = createSignal<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Load auto start status on mount
+
+
+  // Load auto start status and user preferences on mount
   onMount(async () => {
     try {
       const config = await invoke<AutoStartConfig>('get_auto_start_config');
@@ -22,6 +25,8 @@ export const Settings = () => {
     } catch (error) {
       console.error('Failed to load auto start config:', error);
     }
+
+
   });
 
   // Handle language change
@@ -68,6 +73,8 @@ export const Settings = () => {
     setMessage({ type, text });
     setTimeout(() => setMessage(null), 3000);
   };
+
+
 
 
 
@@ -164,6 +171,8 @@ export const Settings = () => {
             </div>
           </div>
         </div>
+
+
 
         {/* About Section */}
         <div class="settings-card">

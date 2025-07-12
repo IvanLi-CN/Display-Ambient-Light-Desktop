@@ -12,6 +12,7 @@ mod rpc;
 mod screen_stream;
 mod screenshot;
 mod screenshot_manager;
+mod user_preferences;
 mod volume;
 
 use ambient_light::{Border, ColorCalibration, LedStripConfig, LedStripConfigGroup, LedType};
@@ -22,6 +23,7 @@ use paris::{error, info, warn};
 use rpc::{BoardInfo, UdpRpc};
 use screenshot::Screenshot;
 use screenshot_manager::ScreenshotManager;
+use user_preferences::{UserPreferences, UserPreferencesManager, WindowPreferences, UIPreferences};
 use tauri::{
     http::{Request, Response},
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
@@ -549,6 +551,68 @@ async fn set_current_language(language: String) -> Result<(), String> {
     })
 }
 
+#[tauri::command]
+async fn get_user_preferences() -> Result<UserPreferences, String> {
+    let preferences_manager = UserPreferencesManager::global().await;
+    Ok(preferences_manager.get_preferences().await)
+}
+
+#[tauri::command]
+async fn update_user_preferences(preferences: UserPreferences) -> Result<(), String> {
+    let preferences_manager = UserPreferencesManager::global().await;
+    preferences_manager.update_preferences(preferences).await.map_err(|e| {
+        error!("Failed to update user preferences: {}", e);
+        e.to_string()
+    })
+}
+
+#[tauri::command]
+async fn update_window_preferences(window_prefs: WindowPreferences) -> Result<(), String> {
+    let preferences_manager = UserPreferencesManager::global().await;
+    preferences_manager.update_window_preferences(window_prefs).await.map_err(|e| {
+        error!("Failed to update window preferences: {}", e);
+        e.to_string()
+    })
+}
+
+#[tauri::command]
+async fn update_ui_preferences(ui_prefs: UIPreferences) -> Result<(), String> {
+    let preferences_manager = UserPreferencesManager::global().await;
+    preferences_manager.update_ui_preferences(ui_prefs).await.map_err(|e| {
+        error!("Failed to update UI preferences: {}", e);
+        e.to_string()
+    })
+}
+
+// Removed update_display_preferences - feature not implemented
+
+#[tauri::command]
+async fn update_view_scale(scale: f64) -> Result<(), String> {
+    let preferences_manager = UserPreferencesManager::global().await;
+    preferences_manager.update_view_scale(scale).await.map_err(|e| {
+        error!("Failed to update view scale: {}", e);
+        e.to_string()
+    })
+}
+
+#[tauri::command]
+async fn update_theme(theme: String) -> Result<(), String> {
+    let preferences_manager = UserPreferencesManager::global().await;
+    preferences_manager.update_theme(theme).await.map_err(|e| {
+        error!("Failed to update theme: {}", e);
+        e.to_string()
+    })
+}
+
+#[tauri::command]
+async fn get_theme() -> Result<String, String> {
+    let preferences_manager = UserPreferencesManager::global().await;
+    let preferences = preferences_manager.get_preferences().await;
+    Ok(preferences.ui.theme)
+}
+
+// Removed update_last_visited_page - feature not implemented
+
 async fn update_tray_menu_internal<R: Runtime>(app_handle: &tauri::AppHandle<R>) {
     info!("Updating tray menu...");
 
@@ -1006,6 +1070,13 @@ async fn main() {
             get_ambient_light_state,
             get_current_language,
             set_current_language,
+            get_user_preferences,
+            update_user_preferences,
+            update_window_preferences,
+            update_ui_preferences,
+            update_view_scale,
+            update_theme,
+            get_theme,
             update_tray_menu,
             test_tray_visibility,
             get_app_version_string,
@@ -1020,6 +1091,87 @@ async fn main() {
             });
         })
         .setup(move |app| {
+            // Restore window state from user preferences
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                if let Some(main_window) = app_handle.get_webview_window("main") {
+                    let preferences_manager = UserPreferencesManager::global().await;
+                    let preferences = preferences_manager.get_preferences().await;
+
+                    // Restore window size (using logical pixels to avoid DPI scaling issues)
+                    if let Err(e) = main_window.set_size(tauri::Size::Logical(tauri::LogicalSize {
+                        width: preferences.window.width,
+                        height: preferences.window.height,
+                    })) {
+                        warn!("Failed to restore window size: {}", e);
+                    }
+
+                    // Restore window position if available (using logical pixels)
+                    if let (Some(x), Some(y)) = (preferences.window.x, preferences.window.y) {
+                        if let Err(e) = main_window.set_position(tauri::Position::Logical(tauri::LogicalPosition {
+                            x,
+                            y,
+                        })) {
+                            warn!("Failed to restore window position: {}", e);
+                        }
+                    }
+
+                    // Restore maximized state
+                    if preferences.window.maximized {
+                        if let Err(e) = main_window.maximize() {
+                            warn!("Failed to maximize window: {}", e);
+                        }
+                    }
+
+                    info!("Window state restored from preferences");
+                }
+            });
+
+            // Setup window event listeners for state persistence
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                if let Some(main_window) = app_handle.get_webview_window("main") {
+                    let preferences_manager = UserPreferencesManager::global().await;
+
+                    // Listen for window resize events
+                    let preferences_manager_clone = preferences_manager;
+                    let main_window_clone = main_window.clone();
+                    main_window.on_window_event(move |event| {
+                        let prefs_manager = preferences_manager_clone;
+                        let window = main_window_clone.clone();
+
+                        // Clone the event data to move into async task
+                        match event {
+                            tauri::WindowEvent::Resized(_size) => {
+                                tauri::async_runtime::spawn(async move {
+                                    // Get current logical size to avoid DPI scaling issues
+                                    if let Ok(logical_size) = window.inner_size() {
+                                        let scale_factor = window.scale_factor().unwrap_or(1.0);
+                                        let logical_size = logical_size.to_logical::<f64>(scale_factor);
+                                        if let Err(e) = prefs_manager.update_window_size(logical_size.width, logical_size.height).await {
+                                            warn!("Failed to save window size: {}", e);
+                                        }
+                                    }
+                                });
+                            }
+                            tauri::WindowEvent::Moved(_position) => {
+                                tauri::async_runtime::spawn(async move {
+                                    // Get current logical position
+                                    if let Ok(position) = window.outer_position() {
+                                        let scale_factor = window.scale_factor().unwrap_or(1.0);
+                                        let logical_pos = position.to_logical::<f64>(scale_factor);
+                                        if let Err(e) = prefs_manager.update_window_position(logical_pos.x, logical_pos.y).await {
+                                            warn!("Failed to save window position: {}", e);
+                                        }
+                                    }
+                                });
+                            }
+                            _ => {}
+                        }
+                    });
+                }
+            });
+
             // Setup system tray
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
