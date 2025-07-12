@@ -68,16 +68,15 @@ impl Default for UIPreferences {
 impl UserPreferences {
     /// Get the configuration file path
     fn get_config_path() -> anyhow::Result<PathBuf> {
-        let config_dir = config_dir().ok_or_else(|| {
-            anyhow::anyhow!("Could not determine config directory")
-        })?;
+        let config_dir =
+            config_dir().ok_or_else(|| anyhow::anyhow!("Could not determine config directory"))?;
         Ok(config_dir.join(CONFIG_FILE_NAME))
     }
 
     /// Read configuration from file
     pub async fn read_config() -> anyhow::Result<Self> {
         let config_path = Self::get_config_path()?;
-        
+
         if !config_path.exists() {
             info!("User preferences config file not found, using defaults");
             return Ok(Self::default());
@@ -116,7 +115,10 @@ impl UserPreferencesManager {
                 let preferences = match UserPreferences::read_config().await {
                     Ok(prefs) => prefs,
                     Err(e) => {
-                        warn!("Failed to read user preferences config: {}, using defaults", e);
+                        warn!(
+                            "Failed to read user preferences config: {}, using defaults",
+                            e
+                        );
                         UserPreferences::default()
                     }
                 };
@@ -146,7 +148,10 @@ impl UserPreferencesManager {
     }
 
     /// Update window preferences
-    pub async fn update_window_preferences(&self, window_prefs: WindowPreferences) -> anyhow::Result<()> {
+    pub async fn update_window_preferences(
+        &self,
+        window_prefs: WindowPreferences,
+    ) -> anyhow::Result<()> {
         let mut preferences = self.get_preferences().await;
         preferences.window = window_prefs;
         self.update_preferences(preferences).await

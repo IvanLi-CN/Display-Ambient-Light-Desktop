@@ -23,13 +23,13 @@ use paris::{error, info, warn};
 use rpc::{BoardInfo, UdpRpc};
 use screenshot::Screenshot;
 use screenshot_manager::ScreenshotManager;
-use user_preferences::{UserPreferences, UserPreferencesManager, WindowPreferences, UIPreferences};
 use tauri::{
     http::{Request, Response},
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Emitter, Manager, Runtime,
 };
+use user_preferences::{UIPreferences, UserPreferences, UserPreferencesManager, WindowPreferences};
 
 use serde::{Deserialize, Serialize};
 use serde_json::to_string;
@@ -560,28 +560,37 @@ async fn get_user_preferences() -> Result<UserPreferences, String> {
 #[tauri::command]
 async fn update_user_preferences(preferences: UserPreferences) -> Result<(), String> {
     let preferences_manager = UserPreferencesManager::global().await;
-    preferences_manager.update_preferences(preferences).await.map_err(|e| {
-        error!("Failed to update user preferences: {}", e);
-        e.to_string()
-    })
+    preferences_manager
+        .update_preferences(preferences)
+        .await
+        .map_err(|e| {
+            error!("Failed to update user preferences: {}", e);
+            e.to_string()
+        })
 }
 
 #[tauri::command]
 async fn update_window_preferences(window_prefs: WindowPreferences) -> Result<(), String> {
     let preferences_manager = UserPreferencesManager::global().await;
-    preferences_manager.update_window_preferences(window_prefs).await.map_err(|e| {
-        error!("Failed to update window preferences: {}", e);
-        e.to_string()
-    })
+    preferences_manager
+        .update_window_preferences(window_prefs)
+        .await
+        .map_err(|e| {
+            error!("Failed to update window preferences: {}", e);
+            e.to_string()
+        })
 }
 
 #[tauri::command]
 async fn update_ui_preferences(ui_prefs: UIPreferences) -> Result<(), String> {
     let preferences_manager = UserPreferencesManager::global().await;
-    preferences_manager.update_ui_preferences(ui_prefs).await.map_err(|e| {
-        error!("Failed to update UI preferences: {}", e);
-        e.to_string()
-    })
+    preferences_manager
+        .update_ui_preferences(ui_prefs)
+        .await
+        .map_err(|e| {
+            error!("Failed to update UI preferences: {}", e);
+            e.to_string()
+        })
 }
 
 // Removed update_display_preferences - feature not implemented
@@ -589,10 +598,13 @@ async fn update_ui_preferences(ui_prefs: UIPreferences) -> Result<(), String> {
 #[tauri::command]
 async fn update_view_scale(scale: f64) -> Result<(), String> {
     let preferences_manager = UserPreferencesManager::global().await;
-    preferences_manager.update_view_scale(scale).await.map_err(|e| {
-        error!("Failed to update view scale: {}", e);
-        e.to_string()
-    })
+    preferences_manager
+        .update_view_scale(scale)
+        .await
+        .map_err(|e| {
+            error!("Failed to update view scale: {}", e);
+            e.to_string()
+        })
 }
 
 #[tauri::command]
@@ -1108,10 +1120,9 @@ async fn main() {
 
                     // Restore window position if available (using logical pixels)
                     if let (Some(x), Some(y)) = (preferences.window.x, preferences.window.y) {
-                        if let Err(e) = main_window.set_position(tauri::Position::Logical(tauri::LogicalPosition {
-                            x,
-                            y,
-                        })) {
+                        if let Err(e) = main_window
+                            .set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }))
+                        {
                             warn!("Failed to restore window position: {}", e);
                         }
                     }
@@ -1147,8 +1158,15 @@ async fn main() {
                                     // Get current logical size to avoid DPI scaling issues
                                     if let Ok(logical_size) = window.inner_size() {
                                         let scale_factor = window.scale_factor().unwrap_or(1.0);
-                                        let logical_size = logical_size.to_logical::<f64>(scale_factor);
-                                        if let Err(e) = prefs_manager.update_window_size(logical_size.width, logical_size.height).await {
+                                        let logical_size =
+                                            logical_size.to_logical::<f64>(scale_factor);
+                                        if let Err(e) = prefs_manager
+                                            .update_window_size(
+                                                logical_size.width,
+                                                logical_size.height,
+                                            )
+                                            .await
+                                        {
                                             warn!("Failed to save window size: {}", e);
                                         }
                                     }
@@ -1160,7 +1178,10 @@ async fn main() {
                                     if let Ok(position) = window.outer_position() {
                                         let scale_factor = window.scale_factor().unwrap_or(1.0);
                                         let logical_pos = position.to_logical::<f64>(scale_factor);
-                                        if let Err(e) = prefs_manager.update_window_position(logical_pos.x, logical_pos.y).await {
+                                        if let Err(e) = prefs_manager
+                                            .update_window_position(logical_pos.x, logical_pos.y)
+                                            .await
+                                        {
                                             warn!("Failed to save window position: {}", e);
                                         }
                                     }
