@@ -106,6 +106,8 @@ export const ThemeSelector = () => {
   const [isNightModeOpen, setIsNightModeOpen] = createSignal(false);
   let containerRef: HTMLDivElement | undefined;
   let nightModeContainerRef: HTMLDivElement | undefined;
+  let dropdownRef: HTMLDivElement | undefined;
+  let nightModeDropdownRef: HTMLDivElement | undefined;
 
   const handleThemeChange = (theme: DaisyUITheme) => {
     themeStore.setCurrentTheme(theme);
@@ -138,6 +140,19 @@ export const ThemeSelector = () => {
 
   const currentThemeName = () => getThemeDisplayName(themeStore.currentTheme(), t);
   const nightModeThemeName = () => getThemeDisplayName(nightModeTheme(), t);
+
+  // 滚动到当前选中的主题
+  const scrollToCurrentTheme = (dropdown: HTMLDivElement, currentTheme: DaisyUITheme) => {
+    setTimeout(() => {
+      const selectedButton = dropdown.querySelector(`[data-theme="${currentTheme}"]`) as HTMLButtonElement;
+      if (selectedButton) {
+        selectedButton.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center'
+        });
+      }
+    }, 50); // 小延迟确保DOM已渲染
+  };
 
   // 点击外部关闭下拉菜单
   const handleClickOutside = (event: MouseEvent) => {
@@ -195,7 +210,11 @@ export const ThemeSelector = () => {
           class="btn btn-outline w-full justify-between"
           onClick={(e) => {
             e.stopPropagation();
-            setIsOpen(!isOpen());
+            const newIsOpen = !isOpen();
+            setIsOpen(newIsOpen);
+            if (newIsOpen && dropdownRef) {
+              scrollToCurrentTheme(dropdownRef, themeStore.currentTheme());
+            }
           }}
         >
           <div class="flex items-center gap-3">
@@ -217,7 +236,7 @@ export const ThemeSelector = () => {
         </button>
 
         {isOpen() && (
-          <div class="absolute top-full left-0 right-0 z-[1000] mt-1 bg-base-100 rounded-box shadow-lg border border-base-300 max-h-60 overflow-y-auto">
+          <div ref={dropdownRef} class="absolute top-full left-0 right-0 z-[1000] mt-1 bg-base-100 rounded-box shadow-lg border border-base-300 max-h-60 overflow-y-auto">
             <div class="p-2">
               {/* 亮色主题组 */}
               <div class="mb-3">
@@ -231,6 +250,7 @@ export const ThemeSelector = () => {
                       <button
                         class={`w-full flex items-center gap-3 p-2 rounded-lg hover:bg-base-200 transition-colors ${themeStore.currentTheme() === theme ? 'bg-primary/10 text-primary' : ''
                           }`}
+                        data-theme={theme}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleThemeChange(theme);
@@ -279,6 +299,7 @@ export const ThemeSelector = () => {
                       <button
                         class={`w-full flex items-center gap-3 p-2 rounded-lg hover:bg-base-200 transition-colors ${themeStore.currentTheme() === theme ? 'bg-primary/10 text-primary' : ''
                           }`}
+                        data-theme={theme}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleThemeChange(theme);
@@ -341,7 +362,11 @@ export const ThemeSelector = () => {
               class="btn btn-outline btn-sm w-full justify-between"
               onClick={(e) => {
                 e.stopPropagation();
-                setIsNightModeOpen(!isNightModeOpen());
+                const newIsOpen = !isNightModeOpen();
+                setIsNightModeOpen(newIsOpen);
+                if (newIsOpen && nightModeDropdownRef) {
+                  scrollToCurrentTheme(nightModeDropdownRef, nightModeTheme());
+                }
               }}
             >
               <div class="flex items-center gap-2">
@@ -363,7 +388,7 @@ export const ThemeSelector = () => {
             </button>
 
             {isNightModeOpen() && (
-              <div class="absolute top-full left-0 right-0 z-[1001] mt-1 bg-base-100 rounded-box shadow-lg border border-base-300 max-h-48 overflow-y-auto">
+              <div ref={nightModeDropdownRef} class="absolute top-full left-0 right-0 z-[1001] mt-1 bg-base-100 rounded-box shadow-lg border border-base-300 max-h-48 overflow-y-auto">
                 <div class="p-2">
                   {/* 亮色主题组 */}
                   <div class="mb-2">
@@ -377,6 +402,7 @@ export const ThemeSelector = () => {
                           <button
                             class={`w-full flex items-center gap-2 p-2 rounded-lg hover:bg-base-200 transition-colors text-sm ${nightModeTheme() === theme ? 'bg-primary/10 text-primary' : ''
                               }`}
+                            data-theme={theme}
                             onClick={(e) => {
                               e.stopPropagation();
                               handleNightModeThemeChange(theme);
@@ -425,6 +451,7 @@ export const ThemeSelector = () => {
                           <button
                             class={`w-full flex items-center gap-2 p-2 rounded-lg hover:bg-base-200 transition-colors text-sm ${nightModeTheme() === theme ? 'bg-primary/10 text-primary' : ''
                               }`}
+                            data-theme={theme}
                             onClick={(e) => {
                               e.stopPropagation();
                               handleNightModeThemeChange(theme);
