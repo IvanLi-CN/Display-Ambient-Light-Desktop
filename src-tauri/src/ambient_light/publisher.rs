@@ -373,14 +373,14 @@ impl LedColorsPublisher {
                             LedType::WS2812B => {
                                 let calibration_bytes = color_calibration.to_bytes();
                                 let color_bytes = colors[i].as_bytes();
-                                // Apply calibration to RGB values
+                                // Apply calibration and convert RGB to GRB for WS2812B
                                 vec![
-                                    ((color_bytes[0] as f32 * calibration_bytes[0] as f32 / 255.0)
-                                        as u8),
                                     ((color_bytes[1] as f32 * calibration_bytes[1] as f32 / 255.0)
-                                        as u8),
+                                        as u8), // G (Green)
+                                    ((color_bytes[0] as f32 * calibration_bytes[0] as f32 / 255.0)
+                                        as u8), // R (Red)
                                     ((color_bytes[2] as f32 * calibration_bytes[2] as f32 / 255.0)
-                                        as u8),
+                                        as u8), // B (Blue)
                                 ]
                             }
                             LedType::SK6812 => {
@@ -431,14 +431,14 @@ impl LedColorsPublisher {
                             LedType::WS2812B => {
                                 let calibration_bytes = color_calibration.to_bytes();
                                 let color_bytes = colors[i].as_bytes();
-                                // Apply calibration to RGB values
+                                // Apply calibration and convert RGB to GRB for WS2812B
                                 vec![
-                                    ((color_bytes[0] as f32 * calibration_bytes[0] as f32 / 255.0)
-                                        as u8),
                                     ((color_bytes[1] as f32 * calibration_bytes[1] as f32 / 255.0)
-                                        as u8),
+                                        as u8), // G (Green)
+                                    ((color_bytes[0] as f32 * calibration_bytes[0] as f32 / 255.0)
+                                        as u8), // R (Red)
                                     ((color_bytes[2] as f32 * calibration_bytes[2] as f32 / 255.0)
-                                        as u8),
+                                        as u8), // B (Blue)
                                 ]
                             }
                             LedType::SK6812 => {

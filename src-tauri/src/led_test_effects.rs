@@ -31,11 +31,22 @@ impl LedTestEffects {
     fn is_rgbw_type(led_type: &LedType) -> bool {
         matches!(led_type, LedType::SK6812)
     }
+
+    /// Convert RGB buffer to GRB for WS2812B
+    fn convert_rgb_to_grb(buffer: &mut Vec<u8>) {
+        let bytes_per_led = 3; // RGB only
+        for i in (0..buffer.len()).step_by(bytes_per_led) {
+            if i + 2 < buffer.len() {
+                // Swap R and G: [R, G, B] -> [G, R, B]
+                buffer.swap(i, i + 1);
+            }
+        }
+    }
     /// Generate LED colors for a specific test effect at a given time
     pub fn generate_colors(config: &TestEffectConfig, time_ms: u64) -> Vec<u8> {
         let time_seconds = time_ms as f64 / 1000.0;
 
-        match config.effect_type {
+        let mut buffer = match config.effect_type {
             TestEffectType::FlowingRainbow => Self::flowing_rainbow(
                 config.led_count,
                 config.led_type.clone(),
@@ -57,7 +68,14 @@ impl LedTestEffects {
                 time_seconds,
                 config.speed,
             ),
+        };
+
+        // Convert RGB to correct color order for WS2812B (GRB)
+        if matches!(config.led_type, LedType::WS2812B) {
+            Self::convert_rgb_to_grb(&mut buffer);
         }
+
+        buffer
     }
 
     /// Calculate byte offset for 0x02 packet based on LED offset and LED type
@@ -291,14 +309,14 @@ mod tests {
         let colors = LedTestEffects::generate_colors(&config, 0);
         assert_eq!(colors.len(), 60); // 20 LEDs * 3 bytes each
 
-        // First 10 should be red
-        assert_eq!(colors[0], 255); // R
-        assert_eq!(colors[1], 0); // G
+        // First 10 should be red (converted to GRB for WS2812B)
+        assert_eq!(colors[0], 0); // G
+        assert_eq!(colors[1], 255); // R
         assert_eq!(colors[2], 0); // B
 
-        // Next 10 should be green
-        assert_eq!(colors[30], 0); // R
-        assert_eq!(colors[31], 255); // G
+        // Next 10 should be green (converted to GRB for WS2812B)
+        assert_eq!(colors[30], 255); // G
+        assert_eq!(colors[31], 0); // R
         assert_eq!(colors[32], 0); // B
     }
 }
