@@ -71,19 +71,21 @@ Byte 3+: LED Color Data (variable length)
 
 ## LED Color Data
 
+The desktop application handles LED strip type selection and color order conversion. Hardware receives final, ready-to-use data that can be directly forwarded to the LED strip without any processing.
+
 ### RGB LEDs (3 bytes per LED)
 
 ```text
-[R][G][B][R][G][B][R][G][B]...
+[C1][C2][C3][C1][C2][C3][C1][C2][C3]...
 ```
 
 ### RGBW LEDs (4 bytes per LED)
 
 ```text
-[R][G][B][W][R][G][B][W][R][G][B][W]...
+[C1][C2][C3][C4][C1][C2][C3][C4][C1][C2][C3][C4]...
 ```
 
-All values are 0-255.
+Where C1, C2, C3, C4 represent color channels in the exact order required by the target LED chip (e.g., G-R-B for WS2812B, G-R-B-W for SK6812-RGBW). All values are 0-255.
 
 ### Offset Calculation
 
@@ -136,15 +138,24 @@ The offset field specifies the starting byte position in the LED data buffer:
 - **Timing**: 800kHz data rate
 - **Features**: Dedicated white channel for better color mixing and higher brightness
 
-## Color Calibration
+## Desktop Application Responsibilities
 
-Colors are calibrated before transmission:
+The desktop application is responsible for:
+
+1. **LED Strip Type Selection**: User selects the LED strip type (WS2812B, SK6812, SK6812-RGBW, etc.)
+2. **Color Order Conversion**: Converts RGB(W) values to the correct color order for the target LED chip
+3. **Color Calibration**: Applies calibration values before transmission
+4. **Data Formatting**: Sends final, ready-to-use data that hardware can directly forward to LED strips
+
+### Color Calibration (Desktop Side)
+
+Colors are calibrated by the desktop application before transmission:
 
 **RGB:**
 
 ```rust
 calibrated_r = (original_r * calibration_r) / 255
-calibrated_g = (original_g * calibration_g) / 255  
+calibrated_g = (original_g * calibration_g) / 255
 calibrated_b = (original_b * calibration_b) / 255
 ```
 
@@ -252,12 +263,12 @@ Unknown → Connecting(1) → Connected
 
 - **Byte Order**: Big-endian for multi-byte values (offset field)
 - **Delivery**: Fire-and-forget UDP (no acknowledgment required)
-- **Hardware Role**: Simple UDP-to-LED bridge, no data processing
+- **Hardware Role**: Simple UDP-to-LED bridge, no data processing required
 - **LED Type Logic**: Handled entirely on desktop side, not hardware
-- **Mixed Types**: Same display can have both RGB and RGBW strips
+- **Mixed Types**: Desktop can handle multiple LED strip types per display
 - **Data Flow**: Desktop → UDP → Hardware → LED Strip (direct forward)
-- **Color Order**: Hardware must handle color order conversion for different LED chips
-- **LED Compatibility**: Supports WS2812B, SK6812, and SK6812-RGBW chips
+- **Color Order**: Desktop handles all color order conversion, hardware receives final data
+- **LED Compatibility**: Hardware acts as transparent bridge for any LED chip type
 
 ## Hardware Implementation
 
@@ -308,9 +319,9 @@ void handle_led_data(uint8_t* data, size_t len) {
     uint8_t* color_data = &data[3];
     size_t color_len = len - 3;
 
-    // Direct forward to LED strip - supports WS2812B, SK6812, SK6812-RGBW
+    // Direct forward to LED strip - data is already in correct format
     // byte_offset specifies the starting byte position in LED data buffer
-    // Color order conversion handled by LED driver library
+    // No processing required, desktop sends ready-to-use data
     led_strip_update(byte_offset, color_data, color_len);
 }
 ```
@@ -335,45 +346,28 @@ void send_volume_control(uint8_t volume_percent) {
 
 ### LED Strip Driver Implementation
 
-For SK6812-RGBW support, hardware must handle the G-R-B-W color order:
+Hardware simply forwards data directly to LED strips without any processing:
 
 ```c
-// Example LED strip update function for SK6812-RGBW
+// Example LED strip update function - direct forward
 void led_strip_update(uint16_t offset, uint8_t* data, size_t len) {
-    // For SK6812-RGBW: data comes as [R][G][B][W] from desktop
-    // Must be reordered to [G][R][B][W] for the LED chip
+    // Desktop sends data in correct format for target LED chip
+    // Hardware acts as transparent bridge - no processing required
 
-    size_t led_count = len / 4; // 4 bytes per RGBW LED
-    uint8_t* output_buffer = malloc(len);
-
-    for (size_t i = 0; i < led_count; i++) {
-        uint8_t r = data[i * 4 + 0];
-        uint8_t g = data[i * 4 + 1];
-        uint8_t b = data[i * 4 + 2];
-        uint8_t w = data[i * 4 + 3];
-
-        // Reorder to G-R-B-W for SK6812-RGBW
-        output_buffer[i * 4 + 0] = g; // Green first
-        output_buffer[i * 4 + 1] = r; // Red second
-        output_buffer[i * 4 + 2] = b; // Blue third
-        output_buffer[i * 4 + 3] = w; // White fourth
-    }
-
-    // Send to LED strip with proper timing
-    sk6812_rgbw_send(offset, output_buffer, len);
-    free(output_buffer);
+    // Direct forward to LED strip with proper timing
+    led_strip_send(offset, data, len);
 }
 ```
 
 ### Key Implementation Notes
 
 - **Ping Response**: Must respond to ping (0x01) within 1 second
-- **LED Data**: Direct forward to LED strip, with color order conversion if needed
-- **Color Order**: SK6812-RGBW requires G-R-B-W order, desktop sends R-G-B-W
+- **LED Data**: Direct forward to LED strip, no processing required
+- **Data Format**: Desktop sends final data in correct color order for target LED chip
 - **Control Commands**: Optional feature for hardware with input capabilities
 - **mDNS Registration**: Essential for automatic device discovery
 - **UDP Server**: Must handle concurrent connections from multiple desktops
-- **LED Chip Support**: Must support WS2812B (RGB), SK6812 (RGB), and SK6812-RGBW
+- **LED Chip Support**: Hardware acts as transparent bridge, desktop handles chip-specific formatting
 
 ## Troubleshooting
 
@@ -404,14 +398,12 @@ void led_strip_update(uint16_t offset, uint8_t* data, size_t len) {
 
 **Wrong Colors**:
 
+- Check LED strip type selection in desktop application
+- Verify desktop application is configured for correct LED chip type
 - Check color calibration settings on desktop
-- Verify RGB/RGBW data format matches LED strip type
 - Monitor color data in packets (bytes 3+)
-- Check LED chip color order:
-  - WS2812B: G-R-B order
-  - SK6812: G-R-B order
-  - SK6812-RGBW: G-R-B-W order
-- Ensure hardware converts R-G-B(-W) from desktop to correct chip order
+- Ensure desktop application is sending data in correct color order for target LED chip
+- Hardware should forward data directly without any color processing
 
 **Flickering or Lag**:
 
