@@ -49,25 +49,51 @@ const [currentTheme, setCurrentTheme] = createSignal<DaisyUITheme>('dark');
 const [systemTheme, setSystemTheme] = createSignal<'light' | 'dark'>('dark');
 const [isInitialized, setIsInitialized] = createSignal(false);
 
+// Get effective theme based on system theme and night mode settings
+const getEffectiveTheme = async (): Promise<DaisyUITheme> => {
+  try {
+    const nightModeEnabled = await userPreferencesStore.getNightModeThemeEnabled();
+    const systemThemeValue = systemTheme();
+
+    if (nightModeEnabled && systemThemeValue === 'dark') {
+      const nightTheme = await userPreferencesStore.getNightModeTheme();
+      if (nightTheme && AVAILABLE_THEMES.includes(nightTheme as DaisyUITheme)) {
+        return nightTheme as DaisyUITheme;
+      }
+    }
+
+    const regularTheme = await userPreferencesStore.getTheme();
+    if (regularTheme && AVAILABLE_THEMES.includes(regularTheme as DaisyUITheme)) {
+      return regularTheme as DaisyUITheme;
+    }
+
+    return 'dark'; // fallback
+  } catch (error) {
+    console.warn('Failed to get effective theme:', error);
+    return 'dark';
+  }
+};
+
 // Initialize theme from backend
 const initializeTheme = async () => {
   try {
     // Initialize user preferences first
     await userPreferencesStore.initializePreferences();
 
-    // Get theme from backend
-    const savedTheme = await userPreferencesStore.getTheme();
-    if (savedTheme && AVAILABLE_THEMES.includes(savedTheme as DaisyUITheme)) {
-      setCurrentTheme(savedTheme as DaisyUITheme);
-    }
+    // Get effective theme
+    const effectiveTheme = await getEffectiveTheme();
+    setCurrentTheme(effectiveTheme);
 
     // Detect system theme
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     setSystemTheme(mediaQuery.matches ? 'dark' : 'light');
 
     // Listen for system theme changes
-    mediaQuery.addEventListener('change', (e) => {
+    mediaQuery.addEventListener('change', async (e) => {
       setSystemTheme(e.matches ? 'dark' : 'light');
+      // Update effective theme when system theme changes
+      const newEffectiveTheme = await getEffectiveTheme();
+      setCurrentTheme(newEffectiveTheme);
     });
 
     // Mark as initialized
@@ -113,9 +139,18 @@ if (typeof window !== 'undefined') {
   });
 }
 
+// Function to refresh effective theme (useful after night mode settings change)
+const refreshEffectiveTheme = async () => {
+  if (isInitialized()) {
+    const effectiveTheme = await getEffectiveTheme();
+    setCurrentTheme(effectiveTheme);
+  }
+};
+
 export const themeStore = {
   currentTheme,
   setCurrentTheme,
   systemTheme,
   availableThemes: AVAILABLE_THEMES,
+  refreshEffectiveTheme,
 };

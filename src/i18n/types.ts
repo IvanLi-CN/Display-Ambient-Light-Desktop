@@ -256,6 +256,12 @@ export interface TranslationDict {
     themeAuto: string;
     themeSuccess: string;
     themeError: string;
+    lightThemes: string;
+    darkThemes: string;
+    nightModeTheme: string;
+    nightModeThemeDescription: string;
+    enableNightModeTheme: string;
+    enableNightModeThemeDescription: string;
     autoStart: string;
     autoStartDescription: string;
     autoStartEnabled: string;

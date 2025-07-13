@@ -623,6 +623,42 @@ async fn get_theme() -> Result<String, String> {
     Ok(preferences.ui.theme)
 }
 
+#[tauri::command]
+async fn update_night_mode_theme_enabled(enabled: bool) -> Result<(), String> {
+    let preferences_manager = UserPreferencesManager::global().await;
+    preferences_manager
+        .update_night_mode_theme_enabled(enabled)
+        .await
+        .map_err(|e| {
+            error!("Failed to update night mode theme enabled: {}", e);
+            e.to_string()
+        })
+}
+
+#[tauri::command]
+async fn update_night_mode_theme(theme: String) -> Result<(), String> {
+    let preferences_manager = UserPreferencesManager::global().await;
+    preferences_manager
+        .update_night_mode_theme(theme)
+        .await
+        .map_err(|e| {
+            error!("Failed to update night mode theme: {}", e);
+            e.to_string()
+        })
+}
+
+#[tauri::command]
+async fn get_night_mode_theme_enabled() -> Result<bool, String> {
+    let preferences_manager = UserPreferencesManager::global().await;
+    Ok(preferences_manager.get_night_mode_theme_enabled().await)
+}
+
+#[tauri::command]
+async fn get_night_mode_theme() -> Result<String, String> {
+    let preferences_manager = UserPreferencesManager::global().await;
+    Ok(preferences_manager.get_night_mode_theme().await)
+}
+
 // Removed update_last_visited_page - feature not implemented
 
 async fn update_tray_menu_internal<R: Runtime>(app_handle: &tauri::AppHandle<R>) {
@@ -1089,6 +1125,10 @@ async fn main() {
             update_view_scale,
             update_theme,
             get_theme,
+            update_night_mode_theme_enabled,
+            update_night_mode_theme,
+            get_night_mode_theme_enabled,
+            get_night_mode_theme,
             update_tray_menu,
             test_tray_visibility,
             get_app_version_string,

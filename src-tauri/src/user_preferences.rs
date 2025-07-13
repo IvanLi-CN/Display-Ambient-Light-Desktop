@@ -28,6 +28,8 @@ pub struct WindowPreferences {
 pub struct UIPreferences {
     pub view_scale: f64,
     pub theme: String,
+    pub night_mode_theme_enabled: bool,
+    pub night_mode_theme: String,
 }
 
 // DisplayPreferences removed - no implemented features
@@ -59,6 +61,8 @@ impl Default for UIPreferences {
         Self {
             view_scale: 0.2,
             theme: "dark".to_string(),
+            night_mode_theme_enabled: false,
+            night_mode_theme: "dark".to_string(),
         }
     }
 }
@@ -199,6 +203,32 @@ impl UserPreferencesManager {
         let mut preferences = self.get_preferences().await;
         preferences.ui.theme = theme;
         self.update_preferences(preferences).await
+    }
+
+    /// Update night mode theme enabled status
+    pub async fn update_night_mode_theme_enabled(&self, enabled: bool) -> anyhow::Result<()> {
+        let mut preferences = self.get_preferences().await;
+        preferences.ui.night_mode_theme_enabled = enabled;
+        self.update_preferences(preferences).await
+    }
+
+    /// Update night mode theme
+    pub async fn update_night_mode_theme(&self, theme: String) -> anyhow::Result<()> {
+        let mut preferences = self.get_preferences().await;
+        preferences.ui.night_mode_theme = theme;
+        self.update_preferences(preferences).await
+    }
+
+    /// Get night mode theme enabled status
+    pub async fn get_night_mode_theme_enabled(&self) -> bool {
+        let preferences = self.get_preferences().await;
+        preferences.ui.night_mode_theme_enabled
+    }
+
+    /// Get night mode theme
+    pub async fn get_night_mode_theme(&self) -> String {
+        let preferences = self.get_preferences().await;
+        preferences.ui.night_mode_theme.clone()
     }
 
     // Removed update_last_visited_page - feature not implemented

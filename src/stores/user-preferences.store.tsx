@@ -1,4 +1,4 @@
-import { createSignal, createEffect, onMount } from 'solid-js';
+import { createSignal } from 'solid-js';
 import { invoke } from '@tauri-apps/api/core';
 
 // TypeScript interfaces matching Rust structs
@@ -19,6 +19,8 @@ export interface WindowPreferences {
 export interface UIPreferences {
   view_scale: number;
   theme: string;
+  night_mode_theme_enabled: boolean;
+  night_mode_theme: string;
 }
 
 // Default preferences
@@ -32,6 +34,8 @@ const defaultPreferences: UserPreferences = {
   ui: {
     view_scale: 0.2,
     theme: 'dark',
+    night_mode_theme_enabled: false,
+    night_mode_theme: 'dark',
   },
 };
 
@@ -138,6 +142,56 @@ const getTheme = async (): Promise<string> => {
   }
 };
 
+const updateNightModeThemeEnabled = async (enabled: boolean) => {
+  try {
+    await invoke('update_night_mode_theme_enabled', { enabled });
+    setUserPreferences(prev => ({
+      ...prev,
+      ui: {
+        ...prev.ui,
+        night_mode_theme_enabled: enabled,
+      },
+    }));
+  } catch (error) {
+    console.error('Failed to update night mode theme enabled:', error);
+    throw error;
+  }
+};
+
+const updateNightModeTheme = async (theme: string) => {
+  try {
+    await invoke('update_night_mode_theme', { theme });
+    setUserPreferences(prev => ({
+      ...prev,
+      ui: {
+        ...prev.ui,
+        night_mode_theme: theme,
+      },
+    }));
+  } catch (error) {
+    console.error('Failed to update night mode theme:', error);
+    throw error;
+  }
+};
+
+const getNightModeThemeEnabled = async (): Promise<boolean> => {
+  try {
+    return await invoke<boolean>('get_night_mode_theme_enabled');
+  } catch (error) {
+    console.error('Failed to get night mode theme enabled:', error);
+    return false; // fallback
+  }
+};
+
+const getNightModeTheme = async (): Promise<string> => {
+  try {
+    return await invoke<string>('get_night_mode_theme');
+  } catch (error) {
+    console.error('Failed to get night mode theme:', error);
+    return 'dark'; // fallback
+  }
+};
+
 // Removed updateLastVisitedPage - feature not implemented
 
 // Removed helper functions for unimplemented features
@@ -165,6 +219,10 @@ export const userPreferencesStore = {
   updateViewScale,
   updateTheme,
   getTheme,
+  updateNightModeThemeEnabled,
+  updateNightModeTheme,
+  getNightModeThemeEnabled,
+  getNightModeTheme,
   initializePreferences,
 
   // Getters
@@ -173,5 +231,11 @@ export const userPreferencesStore = {
   },
   get theme() {
     return userPreferences().ui.theme;
+  },
+  get nightModeThemeEnabled() {
+    return userPreferences().ui.night_mode_theme_enabled;
+  },
+  get nightModeTheme() {
+    return userPreferences().ui.night_mode_theme;
   },
 };
