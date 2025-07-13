@@ -22,6 +22,7 @@ interface TestEffectConfig {
   led_count: number;
   led_type: string;
   speed: number;
+  offset: number;
 }
 
 export const LedStripTest = () => {
@@ -30,12 +31,14 @@ export const LedStripTest = () => {
   const [selectedBoard, setSelectedBoard] = createSignal<BoardInfo | null>(null);
   const [ledCount, setLedCount] = createSignal(60);
   const [ledType, setLedType] = createSignal<'WS2812B' | 'SK6812'>('WS2812B');
+  const [ledOffset, setLedOffset] = createSignal(0);
   const [isRunning, setIsRunning] = createSignal(false);
   const [currentPattern, setCurrentPattern] = createSignal<TestPattern | null>(null);
   const [animationSpeed, setAnimationSpeed] = createSignal(33); // ~30fps
 
   // Temporary input values for better UX
   const [ledCountInput, setLedCountInput] = createSignal('60');
+  const [ledOffsetInput, setLedOffsetInput] = createSignal('0');
   const [animationSpeedInput, setAnimationSpeedInput] = createSignal('33');
 
   // Input handlers for LED count
@@ -88,9 +91,38 @@ export const LedStripTest = () => {
     }
   };
 
+  // Input handlers for LED offset
+  const handleLedOffsetInput = (e: Event) => {
+    const target = e.target as HTMLInputElement;
+    setLedOffsetInput(target.value);
+  };
+
+  const handleLedOffsetBlur = (e: Event) => {
+    const target = e.target as HTMLInputElement;
+    const value = parseInt(target.value);
+    if (!isNaN(value) && value >= 0 && value <= 1000) {
+      setLedOffset(value);
+      setLedOffsetInput(value.toString());
+    } else {
+      // Reset to current valid value
+      setLedOffsetInput(ledOffset().toString());
+      target.value = ledOffset().toString();
+    }
+  };
+
+  const handleLedOffsetKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleLedOffsetBlur(e);
+    }
+  };
+
   // Sync input values with actual values
   createEffect(() => {
     setLedCountInput(ledCount().toString());
+  });
+
+  createEffect(() => {
+    setLedOffsetInput(ledOffset().toString());
   });
 
   createEffect(() => {
@@ -205,7 +237,8 @@ export const LedStripTest = () => {
         effect_type: pattern.effect_type,
         led_count: ledCount(),
         led_type: ledType(),
-        speed: 1.0 / (animationSpeed() / 50) // Convert animation speed to effect speed
+        speed: 1.0 / (animationSpeed() / 50), // Convert animation speed to effect speed
+        offset: ledOffset()
       };
 
       // Start the test effect in Rust backend
@@ -300,7 +333,7 @@ export const LedStripTest = () => {
           </div>
 
           {/* LED Configuration */}
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
             <div class="form-control">
               <label class="label">
                 <span class="label-text">{t('ledTest.ledCount')}</span>
@@ -329,6 +362,22 @@ export const LedStripTest = () => {
                 <option value="WS2812B">WS2812B</option>
                 <option value="SK6812">SK6812</option>
               </select>
+            </div>
+
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text">{t('ledTest.ledOffset')}</span>
+              </label>
+              <input
+                type="number"
+                class="input input-bordered w-full text-center text-lg"
+                value={ledOffsetInput()}
+                min="0"
+                max="1000"
+                onInput={handleLedOffsetInput}
+                onBlur={handleLedOffsetBlur}
+                onKeyDown={handleLedOffsetKeyDown}
+              />
             </div>
 
             <div class="form-control">

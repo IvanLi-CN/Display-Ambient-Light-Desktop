@@ -314,8 +314,11 @@ async fn start_led_test_effect(
                     let elapsed_ms = start_time.elapsed().as_millis() as u64;
                     let colors = LedTestEffects::generate_colors(&effect_config, elapsed_ms);
 
-                    // Send to board
-                    if let Err(e) = send_test_colors_to_board_internal(&board_address, 0, colors).await {
+                    // Calculate byte offset for 0x02 packet
+                    let byte_offset = LedTestEffects::calculate_byte_offset(&effect_config);
+
+                    // Send to board with calculated offset
+                    if let Err(e) = send_test_colors_to_board_internal(&board_address, byte_offset, colors).await {
                         error!("Failed to send test effect colors: {}", e);
                         break;
                     }

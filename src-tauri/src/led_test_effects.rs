@@ -14,7 +14,8 @@ pub struct TestEffectConfig {
     pub effect_type: TestEffectType,
     pub led_count: u32,
     pub led_type: LedType,
-    pub speed: f64, // Speed multiplier
+    pub speed: f64,  // Speed multiplier
+    pub offset: u32, // LED offset
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,6 +58,16 @@ impl LedTestEffects {
                 config.speed,
             ),
         }
+    }
+
+    /// Calculate byte offset for 0x02 packet based on LED offset and LED type
+    pub fn calculate_byte_offset(config: &TestEffectConfig) -> u16 {
+        let bytes_per_led = if Self::is_rgbw_type(&config.led_type) {
+            4
+        } else {
+            3
+        };
+        (config.offset * bytes_per_led) as u16
     }
 
     /// Flowing rainbow effect - smooth rainbow colors flowing along the strip
@@ -221,10 +232,50 @@ mod tests {
             led_count: 10,
             led_type: LedType::WS2812B,
             speed: 1.0,
+            offset: 0,
         };
 
         let colors = LedTestEffects::generate_colors(&config, 0);
         assert_eq!(colors.len(), 30); // 10 LEDs * 3 bytes each
+    }
+
+    #[test]
+    fn test_calculate_byte_offset() {
+        // Test WS2812B (3 bytes per LED)
+        let config_ws2812b = TestEffectConfig {
+            effect_type: TestEffectType::GroupCounting,
+            led_count: 60,
+            led_type: LedType::WS2812B,
+            speed: 1.0,
+            offset: 10, // 10 LEDs offset
+        };
+
+        let byte_offset_ws2812b = LedTestEffects::calculate_byte_offset(&config_ws2812b);
+        assert_eq!(byte_offset_ws2812b, 30); // 10 LEDs * 3 bytes = 30 bytes
+
+        // Test SK6812 (4 bytes per LED)
+        let config_sk6812 = TestEffectConfig {
+            effect_type: TestEffectType::GroupCounting,
+            led_count: 60,
+            led_type: LedType::SK6812,
+            speed: 1.0,
+            offset: 10, // 10 LEDs offset
+        };
+
+        let byte_offset_sk6812 = LedTestEffects::calculate_byte_offset(&config_sk6812);
+        assert_eq!(byte_offset_sk6812, 40); // 10 LEDs * 4 bytes = 40 bytes
+
+        // Test zero offset
+        let config_zero_offset = TestEffectConfig {
+            effect_type: TestEffectType::GroupCounting,
+            led_count: 60,
+            led_type: LedType::WS2812B,
+            speed: 1.0,
+            offset: 0,
+        };
+
+        let byte_offset_zero = LedTestEffects::calculate_byte_offset(&config_zero_offset);
+        assert_eq!(byte_offset_zero, 0); // 0 LEDs * 3 bytes = 0 bytes
     }
 
     #[test]
@@ -234,6 +285,7 @@ mod tests {
             led_count: 20,
             led_type: LedType::WS2812B,
             speed: 1.0,
+            offset: 0,
         };
 
         let colors = LedTestEffects::generate_colors(&config, 0);

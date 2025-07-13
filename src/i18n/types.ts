@@ -218,6 +218,7 @@ export interface TranslationDict {
     // LED test form labels
     ledCount: string;
     ledType: string;
+    ledOffset: string;
     animationSpeed: string;
     startTestButton: string;
     // Hardware selection

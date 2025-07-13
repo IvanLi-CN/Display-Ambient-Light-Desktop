@@ -211,6 +211,7 @@ export const enUS: TranslationDict = {
     // LED test form labels
     ledCount: 'LED Count',
     ledType: 'LED Type',
+    ledOffset: 'LED Offset',
     animationSpeed: 'Animation Speed (ms)',
     startTestButton: 'Start Test',
     // Hardware selection
