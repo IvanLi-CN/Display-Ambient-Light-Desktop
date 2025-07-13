@@ -3,7 +3,6 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use paris::warn;
 use tauri::async_runtime::RwLock;
 use tokio::{
-    net::UdpSocket,
     sync::{broadcast, watch},
     time::sleep,
 };
@@ -95,17 +94,32 @@ impl LedColorsPublisher {
                     state_manager.is_enabled().await
                 };
 
+                log::debug!(
+                    "Display #{}: test_mode_active={}, ambient_light_enabled={}, colors_count={}",
+                    display_id,
+                    test_mode_active,
+                    ambient_light_enabled,
+                    colors.len()
+                );
+
                 if !test_mode_active && ambient_light_enabled {
                     match Self::send_colors_by_display(colors, mappers, &strips, &color_calibration)
                         .await
                     {
                         Ok(_) => {
-                            // log::info!("sent colors: #{: >15}", display_id);
+                            log::info!("Successfully sent colors for display #{}", display_id);
                         }
                         Err(err) => {
                             warn!("Failed to send colors:  #{: >15}\t{}", display_id, err);
                         }
                     }
+                } else {
+                    log::debug!(
+                        "Skipping color send for display #{}: test_mode={}, enabled={}",
+                        display_id,
+                        test_mode_active,
+                        ambient_light_enabled
+                    );
                 }
 
                 match display_colors_tx.send((
@@ -275,16 +289,20 @@ impl LedColorsPublisher {
     }
 
     pub async fn send_colors(offset: u16, mut payload: Vec<u8>) -> anyhow::Result<()> {
-        // let mqtt = MqttRpc::global().await;
+        // Use UdpRpc to send to all discovered devices instead of hardcoded IP
+        let udp_rpc = UdpRpc::global().await;
+        if let Err(err) = udp_rpc {
+            warn!("udp_rpc can not be initialized: {}", err);
+            return Err(anyhow::anyhow!("UDP RPC not available: {}", err));
+        }
+        let udp_rpc = udp_rpc.as_ref().unwrap();
 
-        // mqtt.publish_led_sub_pixels(payload).await;
-
-        let socket = UdpSocket::bind("0.0.0.0:8000").await?;
         let mut buffer = vec![2];
         buffer.push((offset >> 8) as u8);
         buffer.push((offset & 0xff) as u8);
         buffer.append(&mut payload);
-        socket.send_to(&buffer, "192.168.31.206:23042").await?;
+
+        udp_rpc.send_to_all(&buffer).await?;
         Ok(())
     }
 
@@ -305,6 +323,7 @@ impl LedColorsPublisher {
         let udp_rpc = UdpRpc::global().await;
         if let Err(err) = udp_rpc {
             warn!("udp_rpc can not be initialized: {}", err);
+            return Err(anyhow::anyhow!("UDP RPC not available: {}", err));
         }
         let udp_rpc = udp_rpc.as_ref().unwrap();
 

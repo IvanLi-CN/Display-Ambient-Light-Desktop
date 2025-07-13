@@ -235,13 +235,35 @@ impl Board {
 
     pub async fn send_colors(&self, buf: &[u8]) {
         let info = self.info.read().await;
-        if self.socket.is_none() || info.connect_status != BoardConnectStatus::Connected {
+        if self.socket.is_none() {
+            log::debug!("Board {}: socket is None, skipping color send", info.host);
+            return;
+        }
+
+        if info.connect_status != BoardConnectStatus::Connected {
+            log::debug!(
+                "Board {}: not connected (status: {:?}), skipping color send",
+                info.host,
+                info.connect_status
+            );
             return;
         }
 
         let socket = self.socket.as_ref().unwrap();
+        log::debug!("Sending {} bytes to board {}", buf.len(), info.host);
 
-        socket.send(buf).await.unwrap();
+        match socket.send(buf).await {
+            Ok(bytes_sent) => {
+                log::debug!(
+                    "Successfully sent {} bytes to board {}",
+                    bytes_sent,
+                    info.host
+                );
+            }
+            Err(err) => {
+                error!("Failed to send colors to board {}: {}", info.host, err);
+            }
+        }
     }
 
     pub async fn check(&self) -> anyhow::Result<()> {

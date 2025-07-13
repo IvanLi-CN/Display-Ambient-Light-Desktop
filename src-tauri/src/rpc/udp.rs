@@ -151,32 +151,16 @@ impl UdpRpc {
     pub async fn send_to_all(&self, buff: &Vec<u8>) -> anyhow::Result<()> {
         let boards = self.boards.read().await;
 
+        if boards.is_empty() {
+            log::debug!("No boards available to send colors to");
+            return Ok(());
+        }
+
+        log::debug!("Sending {} bytes to {} boards", buff.len(), boards.len());
+
         for board in boards.values() {
             board.send_colors(buff).await;
         }
-
-        // let socket = self.socket.clone();
-
-        // let handlers = boards.into_iter().map(|board| {
-        //     if board.connect_status == BoardConnectStatus::Disconnected {
-        //         return tokio::spawn(async move {
-        //             log::debug!("board {} is disconnected, skip.", board.host);
-        //         });
-        //     }
-
-        //     let socket = socket.clone();
-        //     let buff = buff.clone();
-        //     tokio::spawn(async move {
-        //         match socket.send_to(&buff, (board.address, board.port)).await {
-        //             Ok(_) => {}
-        //             Err(err) => {
-        //                 error!("failed to send to {}: {:?}", board.host, err);
-        //             }
-        //         }
-        //     })
-        // });
-
-        // join_all(handlers).await;
 
         Ok(())
     }

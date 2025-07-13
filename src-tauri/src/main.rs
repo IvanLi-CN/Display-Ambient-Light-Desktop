@@ -1066,15 +1066,19 @@ async fn main() {
     // Initialize display info (removed debug output)
 
     tokio::spawn(async move {
+        info!("🖥️ Starting screenshot manager...");
         let screenshot_manager = ScreenshotManager::global().await;
         screenshot_manager.start().await.unwrap_or_else(|e| {
             error!("can not start screenshot manager: {}", e);
-        })
+        });
+        info!("✅ Screenshot manager started successfully");
     });
 
     tokio::spawn(async move {
+        info!("💡 Starting LED color publisher...");
         let led_color_publisher = ambient_light::LedColorsPublisher::global().await;
         led_color_publisher.start().await;
+        info!("✅ LED color publisher started successfully");
     });
 
     // Start WebSocket server for screen streaming
