@@ -1,4 +1,4 @@
-import { createSignal, For, onMount, onCleanup, createEffect } from 'solid-js';
+import { createSignal, For, onMount, onCleanup } from 'solid-js';
 import { themeStore, DaisyUITheme, AVAILABLE_THEMES } from '../../stores/theme.store';
 import { useLanguage } from '../../i18n/index';
 import { userPreferencesStore } from '../../stores/user-preferences.store';
@@ -58,49 +58,104 @@ const DARK_THEMES: DaisyUITheme[] = [
   'dracula', 'business', 'night', 'coffee', 'dim', 'abyss'
 ];
 
-// 获取主题颜色的工具函数
-const getThemeColors = (theme: DaisyUITheme): { primary: string; secondary: string; accent: string } => {
-  // 创建一个临时元素来获取主题颜色
-  const tempDiv = document.createElement('div');
-  tempDiv.setAttribute('data-theme', theme);
-  tempDiv.style.position = 'absolute';
-  tempDiv.style.visibility = 'hidden';
-  tempDiv.style.pointerEvents = 'none';
+// 获取主题颜色的工具函数 - 使用临时隐藏元素
+const getThemeColors = (theme: DaisyUITheme): { primary: string; secondary: string; accent: string; base100: string; base200: string } => {
+  // 创建一个临时的隐藏容器
+  const tempContainer = document.createElement('div');
+  tempContainer.setAttribute('data-theme', theme);
+  tempContainer.style.position = 'absolute';
+  tempContainer.style.left = '-9999px';
+  tempContainer.style.visibility = 'hidden';
+  tempContainer.style.pointerEvents = 'none';
 
-  // 添加到DOM中以获取计算样式
-  document.body.appendChild(tempDiv);
-
-  // 创建子元素来获取颜色
+  // 创建颜色测试元素
   const primaryEl = document.createElement('div');
   primaryEl.className = 'bg-primary';
   const secondaryEl = document.createElement('div');
   secondaryEl.className = 'bg-secondary';
   const accentEl = document.createElement('div');
   accentEl.className = 'bg-accent';
+  const base100El = document.createElement('div');
+  base100El.className = 'bg-base-100';
+  const base200El = document.createElement('div');
+  base200El.className = 'bg-base-200';
 
-  tempDiv.appendChild(primaryEl);
-  tempDiv.appendChild(secondaryEl);
-  tempDiv.appendChild(accentEl);
+  tempContainer.appendChild(primaryEl);
+  tempContainer.appendChild(secondaryEl);
+  tempContainer.appendChild(accentEl);
+  tempContainer.appendChild(base100El);
+  tempContainer.appendChild(base200El);
 
-  // 获取计算样式
+  // 添加到body获取计算样式
+  document.body.appendChild(tempContainer);
+
   const primaryColor = getComputedStyle(primaryEl).backgroundColor;
   const secondaryColor = getComputedStyle(secondaryEl).backgroundColor;
   const accentColor = getComputedStyle(accentEl).backgroundColor;
+  const base100Color = getComputedStyle(base100El).backgroundColor;
+  const base200Color = getComputedStyle(base200El).backgroundColor;
 
-  // 清理DOM
-  document.body.removeChild(tempDiv);
+  // 立即清理
+  document.body.removeChild(tempContainer);
 
   return {
     primary: primaryColor,
     secondary: secondaryColor,
-    accent: accentColor
+    accent: accentColor,
+    base100: base100Color,
+    base200: base200Color
   };
+};
+
+// 主题颜色预览组件
+const ThemeColorPreview = (props: { theme: DaisyUITheme; size?: 'sm' | 'md' }) => {
+  const [colors, setColors] = createSignal<{ primary: string; secondary: string; accent: string; base100: string; base200: string } | null>(null);
+  const size = props.size || 'md';
+  const dotSize = size === 'sm' ? 'w-1.5 h-1.5' : 'w-2 h-2';
+  const containerHeight = size === 'sm' ? 'h-6' : 'h-8';
+  const containerPadding = size === 'sm' ? 'p-1' : 'p-1.5';
+
+  onMount(() => {
+    // 延迟获取颜色，避免阻塞渲染
+    setTimeout(() => {
+      const themeColors = getThemeColors(props.theme);
+      setColors(themeColors);
+    }, 0);
+  });
+
+  return (
+    <div
+      class={`flex items-center gap-1 flex-shrink-0 ${containerPadding} ${containerHeight} rounded-md border border-base-300/50`}
+      style={{ 'background-color': colors()?.base100 || 'hsl(var(--b1))' }}
+    >
+      {/* 背景色条 */}
+      <div
+        class="w-1 h-full rounded-sm flex-shrink-0"
+        style={{ 'background-color': colors()?.base200 || 'hsl(var(--b2))' }}
+      ></div>
+
+      {/* 主题色圆点 */}
+      <div class="flex gap-0.5">
+        <div
+          class={`${dotSize} rounded-full`}
+          style={{ 'background-color': colors()?.primary || 'hsl(var(--p))' }}
+        ></div>
+        <div
+          class={`${dotSize} rounded-full`}
+          style={{ 'background-color': colors()?.secondary || 'hsl(var(--s))' }}
+        ></div>
+        <div
+          class={`${dotSize} rounded-full`}
+          style={{ 'background-color': colors()?.accent || 'hsl(var(--a))' }}
+        ></div>
+      </div>
+    </div>
+  );
 };
 
 export const ThemeSelector = () => {
   const { t } = useLanguage();
   const [isOpen, setIsOpen] = createSignal(false);
-  const [themeColors, setThemeColors] = createSignal<Record<DaisyUITheme, { primary: string; secondary: string; accent: string }>>({} as any);
   const [nightModeEnabled, setNightModeEnabled] = createSignal(false);
   const [nightModeTheme, setNightModeTheme] = createSignal<DaisyUITheme>('dark');
   const [isNightModeOpen, setIsNightModeOpen] = createSignal(false);
@@ -164,14 +219,7 @@ export const ThemeSelector = () => {
     }
   };
 
-  // 预加载所有主题颜色
-  const preloadThemeColors = () => {
-    const colors: Record<DaisyUITheme, { primary: string; secondary: string; accent: string }> = {} as any;
-    AVAILABLE_THEMES.forEach(theme => {
-      colors[theme] = getThemeColors(theme);
-    });
-    setThemeColors(colors);
-  };
+
 
   // 初始化夜间模式设置
   const initializeNightModeSettings = async () => {
@@ -189,8 +237,6 @@ export const ThemeSelector = () => {
 
   onMount(() => {
     document.addEventListener('click', handleClickOutside);
-    // 延迟预加载颜色，避免阻塞初始渲染
-    setTimeout(preloadThemeColors, 100);
     // 初始化夜间模式设置
     initializeNightModeSettings();
   });
@@ -244,43 +290,26 @@ export const ThemeSelector = () => {
                   {t('settings.lightThemes')}
                 </div>
                 <For each={LIGHT_THEMES}>
-                  {(theme) => {
-                    const colors = () => themeColors()[theme];
-                    return (
-                      <button
-                        class={`w-full flex items-center gap-3 p-2 rounded-lg hover:bg-base-200 transition-colors ${themeStore.currentTheme() === theme ? 'bg-primary/10 text-primary' : ''
-                          }`}
-                        data-theme={theme}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleThemeChange(theme);
-                        }}
-                      >
-                        <div class="flex gap-1 flex-shrink-0">
-                          <div
-                            class="w-2 h-2 rounded-full opacity-80"
-                            style={{ 'background-color': colors()?.primary || 'hsl(var(--p))' }}
-                          ></div>
-                          <div
-                            class="w-2 h-2 rounded-full opacity-80"
-                            style={{ 'background-color': colors()?.secondary || 'hsl(var(--s))' }}
-                          ></div>
-                          <div
-                            class="w-2 h-2 rounded-full opacity-80"
-                            style={{ 'background-color': colors()?.accent || 'hsl(var(--a))' }}
-                          ></div>
-                        </div>
-                        <div class="flex-1 text-left">
-                          <div class="font-medium">{getThemeDisplayName(theme, t)}</div>
-                        </div>
-                        {themeStore.currentTheme() === theme && (
-                          <svg class="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                          </svg>
-                        )}
-                      </button>
-                    );
-                  }}
+                  {(theme) => (
+                    <button
+                      class={`w-full flex items-center gap-3 p-2 rounded-lg hover:bg-base-200 transition-colors ${themeStore.currentTheme() === theme ? 'ring-2 ring-primary ring-offset-2 ring-offset-base-100' : ''
+                        }`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleThemeChange(theme);
+                      }}
+                    >
+                      <ThemeColorPreview theme={theme} />
+                      <div class="flex-1 text-left">
+                        <div class="font-medium text-base-content">{getThemeDisplayName(theme, t)}</div>
+                      </div>
+                      {themeStore.currentTheme() === theme && (
+                        <svg class="w-4 h-4 text-primary flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                        </svg>
+                      )}
+                    </button>
+                  )}
                 </For>
               </div>
 
@@ -293,43 +322,26 @@ export const ThemeSelector = () => {
                   {t('settings.darkThemes')}
                 </div>
                 <For each={DARK_THEMES}>
-                  {(theme) => {
-                    const colors = () => themeColors()[theme];
-                    return (
-                      <button
-                        class={`w-full flex items-center gap-3 p-2 rounded-lg hover:bg-base-200 transition-colors ${themeStore.currentTheme() === theme ? 'bg-primary/10 text-primary' : ''
-                          }`}
-                        data-theme={theme}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleThemeChange(theme);
-                        }}
-                      >
-                        <div class="flex gap-1 flex-shrink-0">
-                          <div
-                            class="w-2 h-2 rounded-full opacity-80"
-                            style={{ 'background-color': colors()?.primary || 'hsl(var(--p))' }}
-                          ></div>
-                          <div
-                            class="w-2 h-2 rounded-full opacity-80"
-                            style={{ 'background-color': colors()?.secondary || 'hsl(var(--s))' }}
-                          ></div>
-                          <div
-                            class="w-2 h-2 rounded-full opacity-80"
-                            style={{ 'background-color': colors()?.accent || 'hsl(var(--a))' }}
-                          ></div>
-                        </div>
-                        <div class="flex-1 text-left">
-                          <div class="font-medium">{getThemeDisplayName(theme, t)}</div>
-                        </div>
-                        {themeStore.currentTheme() === theme && (
-                          <svg class="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                          </svg>
-                        )}
-                      </button>
-                    );
-                  }}
+                  {(theme) => (
+                    <button
+                      class={`w-full flex items-center gap-3 p-2 rounded-lg hover:bg-base-200 transition-colors ${themeStore.currentTheme() === theme ? 'ring-2 ring-primary ring-offset-2 ring-offset-base-100' : ''
+                        }`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleThemeChange(theme);
+                      }}
+                    >
+                      <ThemeColorPreview theme={theme} />
+                      <div class="flex-1 text-left">
+                        <div class="font-medium text-base-content">{getThemeDisplayName(theme, t)}</div>
+                      </div>
+                      {themeStore.currentTheme() === theme && (
+                        <svg class="w-4 h-4 text-primary flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                        </svg>
+                      )}
+                    </button>
+                  )}
                 </For>
               </div>
             </div>
@@ -396,43 +408,26 @@ export const ThemeSelector = () => {
                       {t('settings.lightThemes')}
                     </div>
                     <For each={LIGHT_THEMES}>
-                      {(theme) => {
-                        const colors = () => themeColors()[theme];
-                        return (
-                          <button
-                            class={`w-full flex items-center gap-2 p-2 rounded-lg hover:bg-base-200 transition-colors text-sm ${nightModeTheme() === theme ? 'bg-primary/10 text-primary' : ''
-                              }`}
-                            data-theme={theme}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleNightModeThemeChange(theme);
-                            }}
-                          >
-                            <div class="flex gap-1 flex-shrink-0">
-                              <div
-                                class="w-1.5 h-1.5 rounded-full opacity-80"
-                                style={{ 'background-color': colors()?.primary || 'hsl(var(--p))' }}
-                              ></div>
-                              <div
-                                class="w-1.5 h-1.5 rounded-full opacity-80"
-                                style={{ 'background-color': colors()?.secondary || 'hsl(var(--s))' }}
-                              ></div>
-                              <div
-                                class="w-1.5 h-1.5 rounded-full opacity-80"
-                                style={{ 'background-color': colors()?.accent || 'hsl(var(--a))' }}
-                              ></div>
-                            </div>
-                            <div class="flex-1 text-left">
-                              <div class="font-medium">{getThemeDisplayName(theme, t)}</div>
-                            </div>
-                            {nightModeTheme() === theme && (
-                              <svg class="w-3 h-3 text-primary" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                              </svg>
-                            )}
-                          </button>
-                        );
-                      }}
+                      {(theme) => (
+                        <button
+                          class={`w-full flex items-center gap-2 p-2 rounded-lg hover:bg-base-200 transition-colors text-sm ${nightModeTheme() === theme ? 'ring-2 ring-primary ring-offset-1 ring-offset-base-100' : ''
+                            }`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleNightModeThemeChange(theme);
+                          }}
+                        >
+                          <ThemeColorPreview theme={theme} size="sm" />
+                          <div class="flex-1 text-left">
+                            <div class="font-medium text-base-content">{getThemeDisplayName(theme, t)}</div>
+                          </div>
+                          {nightModeTheme() === theme && (
+                            <svg class="w-3 h-3 text-primary flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                            </svg>
+                          )}
+                        </button>
+                      )}
                     </For>
                   </div>
 
@@ -445,43 +440,26 @@ export const ThemeSelector = () => {
                       {t('settings.darkThemes')}
                     </div>
                     <For each={DARK_THEMES}>
-                      {(theme) => {
-                        const colors = () => themeColors()[theme];
-                        return (
-                          <button
-                            class={`w-full flex items-center gap-2 p-2 rounded-lg hover:bg-base-200 transition-colors text-sm ${nightModeTheme() === theme ? 'bg-primary/10 text-primary' : ''
-                              }`}
-                            data-theme={theme}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleNightModeThemeChange(theme);
-                            }}
-                          >
-                            <div class="flex gap-1 flex-shrink-0">
-                              <div
-                                class="w-1.5 h-1.5 rounded-full opacity-80"
-                                style={{ 'background-color': colors()?.primary || 'hsl(var(--p))' }}
-                              ></div>
-                              <div
-                                class="w-1.5 h-1.5 rounded-full opacity-80"
-                                style={{ 'background-color': colors()?.secondary || 'hsl(var(--s))' }}
-                              ></div>
-                              <div
-                                class="w-1.5 h-1.5 rounded-full opacity-80"
-                                style={{ 'background-color': colors()?.accent || 'hsl(var(--a))' }}
-                              ></div>
-                            </div>
-                            <div class="flex-1 text-left">
-                              <div class="font-medium">{getThemeDisplayName(theme, t)}</div>
-                            </div>
-                            {nightModeTheme() === theme && (
-                              <svg class="w-3 h-3 text-primary" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                              </svg>
-                            )}
-                          </button>
-                        );
-                      }}
+                      {(theme) => (
+                        <button
+                          class={`w-full flex items-center gap-2 p-2 rounded-lg hover:bg-base-200 transition-colors text-sm ${nightModeTheme() === theme ? 'ring-2 ring-primary ring-offset-1 ring-offset-base-100' : ''
+                            }`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleNightModeThemeChange(theme);
+                          }}
+                        >
+                          <ThemeColorPreview theme={theme} size="sm" />
+                          <div class="flex-1 text-left">
+                            <div class="font-medium text-base-content">{getThemeDisplayName(theme, t)}</div>
+                          </div>
+                          {nightModeTheme() === theme && (
+                            <svg class="w-3 h-3 text-primary flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                            </svg>
+                          )}
+                        </button>
+                      )}
                     </For>
                   </div>
                 </div>
