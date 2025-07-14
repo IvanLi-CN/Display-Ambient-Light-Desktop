@@ -42,6 +42,17 @@ impl LedTestEffects {
             }
         }
     }
+
+    /// Convert RGBW buffer to GRBW for SK6812-RGBW
+    fn convert_rgbw_to_grbw(buffer: &mut Vec<u8>) {
+        let bytes_per_led = 4; // RGBW
+        for i in (0..buffer.len()).step_by(bytes_per_led) {
+            if i + 3 < buffer.len() {
+                // Swap R and G: [R, G, B, W] -> [G, R, B, W]
+                buffer.swap(i, i + 1);
+            }
+        }
+    }
     /// Generate LED colors for a specific test effect at a given time
     pub fn generate_colors(config: &TestEffectConfig, time_ms: u64) -> Vec<u8> {
         let time_seconds = time_ms as f64 / 1000.0;
@@ -70,9 +81,14 @@ impl LedTestEffects {
             ),
         };
 
-        // Convert RGB to correct color order for WS2812B (GRB)
-        if matches!(config.led_type, LedType::WS2812B) {
-            Self::convert_rgb_to_grb(&mut buffer);
+        // Convert RGB to correct color order based on LED type
+        match config.led_type {
+            LedType::WS2812B => {
+                Self::convert_rgb_to_grb(&mut buffer);
+            }
+            LedType::SK6812 => {
+                Self::convert_rgbw_to_grbw(&mut buffer);
+            }
         }
 
         buffer

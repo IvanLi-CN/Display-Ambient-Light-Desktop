@@ -78,6 +78,12 @@ impl LedColorsPublisher {
                 let screenshot = screenshot_rx.borrow().clone();
                 let colors = screenshot.get_colors_by_sample_points(&sample_points).await;
 
+                log::info!(
+                    "🖼️ Got screenshot for display #{}, extracted {} colors",
+                    display_id,
+                    colors.len()
+                );
+
                 let colors_copy = colors.clone();
 
                 let mappers = mappers.clone();
@@ -94,7 +100,7 @@ impl LedColorsPublisher {
                     state_manager.is_enabled().await
                 };
 
-                log::debug!(
+                log::info!(
                     "Display #{}: test_mode_active={}, ambient_light_enabled={}, colors_count={}",
                     display_id,
                     test_mode_active,
@@ -114,7 +120,7 @@ impl LedColorsPublisher {
                         }
                     }
                 } else {
-                    log::debug!(
+                    log::info!(
                         "Skipping color send for display #{}: test_mode={}, enabled={}",
                         display_id,
                         test_mode_active,
@@ -327,8 +333,24 @@ impl LedColorsPublisher {
         }
         let udp_rpc = udp_rpc.as_ref().unwrap();
 
+        log::info!(
+            "Starting LED data send for display: colors_count={}, mappers_count={}",
+            colors.len(),
+            mappers.len()
+        );
+
         // let socket = UdpSocket::bind("0.0.0.0:0").await?;
         for (group_index, group) in mappers.clone().iter().enumerate() {
+            log::info!(
+                "Processing LED group {}: start={}, end={}, pos={}, strip_len={}, display_led_offset={}",
+                group_index,
+                group.start,
+                group.end,
+                group.pos,
+                group.start.abs_diff(group.end),
+                display_led_offset
+            );
+
             if (group.start.abs_diff(group.end)) > colors.len() {
                 return Err(anyhow::anyhow!(
                     "get_sorted_colors: color_index out of range. color_index: {}, strip len: {}, colors.len(): {}",
@@ -367,6 +389,14 @@ impl LedColorsPublisher {
                     0
                 };
 
+                log::info!(
+                    "Forward group {}: start_index={}, end_index={}, colors.len()={}",
+                    group_index,
+                    start_index,
+                    end_index,
+                    colors.len()
+                );
+
                 for i in start_index..end_index {
                     if i < colors.len() {
                         let bytes = match led_type {
@@ -386,14 +416,14 @@ impl LedColorsPublisher {
                             LedType::SK6812 => {
                                 let calibration_bytes = color_calibration.to_bytes_rgbw();
                                 let color_bytes = colors[i].as_bytes();
-                                // Apply calibration to RGB values and use calibrated W
+                                // Apply calibration and convert RGB to GRBW for SK6812-RGBW
                                 vec![
-                                    ((color_bytes[0] as f32 * calibration_bytes[0] as f32 / 255.0)
-                                        as u8),
                                     ((color_bytes[1] as f32 * calibration_bytes[1] as f32 / 255.0)
-                                        as u8),
+                                        as u8), // G (Green)
+                                    ((color_bytes[0] as f32 * calibration_bytes[0] as f32 / 255.0)
+                                        as u8), // R (Red)
                                     ((color_bytes[2] as f32 * calibration_bytes[2] as f32 / 255.0)
-                                        as u8),
+                                        as u8), // B (Blue)
                                     calibration_bytes[3], // W channel
                                 ]
                             }
@@ -425,6 +455,14 @@ impl LedColorsPublisher {
                     0
                 };
 
+                log::info!(
+                    "Reverse group {}: start_index={}, end_index={}, colors.len()={}",
+                    group_index,
+                    start_index,
+                    end_index,
+                    colors.len()
+                );
+
                 for i in (start_index..end_index).rev() {
                     if i < colors.len() {
                         let bytes = match led_type {
@@ -444,14 +482,14 @@ impl LedColorsPublisher {
                             LedType::SK6812 => {
                                 let calibration_bytes = color_calibration.to_bytes_rgbw();
                                 let color_bytes = colors[i].as_bytes();
-                                // Apply calibration to RGB values and use calibrated W
+                                // Apply calibration and convert RGB to GRBW for SK6812-RGBW
                                 vec![
-                                    ((color_bytes[0] as f32 * calibration_bytes[0] as f32 / 255.0)
-                                        as u8),
                                     ((color_bytes[1] as f32 * calibration_bytes[1] as f32 / 255.0)
-                                        as u8),
+                                        as u8), // G (Green)
+                                    ((color_bytes[0] as f32 * calibration_bytes[0] as f32 / 255.0)
+                                        as u8), // R (Red)
                                     ((color_bytes[2] as f32 * calibration_bytes[2] as f32 / 255.0)
-                                        as u8),
+                                        as u8), // B (Blue)
                                     calibration_bytes[3], // W channel
                                 ]
                             }
@@ -480,7 +518,42 @@ impl LedColorsPublisher {
             tx_buffer.push((byte_offset & 0xff) as u8);
             tx_buffer.append(&mut buffer);
 
-            udp_rpc.send_to_all(&tx_buffer).await?;
+            log::info!(
+                "Sending LED data: group_index={}, led_offset={}, byte_offset={}, buffer_size={}, tx_buffer_size={}",
+                group_index,
+                led_offset,
+                byte_offset,
+                buffer.len(),
+                tx_buffer.len()
+            );
+
+            log::info!(
+                "📤 Attempting to send LED data for group {}: {} bytes",
+                group_index,
+                tx_buffer.len()
+            );
+
+            match udp_rpc.send_to_all(&tx_buffer).await {
+                Ok(_) => {
+                    log::info!(
+                        "✅ Successfully sent LED data for group {} ({} bytes)",
+                        group_index,
+                        tx_buffer.len()
+                    );
+                }
+                Err(e) => {
+                    log::error!(
+                        "❌ Failed to send LED data for group {}: {} (buffer size: {} bytes)",
+                        group_index,
+                        e,
+                        tx_buffer.len()
+                    );
+                    // Continue with next group instead of returning error
+                }
+            }
+
+            // Add a small delay between packets to avoid overwhelming the network
+            tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
         }
 
         Ok(())
