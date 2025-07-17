@@ -1,7 +1,5 @@
 use std::env::current_dir;
 
-use display_info::DisplayInfo;
-use paris::{error, info};
 use serde::{Deserialize, Serialize};
 
 use crate::screenshot::LedSamplePoints;
@@ -39,6 +37,19 @@ pub struct LedStripConfig {
     pub led_type: LedType,
 }
 
+impl LedStripConfig {
+    pub fn default_for_display(display_id: u32, index: usize) -> Self {
+        Self {
+            index,
+            display_id,
+            border: Border::Top,
+            start_pos: 0,
+            len: 0, // Default to 0 length
+            led_type: LedType::WS2812B,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Serialize, Deserialize, Debug)]
 pub struct ColorCalibration {
     r: f32,
@@ -53,6 +64,15 @@ fn default_w_value() -> f32 {
 }
 
 impl ColorCalibration {
+    pub fn new() -> Self {
+        Self {
+            r: 1.0,
+            g: 1.0,
+            b: 1.0,
+            w: 1.0,
+        }
+    }
+
     pub fn to_bytes(&self) -> [u8; 3] {
         [
             (self.r * 255.0) as u8,
@@ -80,32 +100,37 @@ pub struct LedStripConfigGroup {
 
 impl LedStripConfigGroup {
     pub async fn read_config() -> anyhow::Result<Self> {
-        let displays = DisplayInfo::all()?;
+        log::info!("📖 Reading LED strip configuration...");
 
         // config path
         let path = dirs::config_dir()
             .unwrap_or(current_dir().unwrap())
             .join(CONFIG_FILE_NAME);
 
+        log::info!("📁 Config file path: {:?}", path);
+
         let exists = tokio::fs::try_exists(path.clone())
             .await
             .map_err(|e| anyhow::anyhow!("Failed to check config file exists: {}", e))?;
 
         if exists {
+            log::info!("📄 Config file exists, reading...");
             let config = tokio::fs::read_to_string(path).await?;
 
-            let mut config: LedStripConfigGroup = toml::from_str(&config)
+            let config: LedStripConfigGroup = toml::from_str(&config)
                 .map_err(|e| anyhow::anyhow!("Failed to parse config file: {}", e))?;
 
-            for strip in config.strips.iter_mut() {
-                strip.display_id = displays[strip.index / 4].id;
-            }
+            // Defer display detection to avoid blocking during initialization
+            log::info!("⏳ Deferring display ID assignment to avoid blocking...");
 
-            // log::info!("config loaded: {:?}", config);
+            log::info!(
+                "✅ Successfully loaded config with {} strips",
+                config.strips.len()
+            );
 
             Ok(config)
         } else {
-            info!("config file not exist, fallback to default config");
+            log::info!("📄 Config file not exist, fallback to default config");
             Ok(Self::get_default_config().await?)
         }
     }
@@ -129,19 +154,19 @@ impl LedStripConfigGroup {
     }
 
     pub async fn get_default_config() -> anyhow::Result<Self> {
-        let displays = display_info::DisplayInfo::all().map_err(|e| {
-            error!("can not list display info: {}", e);
-            anyhow::anyhow!("can not list display info: {}", e)
-        })?;
+        log::info!("🔧 Creating default LED strip configuration...");
 
+        // Create a minimal default configuration without display detection
+        // Display IDs will be assigned later when needed
         let mut strips = Vec::new();
         let mut mappers = Vec::new();
-        for (i, display) in displays.iter().enumerate() {
-            let mut configs = Vec::new();
+
+        // Create default configuration for 2 displays (common setup)
+        for i in 0..2 {
             for j in 0..4 {
                 let item = LedStripConfig {
                     index: j + i * 4,
-                    display_id: display.id,
+                    display_id: 0, // Will be assigned later
                     border: match j {
                         0 => Border::Top,
                         1 => Border::Bottom,
@@ -153,7 +178,6 @@ impl LedStripConfigGroup {
                     len: 30,
                     led_type: LedType::WS2812B,
                 };
-                configs.push(item);
                 strips.push(item);
                 mappers.push(SamplePointMapper {
                     start: (j + i * 4) * 30,
@@ -162,17 +186,10 @@ impl LedStripConfigGroup {
                 })
             }
         }
-        let color_calibration = ColorCalibration {
-            r: 1.0,
-            g: 1.0,
-            b: 1.0,
-            w: 1.0,
-        };
-
         Ok(Self {
             strips,
             mappers,
-            color_calibration,
+            color_calibration: ColorCalibration::new(),
         })
     }
 }

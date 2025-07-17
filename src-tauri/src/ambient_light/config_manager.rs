@@ -17,20 +17,30 @@ impl ConfigManager {
         static CONFIG_MANAGER_GLOBAL: OnceCell<ConfigManager> = OnceCell::const_new();
         CONFIG_MANAGER_GLOBAL
             .get_or_init(|| async {
-                let configs = LedStripConfigGroup::read_config().await.unwrap();
-                let (config_update_sender, config_update_receiver) =
-                    tokio::sync::watch::channel(configs.clone());
+                log::info!("🔧 Initializing ConfigManager...");
 
-                if let Err(err) = config_update_sender.send(configs.clone()) {
-                    log::error!(
-                        "Failed to send config update when read config first time: {}",
-                        err
-                    );
-                }
-                drop(config_update_receiver);
-                ConfigManager {
-                    config: Arc::new(RwLock::new(configs)),
-                    config_update_sender,
+                match LedStripConfigGroup::read_config().await {
+                    Ok(configs) => {
+                        log::info!("✅ Successfully loaded LED strip configuration");
+                        let (config_update_sender, config_update_receiver) =
+                            tokio::sync::watch::channel(configs.clone());
+
+                        if let Err(err) = config_update_sender.send(configs.clone()) {
+                            log::error!(
+                                "Failed to send config update when read config first time: {}",
+                                err
+                            );
+                        }
+                        drop(config_update_receiver);
+                        ConfigManager {
+                            config: Arc::new(RwLock::new(configs)),
+                            config_update_sender,
+                        }
+                    }
+                    Err(e) => {
+                        log::error!("❌ Failed to load LED strip configuration: {}", e);
+                        panic!("Failed to initialize ConfigManager: {}", e);
+                    }
                 }
             })
             .await
@@ -186,6 +196,8 @@ impl ConfigManager {
                 mapper.end = start;
             }
         }
+
+        Self::rebuild_mappers(&mut config);
 
         let cloned_config = config.clone();
 

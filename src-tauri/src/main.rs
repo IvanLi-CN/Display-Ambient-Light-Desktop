@@ -7,6 +7,7 @@ mod auto_start;
 mod display;
 mod language_manager;
 mod led_color;
+mod led_data_sender;
 mod led_test_effects;
 mod rpc;
 mod screen_stream;
@@ -18,6 +19,7 @@ mod volume;
 use ambient_light::{Border, ColorCalibration, LedStripConfig, LedStripConfigGroup, LedType};
 use display::{DisplayManager, DisplayState};
 use display_info::DisplayInfo;
+use led_data_sender::{DataSendMode, LedDataSender};
 use led_test_effects::{LedTestEffects, TestEffectConfig};
 use paris::{error, info, warn};
 use rpc::{BoardInfo, UdpRpc};
@@ -208,33 +210,25 @@ async fn send_colors(offset: u16, buffer: Vec<u8>) -> Result<(), String> {
 
 #[tauri::command]
 async fn send_test_colors_to_board(
-    board_address: String,
+    _board_address: String, // Keep for API compatibility but not used
     offset: u16,
     buffer: Vec<u8>,
 ) -> Result<(), String> {
-    use tokio::net::UdpSocket;
+    // Set data send mode to StripConfig for single strip configuration testing
+    let sender = LedDataSender::global().await;
+    sender.set_mode(DataSendMode::StripConfig).await;
 
-    let socket = UdpSocket::bind("0.0.0.0:0").await.map_err(|e| {
-        error!("Failed to bind UDP socket: {}", e);
-        e.to_string()
-    })?;
-
-    let mut packet = vec![0x02]; // Header
-    packet.push((offset >> 8) as u8); // Byte offset high
-    packet.push((offset & 0xff) as u8); // Byte offset low
-    packet.extend_from_slice(&buffer); // Color data
-
-    socket.send_to(&packet, &board_address).await.map_err(|e| {
-        error!(
-            "Failed to send test colors to board {}: {}",
-            board_address, e
-        );
-        e.to_string()
-    })?;
+    // Send the data through unified sender
+    sender
+        .send_strip_config_data(offset, buffer.clone())
+        .await
+        .map_err(|e| {
+            error!("Failed to send strip config colors: {}", e);
+            e.to_string()
+        })?;
 
     info!(
-        "Sent test colors to board {} with offset {} and {} bytes",
-        board_address,
+        "Sent strip config colors with offset {} and {} bytes",
         offset,
         buffer.len()
     );
@@ -274,6 +268,10 @@ async fn start_led_test_effect(
     // Enable test mode first
     let publisher = ambient_light::LedColorsPublisher::global().await;
     publisher.enable_test_mode().await;
+
+    // Set data send mode to TestEffect for LED test effects
+    let sender = LedDataSender::global().await;
+    sender.set_mode(DataSendMode::TestEffect).await;
 
     let handle_storage = EFFECT_HANDLE
         .get_or_init(|| async { Arc::new(RwLock::new(None)) })
@@ -400,20 +398,12 @@ async fn stop_led_test_effect(
 
 // Internal helper function
 async fn send_test_colors_to_board_internal(
-    board_address: &str,
+    _board_address: &str, // Keep for API compatibility but not used
     offset: u16,
     buffer: Vec<u8>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    use tokio::net::UdpSocket;
-
-    let socket = UdpSocket::bind("0.0.0.0:0").await?;
-
-    let mut packet = vec![0x02]; // Header
-    packet.push((offset >> 8) as u8); // Byte offset high
-    packet.push((offset & 0xff) as u8); // Byte offset low
-    packet.extend_from_slice(&buffer); // Color data
-
-    socket.send_to(&packet, board_address).await?;
+    let sender = LedDataSender::global().await;
+    sender.send_test_effect_data(offset, buffer).await?;
     Ok(())
 }
 
@@ -537,6 +527,43 @@ async fn toggle_ambient_light() -> Result<bool, String> {
 async fn get_ambient_light_state() -> Result<ambient_light_state::AmbientLightState, String> {
     let state_manager = ambient_light_state::AmbientLightStateManager::global().await;
     Ok(state_manager.get_state().await)
+}
+
+#[tauri::command]
+async fn get_led_data_send_mode() -> Result<DataSendMode, String> {
+    let sender = LedDataSender::global().await;
+    Ok(sender.get_mode().await)
+}
+
+#[tauri::command]
+async fn set_led_data_send_mode(mode: DataSendMode) -> Result<(), String> {
+    let sender = LedDataSender::global().await;
+    sender.set_mode(mode).await;
+    info!("LED data send mode set to: {}", mode);
+    Ok(())
+}
+
+#[tauri::command]
+async fn test_led_data_sender() -> Result<String, String> {
+    let sender = LedDataSender::global().await;
+
+    // Test mode switching
+    sender.set_mode(DataSendMode::None).await;
+    let stats1 = sender.get_stats().await;
+
+    sender.set_mode(DataSendMode::AmbientLight).await;
+    let stats2 = sender.get_stats().await;
+
+    sender.set_mode(DataSendMode::TestEffect).await;
+    let stats3 = sender.get_stats().await;
+
+    let result = format!(
+        "LED Data Sender Test Results:\n1. {}\n2. {}\n3. {}",
+        stats1, stats2, stats3
+    );
+
+    info!("{}", result);
+    Ok(result)
 }
 
 #[tauri::command]
@@ -1067,18 +1094,65 @@ async fn main() {
 
     tokio::spawn(async move {
         info!("🖥️ Starting screenshot manager...");
+
+        // Test display detection first
+        info!("🔍 Testing display detection...");
+        match DisplayInfo::all() {
+            Ok(displays) => {
+                info!(
+                    "✅ Display detection successful: {} displays found",
+                    displays.len()
+                );
+                for (i, display) in displays.iter().enumerate() {
+                    info!(
+                        "  Display {}: ID={}, Scale={}",
+                        i, display.id, display.scale_factor
+                    );
+                }
+            }
+            Err(e) => {
+                error!("❌ Display detection failed: {}", e);
+            }
+        }
+
         let screenshot_manager = ScreenshotManager::global().await;
-        screenshot_manager.start().await.unwrap_or_else(|e| {
-            error!("can not start screenshot manager: {}", e);
-        });
-        info!("✅ Screenshot manager started successfully");
+        info!("📱 Screenshot manager instance obtained, calling start()...");
+        match screenshot_manager.start().await {
+            Ok(_) => {
+                info!("✅ Screenshot manager started successfully");
+            }
+            Err(e) => {
+                error!("❌ Failed to start screenshot manager: {}", e);
+            }
+        }
+        info!("🏁 Screenshot manager startup task completed");
     });
 
     tokio::spawn(async move {
         info!("💡 Starting LED color publisher...");
+
+        // Add a small delay to avoid initialization conflicts
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        info!("⏰ LED color publisher delay completed, proceeding...");
+
         let led_color_publisher = ambient_light::LedColorsPublisher::global().await;
-        led_color_publisher.start().await;
-        info!("✅ LED color publisher started successfully");
+        info!("📦 LED color publisher instance obtained");
+
+        // Add timeout to prevent infinite blocking
+        match tokio::time::timeout(
+            std::time::Duration::from_secs(30),
+            led_color_publisher.start(),
+        )
+        .await
+        {
+            Ok(_) => {
+                info!("✅ LED color publisher started successfully");
+            }
+            Err(_) => {
+                error!("❌ LED color publisher start() timed out after 30 seconds");
+                error!("💡 This indicates a blocking issue in the start() method");
+            }
+        }
     });
 
     // Start WebSocket server for screen streaming
@@ -1123,6 +1197,9 @@ async fn main() {
             set_ambient_light_enabled,
             toggle_ambient_light,
             get_ambient_light_state,
+            get_led_data_send_mode,
+            set_led_data_send_mode,
+            test_led_data_sender,
             get_current_language,
             set_current_language,
             get_user_preferences,
@@ -1357,17 +1434,9 @@ async fn main() {
                 }
             });
 
-            // Start screenshot manager
-            tokio::spawn(async move {
-                let screenshot_manager = ScreenshotManager::global().await;
-                screenshot_manager.start().await.unwrap();
-            });
+            // Screenshot manager is already started in main function
 
-            // Start LED colors publisher
-            tokio::spawn(async move {
-                let publisher = ambient_light::LedColorsPublisher::global().await;
-                publisher.start().await;
-            });
+            // LED colors publisher is already started in main function
 
             // Start WebSocket server for screen streaming
             tokio::spawn(async move {

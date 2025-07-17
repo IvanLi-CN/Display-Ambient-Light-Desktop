@@ -103,7 +103,17 @@ impl ScreenshotManager {
     }
 
     pub async fn start(&self) -> anyhow::Result<()> {
-        let displays = display_info::DisplayInfo::all()?;
+        log::info!("🔍 Attempting to detect displays...");
+        let displays = match display_info::DisplayInfo::all() {
+            Ok(displays) => {
+                log::info!("✅ Successfully detected {} displays", displays.len());
+                displays
+            }
+            Err(e) => {
+                log::error!("❌ Failed to detect displays: {}", e);
+                return Err(e.into());
+            }
+        };
 
         log::info!(
             "ScreenshotManager starting with {} displays:",
@@ -126,7 +136,7 @@ impl ScreenshotManager {
         });
 
         futures::future::join_all(futures).await;
-        log::info!("ScreenshotManager started successfully");
+        log::info!("🎯 ScreenshotManager internal start completed successfully");
         Ok(())
     }
 
@@ -151,66 +161,79 @@ impl ScreenshotManager {
 
         drop(channels);
 
-        // Implement screen capture using screen-capture-kit
-        loop {
-            // Check if ambient light is enabled before capturing screenshots
-            let ambient_light_enabled = {
-                let state_manager =
-                    crate::ambient_light_state::AmbientLightStateManager::global().await;
-                state_manager.is_enabled().await
-            };
+        // Start background task for screen capture
+        tokio::spawn(async move {
+            // Implement screen capture using screen-capture-kit
+            loop {
+                // Check if ambient light is enabled before capturing screenshots
+                let ambient_light_enabled = {
+                    let state_manager =
+                        crate::ambient_light_state::AmbientLightStateManager::global().await;
+                    state_manager.is_enabled().await
+                };
 
-            if ambient_light_enabled {
-                match Self::capture_display_screenshot(display_id, scale_factor).await {
-                    Ok(screenshot) => {
-                        let tx_for_send = tx.read().await;
-                        let merged_screenshot_tx = merged_screenshot_tx.write().await;
+                if ambient_light_enabled {
+                    match Self::capture_display_screenshot(display_id, scale_factor).await {
+                        Ok(screenshot) => {
+                            let tx_for_send = tx.read().await;
+                            let merged_screenshot_tx = merged_screenshot_tx.write().await;
 
-                        if let Err(_err) = merged_screenshot_tx.send(screenshot.clone()) {
-                            // log::warn!("merged_screenshot_tx.send failed: {}", err);
+                            if let Err(_err) = merged_screenshot_tx.send(screenshot.clone()) {
+                                // log::warn!("merged_screenshot_tx.send failed: {}", err);
+                            }
+                            if let Err(err) = tx_for_send.send(screenshot.clone()) {
+                                log::warn!(
+                                    "display {} screenshot_tx.send failed: {}",
+                                    display_id,
+                                    err
+                                );
+                            }
                         }
-                        if let Err(err) = tx_for_send.send(screenshot.clone()) {
-                            log::warn!("display {} screenshot_tx.send failed: {}", display_id, err);
+                        Err(err) => {
+                            warn!(
+                                "Failed to capture screenshot for display {}: {}",
+                                display_id, err
+                            );
+                            // Create a fallback empty screenshot to maintain the interface
+                            let screenshot = Screenshot::new(
+                                display_id,
+                                1080,
+                                1920,
+                                1920 * 4, // Assuming RGBA format
+                                Arc::new(vec![0u8; 1920 * 1080 * 4]),
+                                scale_factor,
+                                scale_factor,
+                            );
+
+                            let tx_for_send = tx.read().await;
+                            let merged_screenshot_tx = merged_screenshot_tx.write().await;
+
+                            if let Err(_err) = merged_screenshot_tx.send(screenshot.clone()) {
+                                // log::warn!("merged_screenshot_tx.send failed: {}", err);
+                            }
+                            if let Err(err) = tx_for_send.send(screenshot.clone()) {
+                                log::warn!(
+                                    "display {} screenshot_tx.send failed: {}",
+                                    display_id,
+                                    err
+                                );
+                            }
                         }
                     }
-                    Err(err) => {
-                        warn!(
-                            "Failed to capture screenshot for display {}: {}",
-                            display_id, err
-                        );
-                        // Create a fallback empty screenshot to maintain the interface
-                        let screenshot = Screenshot::new(
-                            display_id,
-                            1080,
-                            1920,
-                            1920 * 4, // Assuming RGBA format
-                            Arc::new(vec![0u8; 1920 * 1080 * 4]),
-                            scale_factor,
-                            scale_factor,
-                        );
-
-                        let tx_for_send = tx.read().await;
-                        let merged_screenshot_tx = merged_screenshot_tx.write().await;
-
-                        if let Err(_err) = merged_screenshot_tx.send(screenshot.clone()) {
-                            // log::warn!("merged_screenshot_tx.send failed: {}", err);
-                        }
-                        if let Err(err) = tx_for_send.send(screenshot.clone()) {
-                            log::warn!("display {} screenshot_tx.send failed: {}", display_id, err);
-                        }
-                    }
+                } else {
+                    // If ambient light is disabled, sleep longer to reduce CPU usage
+                    sleep(Duration::from_millis(1000)).await;
                 }
-            } else {
-                // If ambient light is disabled, sleep longer to reduce CPU usage
-                sleep(Duration::from_millis(1000)).await;
-            }
 
-            // Sleep for a frame duration (5 FPS for much better CPU performance when enabled)
-            if ambient_light_enabled {
-                sleep(Duration::from_millis(200)).await;
+                // Sleep for a frame duration (5 FPS for much better CPU performance when enabled)
+                if ambient_light_enabled {
+                    sleep(Duration::from_millis(200)).await;
+                }
+                yield_now().await;
             }
-            yield_now().await;
-        }
+        });
+
+        Ok(())
     }
 
     async fn capture_display_screenshot(
@@ -257,53 +280,10 @@ impl ScreenshotManager {
         ))
     }
 
-    pub fn get_sorted_colors(colors: &Vec<u8>, mappers: &Vec<SamplePointMapper>) -> Vec<u8> {
-        let total_leds = mappers
-            .iter()
-            .map(|mapper| usize::max(mapper.start, mapper.end))
-            .max()
-            .unwrap_or(0) as usize;
-        let mut global_colors = vec![0u8; total_leds * 3];
-
-        let mut color_index = 0;
-        mappers.iter().for_each(|group| {
-            if group.end > global_colors.len() || group.start > global_colors.len() {
-                warn!(
-                    "get_sorted_colors: group out of range. start: {}, end: {}, global_colors.len(): {}",
-                    group.start,
-                    group.end,
-                    global_colors.len()
-                );
-                return;
-            }
-
-            if color_index + group.start.abs_diff(group.end) * 3 > colors.len(){
-                warn!(
-                    "get_sorted_colors: color_index out of range. color_index: {}, strip len: {}, colors.len(): {}",
-                    color_index / 3,
-                    group.start.abs_diff(group.end),
-                    colors.len() / 3
-                );
-                return;
-            }
-
-            if group.end > group.start {
-                for i in group.start..group.end {
-                    global_colors[i * 3] = colors[color_index +0];
-                    global_colors[i * 3 + 1] = colors[color_index +1];
-                    global_colors[i * 3 + 2] = colors[color_index +2];
-                    color_index += 3;
-                }
-            } else {
-                for i in (group.end..group.start).rev() {
-                    global_colors[i * 3] = colors[color_index +0];
-                    global_colors[i * 3 + 1] = colors[color_index +1];
-                    global_colors[i * 3 + 2] = colors[color_index +2];
-                    color_index += 3;
-                }
-            }
-        });
-        global_colors
+    pub fn get_sorted_colors(colors: &Vec<u8>, _mappers: &Vec<SamplePointMapper>) -> Vec<u8> {
+        // 不再使用mappers，直接返回原始颜色数据
+        // mappers配置已过时，现在直接基于strips配置处理数据
+        colors.clone()
     }
 
     pub async fn clone_merged_screenshot_rx(&self) -> broadcast::Receiver<Screenshot> {

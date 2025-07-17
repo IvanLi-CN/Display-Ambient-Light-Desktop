@@ -7,6 +7,7 @@ import { invoke } from '@tauri-apps/api/core';
 // LED灯带配置类型
 interface LedStripConfig {
   id: string;
+  displayId: number; // Add displayId to the interface
   border: 'Top' | 'Bottom' | 'Left' | 'Right';
   count: number;
   reverse: boolean;
@@ -389,7 +390,20 @@ const LedConfigPanel: Component<{
               type="checkbox"
               class="toggle toggle-sm"
               checked={props.strip.reverse}
-              onChange={(e) => updateStrip({ reverse: e.currentTarget.checked })}
+              onChange={async (e) => {
+                const newReverseState = e.currentTarget.checked;
+                updateStrip({ reverse: newReverseState });
+                try {
+                  console.log(`Calling reverse_led_strip_part for display ${props.strip.displayId} and border ${props.strip.border}`);
+                  await invoke('reverse_led_strip_part', {
+                    displayId: props.strip.displayId,
+                    border: props.strip.border,
+                  });
+                  console.log('Successfully called reverse_led_strip_part');
+                } catch (error) {
+                  console.error('Failed to call reverse_led_strip_part:', error);
+                }
+              }}
             />
           </label>
         </div>
@@ -502,29 +516,46 @@ export function SingleDisplayConfig() {
   const availableDrivers = ['Driver1', 'Driver2', 'Driver3'];
 
   // 保存LED灯带配置到后端
-  const saveLedStripsToBackend = async (strips: LedStripConfig[]) => {
+  const saveLedStripsToBackend = async (stripsToSave: LedStripConfig[]) => {
     try {
       console.log('=== 开始保存LED灯带配置 ===');
-      console.log('显示器ID:', displayId());
-      console.log('要保存的灯带数量:', strips.length);
-      console.log('前端格式的灯带配置:', strips);
+      const currentDisplayId = displayId();
+      console.log('当前显示器ID:', currentDisplayId);
+      console.log('要保存的灯带:', stripsToSave);
 
-      // 转换为后端期望的格式
-      const backendStrips = strips.map((strip, index) => ({
-        index: index,
-        border: strip.border,
-        display_id: displayId(),
-        start_pos: Math.floor(strip.startOffset * strip.count / 100),
-        len: strip.count,
-        led_type: strip.ledType === 'WS2812B' ? 'WS2812B' : 'SK6812',
-        // 注意：后端可能不支持reverse字段，需要在颜色生成时处理
-      }));
+      // 1. 读取完整的现有配置
+      const fullConfig = await invoke('read_led_strip_configs') as any;
+      console.log('读取到的完整配置:', fullConfig);
 
-      console.log('转换为后端格式的配置:', backendStrips);
+      // 2. 移除当前显示器的旧配置
+      const otherDisplayStrips = fullConfig.strips.filter((s: any) => s.display_id !== currentDisplayId);
+      console.log('其他显示器的配置:', otherDisplayStrips);
 
-      await invoke('write_led_strip_configs', { configs: backendStrips });
+      // 3. 转换当前显示器的新配置为后端格式
+      const sortedStripsToSave = [...stripsToSave].sort((a, b) => a.sequence - b.sequence);
+      let cumulativeLedOffset = 0;
+      const currentDisplayBackendStrips = sortedStripsToSave.map((strip) => {
+        const startPos = cumulativeLedOffset;
+        cumulativeLedOffset += strip.count;
+        return {
+          index: strip.sequence,
+          border: strip.border,
+          display_id: currentDisplayId,
+          start_pos: startPos,
+          len: strip.count,
+          led_type: strip.ledType,
+        };
+      });
+      console.log('当前显示器的新后端格式配置:', currentDisplayBackendStrips);
 
-      console.log('✅ 成功保存LED灯带配置到后端');
+      // 4. 合并新旧配置
+      const finalStrips = [...otherDisplayStrips, ...currentDisplayBackendStrips];
+      console.log('合并后的最终配置:', finalStrips);
+
+      // 5. 保存完整的配置
+      await invoke('write_led_strip_configs', { configs: finalStrips });
+
+      console.log('✅ 成功保存完整LED灯带配置到后端');
     } catch (error) {
       console.error('❌ 保存LED灯带配置失败:', error);
       throw error; // 重新抛出错误以便上层处理
@@ -584,17 +615,23 @@ export function SingleDisplayConfig() {
 
         if (savedConfigs && Array.isArray(savedConfigs) && savedConfigs.length > 0) {
           // 转换后端数据为前端格式
-          const convertedStrips: LedStripConfig[] = savedConfigs.map((config: any, index: number) => ({
-            id: `strip-${config.border.toLowerCase()}-${index}`,
-            border: config.border,
-            count: config.len,
-            ledType: config.led_type === 'SK6812' ? 'SK6812' : 'WS2812B',
-            driver: 'Driver1', // 默认驱动器
-            sequence: index + 1,
-            startOffset: config.len > 0 ? Math.floor((config.start_pos / config.len) * 100) : 0,
-            endOffset: 100, // 默认延伸到边缘末端
-            reverse: false
-          }));
+          const mappers = (allConfigs as any).mappers || [];
+          const convertedStrips: LedStripConfig[] = savedConfigs.map((config: any) => {
+            const mapper = mappers.find((_m: any, i: number) => i === config.index);
+            const isReversed = mapper ? mapper.start > mapper.end : false;
+            return {
+              id: `strip-${config.border.toLowerCase()}-${config.index}`,
+              displayId: config.display_id,
+              border: config.border,
+              count: config.len,
+              ledType: config.led_type, // 直接映射
+              driver: 'Driver1', // 默认驱动器
+              sequence: config.index, // 直接使用后端的 index 作为 sequence
+              startOffset: config.len > 0 ? Math.floor((config.start_pos / config.len) * 100) : 0,
+              endOffset: 100, // 默认延伸到边缘末端
+              reverse: isReversed
+            };
+          });
 
           console.log('转换为前端格式的配置:', convertedStrips);
           console.log('转换后的灯带数量:', convertedStrips.length);
@@ -630,6 +667,7 @@ export function SingleDisplayConfig() {
       const testStrips: LedStripConfig[] = [
         {
           id: 'test-right-1',
+          displayId: displayId(),
           border: 'Right',
           count: 22,
           ledType: 'WS2812B',
@@ -641,6 +679,7 @@ export function SingleDisplayConfig() {
         },
         {
           id: 'test-right-2',
+          displayId: displayId(),
           border: 'Right',
           count: 18,
           ledType: 'WS2812B',
@@ -652,6 +691,7 @@ export function SingleDisplayConfig() {
         },
         {
           id: 'test-bottom-1',
+          displayId: displayId(),
           border: 'Bottom',
           count: 38,
           ledType: 'WS2812B',
@@ -663,6 +703,7 @@ export function SingleDisplayConfig() {
         },
         {
           id: 'test-bottom-2',
+          displayId: displayId(),
           border: 'Bottom',
           count: 32,
           ledType: 'WS2812B',
@@ -705,6 +746,7 @@ export function SingleDisplayConfig() {
 
     const newStrip: LedStripConfig = {
       id: `strip_${Date.now()}_${Math.random()}`,
+      displayId: displayId(),
       border: border,
       count: defaultCount,
       reverse: false,
@@ -853,7 +895,7 @@ export function SingleDisplayConfig() {
   let testColorTimer: number | null = null;
 
   // 发送测试颜色到单个灯带
-  const sendTestColorsToStrip = async (strip: LedStripConfig) => {
+  const sendTestColorsToStrip = async (strip: LedStripConfig, ledOffset: number) => {
     try {
       // 生成该边框的预设颜色（两个颜色平分，考虑反向设置）
       const borderColors = generateBorderTestColors(strip.border, strip.count, strip.reverse);
@@ -874,8 +916,7 @@ export function SingleDisplayConfig() {
 
           const bytesPerLed = strip.ledType === 'SK6812' ? 4 : 3;
 
-          // 计算偏移量：基于LED灯带的起始偏移量
-          const ledOffset = Math.floor(strip.startOffset * strip.count / 100);
+          // 计算偏移量：基于累积的LED偏移量
           const byteOffset = ledOffset * bytesPerLed;
 
           // 只在第一次发送时显示详细信息
@@ -921,9 +962,12 @@ export function SingleDisplayConfig() {
     console.log(`目标灯带数量: ${strips.length}`);
 
     // 立即发送一次
-    strips.forEach(strip => {
-      sendTestColorsToStrip(strip);
-    });
+    const sortedStrips = [...strips].sort((a, b) => a.sequence - b.sequence);
+    let cumulativeLedOffset = 0;
+    for (const strip of sortedStrips) {
+      sendTestColorsToStrip(strip, cumulativeLedOffset);
+      cumulativeLedOffset += strip.count;
+    }
 
     let frameCount = 0;
     const startTime = Date.now();
@@ -932,9 +976,12 @@ export function SingleDisplayConfig() {
     testColorTimer = setInterval(() => {
       const currentStrips = ledStrips();
       if (currentStrips.length > 0) {
-        currentStrips.forEach(strip => {
-          sendTestColorsToStrip(strip);
-        });
+        const sortedStrips = [...currentStrips].sort((a, b) => a.sequence - b.sequence);
+        let cumulativeLedOffset = 0;
+        for (const strip of sortedStrips) {
+          sendTestColorsToStrip(strip, cumulativeLedOffset);
+          cumulativeLedOffset += strip.count;
+        }
 
         frameCount++;
         // 每秒显示一次统计信息

@@ -1,7 +1,9 @@
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use paris::warn;
 use tauri::async_runtime::RwLock;
+
+use crate::ambient_light::config::Border;
 use tokio::{
     sync::{broadcast, watch},
     time::sleep,
@@ -10,15 +12,14 @@ use tokio::{
 use crate::{
     ambient_light::{config, ConfigManager},
     led_color::LedColor,
-    rpc::UdpRpc,
-    screenshot::LedSamplePoints,
+    led_data_sender::{DataSendMode, LedDataSender},
+    screenshot::{LedSamplePoints, Screenshot},
     screenshot_manager::ScreenshotManager,
 };
 
-use itertools::Itertools;
-
 use super::{ColorCalibration, LedStripConfig, LedStripConfigGroup, LedType, SamplePointMapper};
 
+#[derive(Clone)]
 pub struct LedColorsPublisher {
     sorted_colors_rx: Arc<RwLock<watch::Receiver<Vec<u8>>>>,
     sorted_colors_tx: Arc<RwLock<watch::Sender<Vec<u8>>>>,
@@ -59,6 +60,7 @@ impl LedColorsPublisher {
         display_colors_tx: broadcast::Sender<(u32, Vec<u8>)>,
         strips: Vec<LedStripConfig>,
         color_calibration: ColorCalibration,
+        start_led_offset: usize,
     ) {
         let internal_tasks_version = self.inner_tasks_version.clone();
         let screenshot_manager = ScreenshotManager::global().await;
@@ -71,11 +73,28 @@ impl LedColorsPublisher {
         }
         let mut screenshot_rx = screenshot_rx.unwrap();
 
+        log::info!("Starting fetcher for display #{}", display_id);
+
         tokio::spawn(async move {
             let init_version = internal_tasks_version.read().await.clone();
 
-            while screenshot_rx.changed().await.is_ok() {
+            loop {
+                if let Err(err) = screenshot_rx.changed().await {
+                    log::error!(
+                        "Screenshot channel closed for display #{}: {:?}",
+                        display_id,
+                        err
+                    );
+                    break;
+                }
+
                 let screenshot = screenshot_rx.borrow().clone();
+                log::info!(
+                    "Received screenshot for display #{}: {}x{}",
+                    display_id,
+                    screenshot.width,
+                    screenshot.height
+                );
                 let colors = screenshot.get_colors_by_sample_points(&sample_points).await;
 
                 log::info!(
@@ -109,8 +128,14 @@ impl LedColorsPublisher {
                 );
 
                 if !test_mode_active && ambient_light_enabled {
-                    match Self::send_colors_by_display(colors, mappers, &strips, &color_calibration)
-                        .await
+                    match Self::send_colors_by_display(
+                        colors,
+                        mappers,
+                        &strips,
+                        &color_calibration,
+                        start_led_offset,
+                    )
+                    .await
                     {
                         Ok(_) => {
                             log::info!("Successfully sent colors for display #{}", display_id);
@@ -169,6 +194,10 @@ impl LedColorsPublisher {
         let colors_tx = self.colors_tx.clone();
 
         tokio::spawn(async move {
+            // Set data send mode to AmbientLight when starting ambient light worker
+            let sender = LedDataSender::global().await;
+            sender.set_mode(DataSendMode::AmbientLight).await;
+
             let sorted_colors_tx = sorted_colors_tx.write().await;
             let colors_tx = colors_tx.write().await;
 
@@ -231,19 +260,100 @@ impl LedColorsPublisher {
     }
 
     pub async fn start(&self) {
+        log::info!("🚀 LED color publisher starting...");
+
         let config_manager = ConfigManager::global().await;
+
         let mut config_receiver = config_manager.clone_config_update_receiver();
-        let configs = config_receiver.borrow().clone();
 
-        self.handle_config_change(configs).await;
-
-        while config_receiver.changed().await.is_ok() {
-            let configs = config_receiver.borrow().clone();
-            self.handle_config_change(configs).await;
+        // Process initial configuration first
+        let initial_configs = config_receiver.borrow().clone();
+        if !initial_configs.strips.is_empty() {
+            log::info!("📋 Processing initial LED configuration...");
+            self.handle_config_change(initial_configs).await;
+        } else {
+            log::warn!("⚠️ Initial LED configuration is empty, waiting for updates...");
         }
+
+        // Then, listen for subsequent configuration changes in a separate task
+        let self_clone = self.clone();
+        tokio::spawn(async move {
+            log::info!("👂 Listening for subsequent LED configuration changes...");
+            loop {
+                if config_receiver.changed().await.is_ok() {
+                    let configs = config_receiver.borrow().clone();
+                    if !configs.strips.is_empty() {
+                        log::info!("🔄 Subsequent LED configuration changed, reprocessing...");
+                        self_clone.handle_config_change(configs).await;
+                    } else {
+                        log::warn!("⚠️ Received empty LED configuration, skipping...");
+                    }
+                } else {
+                    log::error!("❌ Config receiver channel closed, stopping listener.");
+                    break;
+                }
+            }
+        });
     }
 
-    async fn handle_config_change(&self, original_configs: LedStripConfigGroup) {
+    async fn create_test_config(&self) -> anyhow::Result<LedStripConfigGroup> {
+        log::info!("🔧 Creating test LED configuration...");
+
+        // Get display information
+        let displays = display_info::DisplayInfo::all().map_err(|e| {
+            log::error!("Failed to get display info for test config: {}", e);
+            anyhow::anyhow!("Failed to get display info: {}", e)
+        })?;
+
+        log::info!("✅ Found {} displays for test config", displays.len());
+
+        // Create a simple test configuration
+        let mut strips = Vec::new();
+        let mut mappers = Vec::new();
+
+        for (i, display) in displays.iter().enumerate().take(2) {
+            // Limit to 2 displays
+            for j in 0..4 {
+                let strip = LedStripConfig {
+                    index: j + i * 4,
+                    display_id: display.id,
+                    border: match j {
+                        0 => Border::Top,
+                        1 => Border::Bottom,
+                        2 => Border::Left,
+                        3 => Border::Right,
+                        _ => unreachable!(),
+                    },
+                    start_pos: j + i * 4 * 30,
+                    len: 30,
+                    led_type: LedType::WS2812B,
+                };
+                strips.push(strip);
+                mappers.push(SamplePointMapper {
+                    start: (j + i * 4) * 30,
+                    end: (j + i * 4 + 1) * 30,
+                    pos: (j + i * 4) * 30,
+                });
+            }
+        }
+
+        let config = LedStripConfigGroup {
+            strips,
+            mappers,
+            color_calibration: ColorCalibration::new(),
+        };
+
+        log::info!(
+            "✅ Test configuration created with {} strips",
+            config.strips.len()
+        );
+        Ok(config)
+    }
+
+    async fn handle_config_change(&self, mut original_configs: LedStripConfigGroup) {
+        // Sort strips by index to ensure correct order
+        original_configs.strips.sort_by_key(|s| s.index);
+
         let inner_tasks_version = self.inner_tasks_version.clone();
         let configs = Self::get_colors_configs(&original_configs).await;
 
@@ -259,7 +369,22 @@ impl LedColorsPublisher {
         *inner_tasks_version = inner_tasks_version.overflowing_add(1).0;
         drop(inner_tasks_version);
 
+        log::info!(
+            "Processed {} sample point groups.",
+            configs.sample_point_groups.len()
+        );
+
         let (display_colors_tx, display_colors_rx) = broadcast::channel::<(u32, Vec<u8>)>(8);
+
+        // Calculate start offsets for each display
+        let mut cumulative_led_offset = 0;
+        let mut display_start_offsets = std::collections::HashMap::new();
+        for strip in &original_configs.strips {
+            display_start_offsets
+                .entry(strip.display_id)
+                .or_insert(cumulative_led_offset);
+            cumulative_led_offset += strip.len;
+        }
 
         for sample_point_group in configs.sample_point_groups.clone() {
             let display_id = sample_point_group.display_id;
@@ -274,6 +399,8 @@ impl LedColorsPublisher {
                 .cloned()
                 .collect();
 
+            let start_led_offset = *display_start_offsets.get(&display_id).unwrap_or(&0);
+
             self.start_one_display_colors_fetcher(
                 display_id,
                 sample_points,
@@ -282,6 +409,7 @@ impl LedColorsPublisher {
                 display_colors_tx.clone(),
                 display_strips,
                 original_configs.color_calibration,
+                start_led_offset,
             )
             .await;
         }
@@ -294,266 +422,160 @@ impl LedColorsPublisher {
         );
     }
 
-    pub async fn send_colors(offset: u16, mut payload: Vec<u8>) -> anyhow::Result<()> {
-        // Use UdpRpc to send to all discovered devices instead of hardcoded IP
-        let udp_rpc = UdpRpc::global().await;
-        if let Err(err) = udp_rpc {
-            warn!("udp_rpc can not be initialized: {}", err);
-            return Err(anyhow::anyhow!("UDP RPC not available: {}", err));
-        }
-        let udp_rpc = udp_rpc.as_ref().unwrap();
-
-        let mut buffer = vec![2];
-        buffer.push((offset >> 8) as u8);
-        buffer.push((offset & 0xff) as u8);
-        buffer.append(&mut payload);
-
-        udp_rpc.send_to_all(&buffer).await?;
-        Ok(())
+    pub async fn send_colors(offset: u16, payload: Vec<u8>) -> anyhow::Result<()> {
+        let sender = LedDataSender::global().await;
+        sender.send_ambient_light_data(offset, payload).await
     }
 
     pub async fn send_colors_by_display(
         colors: Vec<LedColor>,
-        mappers: Vec<SamplePointMapper>,
+        _mappers: Vec<SamplePointMapper>, // 保留参数但不使用，避免破坏API
         strips: &[LedStripConfig],
         color_calibration: &ColorCalibration,
+        start_led_offset: usize,
     ) -> anyhow::Result<()> {
-        // let color_len = colors.len();
-        let display_led_offset = mappers
-            .clone()
-            .iter()
-            .flat_map(|mapper| [mapper.start, mapper.end])
-            .min()
-            .unwrap();
-
-        let udp_rpc = UdpRpc::global().await;
-        if let Err(err) = udp_rpc {
-            warn!("udp_rpc can not be initialized: {}", err);
-            return Err(anyhow::anyhow!("UDP RPC not available: {}", err));
-        }
-        let udp_rpc = udp_rpc.as_ref().unwrap();
+        let sender = LedDataSender::global().await;
 
         log::info!(
-            "Starting LED data send for display: colors_count={}, mappers_count={}",
+            "Starting LED data send for display: colors_count={}, strips_count={}, start_offset={}",
             colors.len(),
-            mappers.len()
+            strips.len(),
+            start_led_offset
         );
 
-        // let socket = UdpSocket::bind("0.0.0.0:0").await?;
-        for (group_index, group) in mappers.clone().iter().enumerate() {
+        // 直接基于strips配置发送数据，不再使用mappers
+        let mut color_offset = 0;
+        let mut led_offset = start_led_offset; // 硬件中的LED偏移量
+
+        for (strip_index, strip) in strips.iter().enumerate() {
+            let strip_len = strip.len;
+
             log::info!(
-                "Processing LED group {}: start={}, end={}, pos={}, strip_len={}, display_led_offset={}",
-                group_index,
-                group.start,
-                group.end,
-                group.pos,
-                group.start.abs_diff(group.end),
-                display_led_offset
+                "Processing LED strip {}: border={:?}, len={}, color_offset={}, led_offset={}, led_type={:?}",
+                strip_index,
+                strip.border,
+                strip_len,
+                color_offset,
+                led_offset,
+                strip.led_type
             );
 
-            if (group.start.abs_diff(group.end)) > colors.len() {
-                return Err(anyhow::anyhow!(
-                    "get_sorted_colors: color_index out of range. color_index: {}, strip len: {}, colors.len(): {}",
-                    group.pos,
-                    group.start.abs_diff(group.end),
+            // 检查颜色数据是否足够
+            if color_offset + strip_len > colors.len() {
+                log::warn!(
+                    "Skipping strip {}: color range {}..{} exceeds available colors ({})",
+                    strip_index,
+                    color_offset,
+                    color_offset + strip_len,
                     colors.len()
-                ));
+                );
+                // 仍然需要更新偏移量，即使跳过这个灯条
+                color_offset += strip_len;
+                led_offset += strip_len;
+                continue;
             }
 
-            let group_size = group.start.abs_diff(group.end);
-
-            // Find the corresponding LED strip config to get LED type
-            let led_type = if group_index < strips.len() {
-                strips[group_index].led_type
-            } else {
-                LedType::WS2812B // fallback to WS2812B
-            };
+            let led_type = strip.led_type;
 
             let bytes_per_led = match led_type {
                 LedType::WS2812B => 3,
                 LedType::SK6812 => 4,
             };
 
-            let mut buffer = Vec::<u8>::with_capacity(group_size * bytes_per_led);
+            let mut buffer = Vec::<u8>::with_capacity(strip_len * bytes_per_led);
 
-            if group.end > group.start {
-                // Prevent integer underflow by using saturating subtraction
-                let start_index = if group.pos >= display_led_offset {
-                    group.pos - display_led_offset
-                } else {
-                    0
-                };
-                let end_index = if group.pos + group_size >= display_led_offset {
-                    group_size + group.pos - display_led_offset
-                } else {
-                    0
-                };
-
-                log::info!(
-                    "Forward group {}: start_index={}, end_index={}, colors.len()={}",
-                    group_index,
-                    start_index,
-                    end_index,
-                    colors.len()
-                );
-
-                for i in start_index..end_index {
-                    if i < colors.len() {
-                        let bytes = match led_type {
-                            LedType::WS2812B => {
-                                let calibration_bytes = color_calibration.to_bytes();
-                                let color_bytes = colors[i].as_bytes();
-                                // Apply calibration and convert RGB to GRB for WS2812B
-                                vec![
-                                    ((color_bytes[1] as f32 * calibration_bytes[1] as f32 / 255.0)
-                                        as u8), // G (Green)
-                                    ((color_bytes[0] as f32 * calibration_bytes[0] as f32 / 255.0)
-                                        as u8), // R (Red)
-                                    ((color_bytes[2] as f32 * calibration_bytes[2] as f32 / 255.0)
-                                        as u8), // B (Blue)
-                                ]
-                            }
-                            LedType::SK6812 => {
-                                let calibration_bytes = color_calibration.to_bytes_rgbw();
-                                let color_bytes = colors[i].as_bytes();
-                                // Apply calibration and convert RGB to GRBW for SK6812-RGBW
-                                vec![
-                                    ((color_bytes[1] as f32 * calibration_bytes[1] as f32 / 255.0)
-                                        as u8), // G (Green)
-                                    ((color_bytes[0] as f32 * calibration_bytes[0] as f32 / 255.0)
-                                        as u8), // R (Red)
-                                    ((color_bytes[2] as f32 * calibration_bytes[2] as f32 / 255.0)
-                                        as u8), // B (Blue)
-                                    calibration_bytes[3], // W channel
-                                ]
-                            }
-                        };
-                        buffer.extend_from_slice(&bytes);
-                    } else {
-                        log::warn!(
-                            "Index {} out of bounds for colors array of length {}",
-                            i,
-                            colors.len()
-                        );
-                        // Add black color as fallback
-                        match led_type {
-                            LedType::WS2812B => buffer.extend_from_slice(&[0, 0, 0]),
-                            LedType::SK6812 => buffer.extend_from_slice(&[0, 0, 0, 0]),
+            // 处理这个灯条的颜色数据
+            for i in 0..strip_len {
+                let color_index = color_offset + i;
+                if color_index < colors.len() {
+                    let bytes = match led_type {
+                        LedType::WS2812B => {
+                            let calibration_bytes = color_calibration.to_bytes();
+                            let color_bytes = colors[color_index].as_bytes();
+                            // Apply calibration and convert RGB to GRB for WS2812B
+                            vec![
+                                ((color_bytes[1] as f32 * calibration_bytes[1] as f32 / 255.0)
+                                    as u8), // G (Green)
+                                ((color_bytes[0] as f32 * calibration_bytes[0] as f32 / 255.0)
+                                    as u8), // R (Red)
+                                ((color_bytes[2] as f32 * calibration_bytes[2] as f32 / 255.0)
+                                    as u8), // B (Blue)
+                            ]
                         }
-                    }
-                }
-            } else {
-                // Prevent integer underflow by using saturating subtraction
-                let start_index = if group.pos >= display_led_offset {
-                    group.pos - display_led_offset
-                } else {
-                    0
-                };
-                let end_index = if group.pos + group_size >= display_led_offset {
-                    group_size + group.pos - display_led_offset
-                } else {
-                    0
-                };
-
-                log::info!(
-                    "Reverse group {}: start_index={}, end_index={}, colors.len()={}",
-                    group_index,
-                    start_index,
-                    end_index,
-                    colors.len()
-                );
-
-                for i in (start_index..end_index).rev() {
-                    if i < colors.len() {
-                        let bytes = match led_type {
-                            LedType::WS2812B => {
-                                let calibration_bytes = color_calibration.to_bytes();
-                                let color_bytes = colors[i].as_bytes();
-                                // Apply calibration and convert RGB to GRB for WS2812B
-                                vec![
-                                    ((color_bytes[1] as f32 * calibration_bytes[1] as f32 / 255.0)
-                                        as u8), // G (Green)
-                                    ((color_bytes[0] as f32 * calibration_bytes[0] as f32 / 255.0)
-                                        as u8), // R (Red)
-                                    ((color_bytes[2] as f32 * calibration_bytes[2] as f32 / 255.0)
-                                        as u8), // B (Blue)
-                                ]
-                            }
-                            LedType::SK6812 => {
-                                let calibration_bytes = color_calibration.to_bytes_rgbw();
-                                let color_bytes = colors[i].as_bytes();
-                                // Apply calibration and convert RGB to GRBW for SK6812-RGBW
-                                vec![
-                                    ((color_bytes[1] as f32 * calibration_bytes[1] as f32 / 255.0)
-                                        as u8), // G (Green)
-                                    ((color_bytes[0] as f32 * calibration_bytes[0] as f32 / 255.0)
-                                        as u8), // R (Red)
-                                    ((color_bytes[2] as f32 * calibration_bytes[2] as f32 / 255.0)
-                                        as u8), // B (Blue)
-                                    calibration_bytes[3], // W channel
-                                ]
-                            }
-                        };
-                        buffer.extend_from_slice(&bytes);
-                    } else {
-                        log::warn!(
-                            "Index {} out of bounds for colors array of length {}",
-                            i,
-                            colors.len()
-                        );
-                        // Add black color as fallback
-                        match led_type {
-                            LedType::WS2812B => buffer.extend_from_slice(&[0, 0, 0]),
-                            LedType::SK6812 => buffer.extend_from_slice(&[0, 0, 0, 0]),
+                        LedType::SK6812 => {
+                            let calibration_bytes = color_calibration.to_bytes_rgbw();
+                            let color_bytes = colors[color_index].as_bytes();
+                            // Apply calibration and convert RGB to GRBW for SK6812-RGBW
+                            vec![
+                                ((color_bytes[1] as f32 * calibration_bytes[1] as f32 / 255.0)
+                                    as u8), // G (Green)
+                                ((color_bytes[0] as f32 * calibration_bytes[0] as f32 / 255.0)
+                                    as u8), // R (Red)
+                                ((color_bytes[2] as f32 * calibration_bytes[2] as f32 / 255.0)
+                                    as u8), // B (Blue)
+                                calibration_bytes[3], // W channel
+                            ]
                         }
+                    };
+                    buffer.extend_from_slice(&bytes);
+                } else {
+                    log::warn!(
+                        "Color index {} out of bounds for colors array of length {}",
+                        color_index,
+                        colors.len()
+                    );
+                    // Add black color as fallback
+                    match led_type {
+                        LedType::WS2812B => buffer.extend_from_slice(&[0, 0, 0]),
+                        LedType::SK6812 => buffer.extend_from_slice(&[0, 0, 0, 0]),
                     }
                 }
             }
 
-            // Calculate byte offset based on LED position and LED type
-            let led_offset = group.start.min(group.end);
+            // 计算字节偏移量（基于LED偏移量和LED类型）
             let byte_offset = led_offset * bytes_per_led;
-            let mut tx_buffer = vec![2];
-            tx_buffer.push((byte_offset >> 8) as u8);
-            tx_buffer.push((byte_offset & 0xff) as u8);
-            tx_buffer.append(&mut buffer);
 
             log::info!(
-                "Sending LED data: group_index={}, led_offset={}, byte_offset={}, buffer_size={}, tx_buffer_size={}",
-                group_index,
+                "Sending LED data: strip={}, led_offset={}, byte_offset={}, buffer_size={}",
+                strip_index,
                 led_offset,
                 byte_offset,
-                buffer.len(),
-                tx_buffer.len()
+                buffer.len()
             );
 
-            log::info!(
-                "📤 Attempting to send LED data for group {}: {} bytes",
-                group_index,
-                tx_buffer.len()
-            );
+            if !buffer.is_empty() {
+                log::info!(
+                    "📤 Attempting to send LED data for strip {}: {} bytes",
+                    strip_index,
+                    buffer.len()
+                );
 
-            match udp_rpc.send_to_all(&tx_buffer).await {
-                Ok(_) => {
-                    log::info!(
-                        "✅ Successfully sent LED data for group {} ({} bytes)",
-                        group_index,
-                        tx_buffer.len()
-                    );
+                match sender
+                    .send_ambient_light_data(byte_offset as u16, buffer)
+                    .await
+                {
+                    Ok(_) => {
+                        log::info!("✅ Successfully sent LED data for strip {}", strip_index);
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "❌ Failed to send LED data for strip {}: {}",
+                            strip_index,
+                            e
+                        );
+                        // Continue with next strip instead of returning error
+                    }
                 }
-                Err(e) => {
-                    log::error!(
-                        "❌ Failed to send LED data for group {}: {} (buffer size: {} bytes)",
-                        group_index,
-                        e,
-                        tx_buffer.len()
-                    );
-                    // Continue with next group instead of returning error
-                }
+
+                // Add a small delay between packets to avoid overwhelming the network
+                tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
+            } else {
+                log::warn!("Empty buffer for strip {}, skipping", strip_index);
             }
 
-            // Add a small delay between packets to avoid overwhelming the network
-            tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
+            // 更新偏移量，为下一个灯条做准备
+            color_offset += strip_len;
+            led_offset += strip_len;
         }
 
         Ok(())
@@ -565,91 +587,98 @@ impl LedColorsPublisher {
     pub async fn get_colors_configs(
         configs: &LedStripConfigGroup,
     ) -> anyhow::Result<AllColorConfig> {
-        let screenshot_manager = ScreenshotManager::global().await;
+        // Get actual display information and assign IDs if needed
+        let displays = display_info::DisplayInfo::all().map_err(|e| {
+            log::error!("Failed to get display info in get_colors_configs: {}", e);
+            anyhow::anyhow!("Failed to get display info: {}", e)
+        })?;
 
-        let display_ids = configs
-            .strips
-            .iter()
-            .map(|c| c.display_id)
-            .unique()
-            .collect::<Vec<_>>();
+        // Create a mutable copy of configs with proper display IDs
+        let mut updated_configs = configs.clone();
+        for strip in updated_configs.strips.iter_mut() {
+            if strip.display_id == 0 {
+                // Assign display ID based on strip index
+                let display_index = strip.index / 4;
+                if display_index < displays.len() {
+                    strip.display_id = displays[display_index].id;
+                    log::info!(
+                        "Assigned display ID {} to strip {}",
+                        strip.display_id,
+                        strip.index
+                    );
+                }
+            }
+        }
 
-        let mappers = configs.mappers.clone();
+        let mappers = updated_configs.mappers.clone();
 
         let mut colors_configs = Vec::new();
 
-        let mut merged_screenshot_receiver = screenshot_manager.clone_merged_screenshot_rx().await;
-        merged_screenshot_receiver.resubscribe();
+        for display_info in displays {
+            let display_id = display_info.id;
 
-        let mut screenshots = HashMap::new();
+            let mut led_strip_configs: Vec<_> = updated_configs
+                .strips
+                .iter()
+                .filter(|c| c.display_id == display_id)
+                .cloned()
+                .collect();
 
-        loop {
-            let screenshot = merged_screenshot_receiver.recv().await;
-
-            if let Err(err) = screenshot {
-                match err {
-                    tokio::sync::broadcast::error::RecvError::Closed => {
-                        warn!("closed");
-                        continue;
-                    }
-                    tokio::sync::broadcast::error::RecvError::Lagged(_) => {
-                        warn!("lagged");
-                        continue;
-                    }
-                }
+            if led_strip_configs.is_empty() {
+                warn!(
+                    "No LED strip config for display_id: {}, using default.",
+                    display_id
+                );
+                led_strip_configs.push(LedStripConfig::default_for_display(
+                    display_id,
+                    updated_configs.strips.len(),
+                ));
             }
 
-            let screenshot = screenshot.unwrap();
-            // log::info!("got screenshot: {:?}", screenshot.display_id);
+            // Create a dummy screenshot object to calculate sample points
+            let dummy_screenshot = Screenshot::new(
+                display_id,
+                display_info.height,
+                display_info.width,
+                0, // bytes_per_row is not used for sample point calculation
+                Arc::new(vec![]),
+                display_info.scale_factor as f32,
+                display_info.scale_factor as f32,
+            );
 
-            screenshots.insert(screenshot.display_id, screenshot);
+            let points: Vec<_> = led_strip_configs
+                .iter()
+                .map(|config| dummy_screenshot.get_sample_points(config))
+                .flatten()
+                .collect();
 
-            if screenshots.len() == display_ids.len() {
-                let mut led_start = 0;
-
-                for display_id in display_ids {
-                    let led_strip_configs = configs
-                        .strips
-                        .iter()
-                        .enumerate()
-                        .filter(|(_, c)| c.display_id == display_id);
-
-                    let screenshot = screenshots.get(&display_id).unwrap();
-
-                    let points: Vec<_> = led_strip_configs
-                        .clone()
-                        .map(|(_, config)| screenshot.get_sample_points(&config))
-                        .flatten()
-                        .collect();
-
-                    if points.len() == 0 {
-                        warn!("no led strip config for display_id: {}", display_id);
-                        continue;
-                    }
-
-                    let bound_scale_factor = screenshot.bound_scale_factor;
-
-                    let led_end = led_start + points.iter().map(|p| p.len()).sum::<usize>();
-
-                    let mappers = led_strip_configs.map(|(i, _)| mappers[i].clone()).collect();
-
-                    let colors_config = DisplaySamplePointGroup {
-                        display_id,
-                        points,
-                        bound_scale_factor,
-                        mappers,
-                    };
-
-                    colors_configs.push(colors_config);
-                    led_start = led_end;
-                }
-
-                return Ok(AllColorConfig {
-                    sample_point_groups: colors_configs,
-                    mappers,
-                });
+            if points.is_empty() {
+                warn!("No sample points generated for display_id: {}", display_id);
+                continue;
             }
+
+            let display_mappers = updated_configs
+                .mappers
+                .iter()
+                .zip(&updated_configs.strips)
+                .filter(|(_, strip)| strip.display_id == display_id)
+                .map(|(mapper, _)| mapper.clone())
+                .collect();
+
+            let colors_config = DisplaySamplePointGroup {
+                display_id,
+                points,
+                bound_scale_factor: display_info.scale_factor as f32,
+                mappers: display_mappers,
+            };
+
+            colors_configs.push(colors_config);
         }
+
+        Ok(AllColorConfig {
+            sample_point_groups: colors_configs,
+            mappers,
+        })
     }
 
     pub async fn clone_colors_receiver(&self) -> watch::Receiver<Vec<u8>> {
@@ -660,6 +689,11 @@ impl LedColorsPublisher {
     pub async fn enable_test_mode(&self) {
         let mut test_mode = self.test_mode_active.write().await;
         *test_mode = true;
+
+        // Set data send mode to None to pause ambient light data sending
+        let sender = LedDataSender::global().await;
+        sender.set_mode(DataSendMode::None).await;
+
         log::info!("Test mode enabled - normal LED publishing paused");
     }
 
@@ -667,6 +701,11 @@ impl LedColorsPublisher {
     pub async fn disable_test_mode(&self) {
         let mut test_mode = self.test_mode_active.write().await;
         *test_mode = false;
+
+        // Set data send mode back to AmbientLight to resume normal publishing
+        let sender = LedDataSender::global().await;
+        sender.set_mode(DataSendMode::AmbientLight).await;
+
         log::info!("Test mode disabled - normal LED publishing resumed");
     }
 
@@ -686,7 +725,7 @@ impl LedColorsPublisher {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AllColorConfig {
     pub sample_point_groups: Vec<DisplaySamplePointGroup>,
     pub mappers: Vec<config::SamplePointMapper>,

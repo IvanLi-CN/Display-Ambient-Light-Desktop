@@ -1,3 +1,4 @@
+use crate::led_data_sender::{DataSendMode, LedDataSender};
 use dirs::config_dir;
 use paris::{info, warn};
 use serde::{Deserialize, Serialize};
@@ -109,6 +110,15 @@ impl AmbientLightStateManager {
         // Save to file
         let current_state = self.get_state().await;
         current_state.write_config().await?;
+
+        // Set data send mode
+        let led_data_sender = LedDataSender::global().await;
+        let new_mode = if enabled {
+            DataSendMode::AmbientLight
+        } else {
+            DataSendMode::None
+        };
+        led_data_sender.set_mode(new_mode).await;
 
         info!(
             "Ambient light state changed to: {}",

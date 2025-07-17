@@ -3,6 +3,7 @@ import { LedStripConfiguration } from './components/led-strip-configuration/led-
 import { SingleDisplayConfig } from './components/led-strip-configuration/single-display-config';
 import { WhiteBalance } from './components/white-balance/white-balance';
 import { LedStripTest } from './components/led-strip-test/led-strip-test';
+import { LedDataSenderTest } from './components/led-data-sender-test/led-data-sender-test';
 import { Settings } from './components/settings/settings';
 import { createEffect, createSignal } from 'solid-js';
 import { invoke } from '@tauri-apps/api/core';
@@ -88,6 +89,7 @@ function App() {
               <li><A href="/led-strips-configuration" class="text-base-content hover:bg-base-200">{t('nav.ledConfiguration')}</A></li>
               <li><A href="/white-balance" class="text-base-content hover:bg-base-200">{t('nav.whiteBalance')}</A></li>
               <li><A href="/led-strip-test" class="text-base-content hover:bg-base-200">{t('nav.ledTest')}</A></li>
+              <li><A href="/led-data-sender-test" class="text-base-content hover:bg-base-200">数据发送测试</A></li>
               <li><A href="/settings" class="text-base-content hover:bg-base-200">{t('nav.settings')}</A></li>
             </ul>
           </div>
@@ -99,6 +101,7 @@ function App() {
             <li><A href="/led-strips-configuration" class="btn btn-ghost text-base-content hover:text-primary">{t('nav.ledConfiguration')}</A></li>
             <li><A href="/white-balance" class="btn btn-ghost text-base-content hover:text-primary">{t('nav.whiteBalance')}</A></li>
             <li><A href="/led-strip-test" class="btn btn-ghost text-base-content hover:text-primary">{t('nav.ledTest')}</A></li>
+            <li><A href="/led-data-sender-test" class="btn btn-ghost text-base-content hover:text-primary">数据发送测试</A></li>
             <li><A href="/settings" class="btn btn-ghost text-base-content hover:text-primary">{t('nav.settings')}</A></li>
           </ul>
         </div>
@@ -125,6 +128,7 @@ function App() {
           <Route path="/led-strips-configuration/display/:displayId" component={SingleDisplayConfig} />
           <Route path="/white-balance" component={WhiteBalance} />
           <Route path="/led-strip-test" element={<LedStripTest />} />
+          <Route path="/led-data-sender-test" element={<LedDataSenderTest />} />
           <Route path="/settings" component={Settings} />
         </Routes>
       </main>
