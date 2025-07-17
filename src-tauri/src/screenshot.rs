@@ -246,3 +246,99 @@ pub struct ScreenshotPayload {
     pub height: u32,
     pub width: u32,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ambient_light::Border;
+
+    // Helper function to create a mock LedStripConfig
+    fn mock_led_strip_config(border: Border, len: usize) -> LedStripConfig {
+        LedStripConfig {
+            index: 0,
+            border,
+            display_id: 1,
+            start_pos: 0,
+            len,
+            led_type: crate::ambient_light::LedType::WS2812B,
+        }
+    }
+
+    #[test]
+    fn test_get_one_edge_sample_points_logic() {
+        let leds = 10;
+        let length = 1000;
+        let width = 100;
+        let single_axis_points = 5;
+
+        let points =
+            Screenshot::get_one_edge_sample_points(width, length, leds, single_axis_points);
+
+        // Expect one group of points for each LED
+        assert_eq!(points.len(), leds);
+
+        // Expect each group to have single_axis_points * single_axis_points points
+        assert_eq!(points[0].len(), single_axis_points * single_axis_points);
+    }
+
+    #[test]
+    fn test_get_sample_points_for_each_border() {
+        let screenshot = Screenshot::new(1, 1080, 1920, 1920 * 4, Arc::new(vec![]), 1.0, 1.0);
+
+        let top_config = mock_led_strip_config(Border::Top, 100);
+        let top_points = screenshot.get_sample_points(&top_config);
+        assert!(!top_points.is_empty());
+        assert_eq!(top_points.len(), 100);
+
+        let bottom_config = mock_led_strip_config(Border::Bottom, 100);
+        let bottom_points = screenshot.get_sample_points(&bottom_config);
+        assert!(!bottom_points.is_empty());
+        assert_eq!(bottom_points.len(), 100);
+        // Verify that bottom points are transformed correctly
+        assert!(bottom_points[0][0].1 > 1000);
+
+        let left_config = mock_led_strip_config(Border::Left, 50);
+        let left_points = screenshot.get_sample_points(&left_config);
+        assert!(!left_points.is_empty());
+        assert_eq!(left_points.len(), 50);
+
+        let right_config = mock_led_strip_config(Border::Right, 50);
+        let right_points = screenshot.get_sample_points(&right_config);
+        assert!(!right_points.is_empty());
+        assert_eq!(right_points.len(), 50);
+        // Verify that right points are transformed correctly
+        assert!(right_points[0][0].0 > 1900);
+    }
+
+    #[test]
+    fn test_get_one_edge_colors_logic() {
+        let width = 20;
+        let height = 20;
+        let bytes_per_row = width * 4;
+        let mut bitmap = vec![0; height * bytes_per_row];
+
+        // Create a solid red area in the bitmap
+        for y in 0..10 {
+            for x in 0..10 {
+                let pos = y * bytes_per_row + x * 4;
+                bitmap[pos] = 0; // B
+                bitmap[pos + 1] = 0; // G
+                bitmap[pos + 2] = 255; // R
+                bitmap[pos + 3] = 255; // A
+            }
+        }
+
+        // Sample points that fall entirely within the red area
+        let sample_points: Vec<LedSamplePoints> = vec![
+            vec![(2, 2), (3, 3)], // Points for LED 1
+            vec![(5, 5), (6, 6)], // Points for LED 2
+        ];
+
+        let colors = Screenshot::get_one_edge_colors(&sample_points, &bitmap, bytes_per_row);
+
+        assert_eq!(colors.len(), 2);
+        // Both LEDs should be solid red
+        assert_eq!(colors[0].get_rgb(), [255, 0, 0]);
+        assert_eq!(colors[1].get_rgb(), [255, 0, 0]);
+    }
+}

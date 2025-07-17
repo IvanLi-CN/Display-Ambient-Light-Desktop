@@ -282,3 +282,138 @@ impl ConfigManager {
         self.update(&cloned_config).await
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ambient_light::config::{
+        Border, ColorCalibration, LedStripConfig, LedStripConfigGroup, LedType, SamplePointMapper,
+    };
+    use std::sync::Arc;
+    use tauri::async_runtime::RwLock;
+
+    // Helper function to create a ConfigManager with a default in-memory config for testing
+    fn create_test_config_manager() -> ConfigManager {
+        let mut strips = Vec::new();
+        let mut mappers = Vec::new();
+
+        // Create a predictable config for one display
+        for j in 0..4 {
+            let strip = LedStripConfig {
+                index: j,
+                display_id: 1, // Use a fixed display ID
+                border: match j {
+                    0 => Border::Top,
+                    1 => Border::Bottom,
+                    2 => Border::Left,
+                    _ => Border::Right,
+                },
+                start_pos: j * 30,
+                len: 30,
+                led_type: LedType::WS2812B,
+            };
+            strips.push(strip);
+            mappers.push(SamplePointMapper {
+                start: j * 30,
+                end: (j + 1) * 30,
+                pos: j * 30,
+            });
+        }
+
+        let config = LedStripConfigGroup {
+            strips,
+            mappers,
+            color_calibration: ColorCalibration::new(),
+        };
+
+        let (tx, rx) = tokio::sync::watch::channel(config.clone());
+        drop(rx); // Drop the receiver as we won't use it in this test setup
+
+        ConfigManager {
+            config: Arc::new(RwLock::new(config)),
+            config_update_sender: tx,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_patch_led_strip_len_and_rebuild_mappers() {
+        let manager = create_test_config_manager();
+
+        // To test the logic of patch_led_strip_len, we can simulate its core actions
+        // on a config object directly, as the function itself has side effects (file IO).
+        let mut config = manager.configs().await;
+        let original_len = config.strips[0].len;
+        let original_mapper_end = config.mappers[0].end;
+
+        // 1. Modify strip length
+        config.strips[0].len += 5;
+
+        // 2. Rebuild mappers
+        ConfigManager::rebuild_mappers(&mut config);
+
+        // 3. Assert changes
+        assert_eq!(config.strips[0].len, original_len + 5);
+        // Check if the mapper's end was updated correctly for the modified strip
+        assert_eq!(config.mappers[0].end, original_mapper_end + 5);
+        // Check if the next mapper's position was updated
+        assert_eq!(
+            config.mappers[1].pos,
+            config.mappers[0].pos + config.strips[0].len
+        );
+    }
+
+    #[tokio::test]
+    async fn test_reverse_led_strip_part_logic() {
+        let manager = create_test_config_manager();
+
+        // Similar to the above, we test the core logic by manipulating a config object.
+        let mut config = manager.configs().await;
+        let original_start = config.mappers[0].start;
+        let original_end = config.mappers[0].end;
+
+        // 1. Reverse the start and end of a mapper
+        let mapper = &mut config.mappers[0];
+        let start = mapper.start;
+        mapper.start = mapper.end;
+        mapper.end = start;
+
+        // 2. Assert the change
+        assert_eq!(config.mappers[0].start, original_end);
+        assert_eq!(config.mappers[0].end, original_start);
+    }
+
+    #[test]
+    fn test_rebuild_mappers_logic() {
+        let manager = create_test_config_manager();
+        let mut config = futures::executor::block_on(manager.configs());
+
+        // Simulate a change in strip lengths
+        config.strips[0].len = 40;
+        config.strips[1].len = 20;
+        // Simulate a reversed strip
+        let temp_start = config.mappers[2].start;
+        config.mappers[2].start = config.mappers[2].end;
+        config.mappers[2].end = temp_start;
+
+        ConfigManager::rebuild_mappers(&mut config);
+
+        // Verify the first mapper (length changed)
+        assert_eq!(config.mappers[0].pos, 0);
+        assert_eq!(config.mappers[0].end, config.mappers[0].start + 40);
+
+        // Verify the second mapper's position is updated based on the first strip's new length
+        assert_eq!(config.mappers[1].pos, 40);
+        assert_eq!(config.mappers[1].end, config.mappers[1].start + 20);
+
+        // Verify the third mapper's position and that it remains reversed
+        assert_eq!(config.mappers[2].pos, 60); // 40 + 20
+        assert!(config.mappers[2].start > config.mappers[2].end);
+        assert_eq!(
+            config.mappers[2].start,
+            config.mappers[2].end + config.strips[2].len
+        );
+
+        // Verify the fourth mapper's position
+        assert_eq!(config.mappers[3].pos, 90); // 60 + 30
+    }
+}

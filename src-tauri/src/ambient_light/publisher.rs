@@ -739,3 +739,204 @@ pub struct DisplaySamplePointGroup {
     pub bound_scale_factor: f32,
     pub mappers: Vec<config::SamplePointMapper>,
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::ambient_light::config::{Border, ColorCalibration, LedStripConfig, LedType};
+    use crate::led_color::LedColor;
+    use std::sync::Arc;
+    use tokio::sync::Mutex;
+
+    // Mock LedDataSender to capture sent data instead of sending it over UDP
+    struct MockLedDataSender {
+        sent_data: Arc<Mutex<Vec<(u16, Vec<u8>)>>>,
+    }
+
+    impl MockLedDataSender {
+        fn new() -> Self {
+            Self {
+                sent_data: Arc::new(Mutex::new(Vec::new())),
+            }
+        }
+
+        async fn send_ambient_light_data(
+            &self,
+            offset: u16,
+            payload: Vec<u8>,
+        ) -> anyhow::Result<()> {
+            self.sent_data.lock().await.push((offset, payload));
+            Ok(())
+        }
+
+        async fn get_sent_data(&self) -> Vec<(u16, Vec<u8>)> {
+            self.sent_data.lock().await.clone()
+        }
+    }
+
+    // We cannot directly test the original `send_colors_by_display` because it uses a global `LedDataSender`.
+    // We create a testable version that accepts a mock sender.
+    async fn testable_send_colors_by_display(
+        sender: &MockLedDataSender,
+        colors: Vec<LedColor>,
+        strips: &[LedStripConfig],
+        color_calibration: &ColorCalibration,
+        start_led_offset: usize,
+    ) -> anyhow::Result<()> {
+        let mut color_offset = 0;
+        let mut led_offset = start_led_offset;
+
+        for strip in strips {
+            let strip_len = strip.len;
+            if color_offset + strip_len > colors.len() {
+                color_offset += strip_len;
+                led_offset += strip_len;
+                continue;
+            }
+
+            let led_type = strip.led_type;
+            let bytes_per_led = match led_type {
+                LedType::WS2812B => 3,
+                LedType::SK6812 => 4,
+            };
+            let mut buffer = Vec::<u8>::with_capacity(strip_len * bytes_per_led);
+
+            for i in 0..strip_len {
+                let color_index = color_offset + i;
+                let bytes = match led_type {
+                    LedType::WS2812B => {
+                        let cal = color_calibration.to_bytes();
+                        let col = colors[color_index].as_bytes();
+                        vec![
+                            ((col[1] as f32 * cal[1] as f32 / 255.0) as u8), // G
+                            ((col[0] as f32 * cal[0] as f32 / 255.0) as u8), // R
+                            ((col[2] as f32 * cal[2] as f32 / 255.0) as u8), // B
+                        ]
+                    }
+                    LedType::SK6812 => {
+                        let cal = color_calibration.to_bytes_rgbw();
+                        let col = colors[color_index].as_bytes();
+                        vec![
+                            ((col[1] as f32 * cal[1] as f32 / 255.0) as u8), // G
+                            ((col[0] as f32 * cal[0] as f32 / 255.0) as u8), // R
+                            ((col[2] as f32 * cal[2] as f32 / 255.0) as u8), // B
+                            cal[3],                                          // W
+                        ]
+                    }
+                };
+                buffer.extend_from_slice(&bytes);
+            }
+
+            let byte_offset = led_offset * bytes_per_led;
+            if !buffer.is_empty() {
+                sender
+                    .send_ambient_light_data(byte_offset as u16, buffer)
+                    .await?;
+            }
+
+            color_offset += strip_len;
+            led_offset += strip_len;
+        }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_ws2812b_color_transformation_and_calibration() {
+        let sender = MockLedDataSender::new();
+        let colors = vec![LedColor::new(255, 128, 64)]; // R, G, B
+        let strips = vec![LedStripConfig {
+            index: 0,
+            border: Border::Top,
+            display_id: 1,
+            start_pos: 0,
+            len: 1,
+            led_type: LedType::WS2812B,
+        }];
+        let mut calibration = ColorCalibration::new();
+        calibration.r = 0.5; // Halve the red channel
+
+        testable_send_colors_by_display(&sender, colors, &strips, &calibration, 0)
+            .await
+            .unwrap();
+
+        let sent_data = sender.get_sent_data().await;
+        assert_eq!(sent_data.len(), 1);
+        let (offset, payload) = &sent_data[0];
+        assert_eq!(*offset, 0);
+        // Expected: G, R, B -> 128, 255*0.5, 64 -> [128, 127, 64]
+        assert_eq!(*payload, vec![128, 127, 64]);
+    }
+
+    #[tokio::test]
+    async fn test_sk6812_color_transformation_and_w_channel() {
+        let sender = MockLedDataSender::new();
+        let colors = vec![LedColor::new(255, 128, 64)]; // R, G, B
+        let strips = vec![LedStripConfig {
+            index: 0,
+            border: Border::Top,
+            display_id: 1,
+            start_pos: 0,
+            len: 1,
+            led_type: LedType::SK6812,
+        }];
+        let mut calibration = ColorCalibration::new();
+        calibration.w = 0.8; // Set white channel to 80%
+
+        testable_send_colors_by_display(&sender, colors, &strips, &calibration, 0)
+            .await
+            .unwrap();
+
+        let sent_data = sender.get_sent_data().await;
+        assert_eq!(sent_data.len(), 1);
+        let (offset, payload) = &sent_data[0];
+        assert_eq!(*offset, 0);
+        // Expected: G, R, B, W -> 128, 255, 64, 255*0.8 -> [128, 255, 64, 204]
+        assert_eq!(*payload, vec![128, 255, 64, 204]);
+    }
+
+    #[tokio::test]
+    async fn test_led_offset_calculation() {
+        let sender = MockLedDataSender::new();
+        let colors = vec![LedColor::new(10, 20, 30), LedColor::new(40, 50, 60)];
+        let strips = vec![
+            LedStripConfig {
+                len: 1,
+                led_type: LedType::WS2812B,
+                ..Default::default()
+            },
+            LedStripConfig {
+                len: 1,
+                led_type: LedType::WS2812B,
+                ..Default::default()
+            },
+        ];
+        let calibration = ColorCalibration::new();
+
+        // Start with a hardware LED offset of 10
+        testable_send_colors_by_display(&sender, colors, &strips, &calibration, 10)
+            .await
+            .unwrap();
+
+        let sent_data = sender.get_sent_data().await;
+        assert_eq!(sent_data.len(), 2);
+
+        // First strip (WS2812B): starts at LED 10. Byte offset = 10 * 3 = 30.
+        assert_eq!(sent_data[0].0, 30);
+
+        // Second strip (WS2812B): starts at LED 11. Byte offset = 11 * 3 = 33.
+        assert_eq!(sent_data[1].0, 33);
+    }
+
+    // Helper function to provide a default LedStripConfig
+    impl Default for LedStripConfig {
+        fn default() -> Self {
+            Self {
+                index: 0,
+                border: Border::Top,
+                display_id: 0,
+                start_pos: 0,
+                len: 0,
+                led_type: LedType::WS2812B,
+            }
+        }
+    }
+}

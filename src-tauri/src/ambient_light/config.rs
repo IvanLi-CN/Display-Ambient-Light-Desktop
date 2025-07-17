@@ -52,11 +52,11 @@ impl LedStripConfig {
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug)]
 pub struct ColorCalibration {
-    r: f32,
-    g: f32,
-    b: f32,
+    pub r: f32,
+    pub g: f32,
+    pub b: f32,
     #[serde(default = "default_w_value")]
-    w: f32,
+    pub w: f32,
 }
 
 fn default_w_value() -> f32 {
@@ -205,4 +205,97 @@ pub struct SamplePointMapper {
 pub struct SamplePointConfig {
     pub display_id: u32,
     pub points: Vec<LedSamplePoints>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_led_strip_config_group_from_toml() {
+        let toml_str = r#"
+            [[strips]]
+            index = 0
+            border = "Top"
+            display_id = 1
+            start_pos = 0
+            len = 60
+            led_type = "WS2812B"
+
+            [[strips]]
+            index = 1
+            border = "Bottom"
+            display_id = 1
+            start_pos = 60
+            len = 60
+            led_type = "SK6812"
+
+            [[mappers]]
+            start = 0
+            end = 60
+            pos = 0
+
+            [[mappers]]
+            start = 60
+            end = 120
+            pos = 60
+
+            [color_calibration]
+            r = 1.0
+            g = 0.9
+            b = 0.8
+            w = 1.0
+        "#;
+
+        let config: LedStripConfigGroup = toml::from_str(toml_str).unwrap();
+
+        assert_eq!(config.strips.len(), 2);
+        assert_eq!(config.mappers.len(), 2);
+
+        assert_eq!(config.strips[0].index, 0);
+        assert_eq!(config.strips[0].border, Border::Top);
+        assert_eq!(config.strips[0].led_type, LedType::WS2812B);
+
+        assert_eq!(config.strips[1].index, 1);
+        assert_eq!(config.strips[1].border, Border::Bottom);
+        assert_eq!(config.strips[1].led_type, LedType::SK6812);
+
+        assert_eq!(config.mappers[0].start, 0);
+        assert_eq!(config.mappers[0].end, 60);
+
+        assert_eq!(config.color_calibration.g, 0.9);
+    }
+
+    #[tokio::test]
+    async fn test_get_default_config() {
+        let default_config = LedStripConfigGroup::get_default_config().await.unwrap();
+
+        assert_eq!(default_config.strips.len(), 8); // 2 displays * 4 borders
+        assert_eq!(default_config.mappers.len(), 8);
+        assert_eq!(default_config.color_calibration.r, 1.0);
+        assert_eq!(default_config.color_calibration.g, 1.0);
+        assert_eq!(default_config.color_calibration.b, 1.0);
+        assert_eq!(default_config.color_calibration.w, 1.0);
+    }
+
+    #[tokio::test]
+    async fn test_config_serialization_deserialization() {
+        let original_config = LedStripConfigGroup::get_default_config().await.unwrap();
+        let toml_string = toml::to_string(&original_config).unwrap();
+        let deserialized_config: LedStripConfigGroup = toml::from_str(&toml_string).unwrap();
+
+        assert_eq!(
+            original_config.strips.len(),
+            deserialized_config.strips.len()
+        );
+        assert_eq!(
+            original_config.mappers.len(),
+            deserialized_config.mappers.len()
+        );
+        for (i, strip) in original_config.strips.iter().enumerate() {
+            assert_eq!(strip.index, deserialized_config.strips[i].index);
+            assert_eq!(strip.border, deserialized_config.strips[i].border);
+            assert_eq!(strip.len, deserialized_config.strips[i].len);
+        }
+    }
 }
