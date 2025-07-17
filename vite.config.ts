@@ -16,6 +16,11 @@ export default defineConfig(() => {
       tailwindcss(),
     ],
 
+    // 优化依赖处理
+    optimizeDeps: {
+      exclude: ['@tauri-apps/api']
+    },
+
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   // prevent vite from obscuring rust errors
   clearScreen: false,

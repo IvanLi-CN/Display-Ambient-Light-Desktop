@@ -39,6 +39,9 @@ export interface TranslationDict {
     apply: string;
     refresh: string;
     realtime: string;
+    back: string;
+    clear: string;
+    confirmUnsavedChanges: string;
   };
   
   // Info page
@@ -109,6 +112,8 @@ export interface TranslationDict {
     ledStripConfig: string;
     ledCount: string;
     ledType: string;
+    border: string;
+    count: string;
     position: string;
     top: string;
     bottom: string;
@@ -137,7 +142,43 @@ export interface TranslationDict {
     decreaseLedCount: string;
     increaseLedCount: string;
     display: string;
+    driver: string;
+    sequence: string;
+    startOffset: string;
+    endOffset: string;
+    testStrip: string;
+    configPanel: string;
     controlTip: string;
+  };
+
+  // Single Display LED Strip Configuration
+  singleDisplayConfig: {
+    title: string;
+    displayNotFound: string;
+    displayVisualization: string;
+    displayInfo: string;
+    ledConfiguration: string;
+    selectStripToConfig: string;
+    selectOrCreateStrip: string;
+    clearConfig: string;
+    confirmClear: string;
+    confirmDeleteStrip: string;
+    virtualDisplay: string;
+    virtualDisplayDesc: string;
+    virtualDisplayPlaceholder: string;
+    virtualDisplayInstructions: string;
+    colorIndicator: string;
+    colorIndicatorDesc: string;
+    stripConfig: string;
+    dataDirection: string;
+    normal: string;
+    reversed: string;
+    driverSelection: string;
+    driver: string;
+    stripOrder: string;
+    positionOffset: string;
+    startOffset: string;
+    endOffset: string;
   };
   
   // White Balance

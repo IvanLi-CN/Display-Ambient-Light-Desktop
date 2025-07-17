@@ -1,5 +1,6 @@
 import { Routes, Route, useLocation, A, Navigate } from '@solidjs/router';
 import { LedStripConfiguration } from './components/led-strip-configuration/led-strip-configuration';
+import { SingleDisplayConfig } from './components/led-strip-configuration/single-display-config';
 import { WhiteBalance } from './components/white-balance/white-balance';
 import { LedStripTest } from './components/led-strip-test/led-strip-test';
 import { Settings } from './components/settings/settings';
@@ -121,6 +122,7 @@ function App() {
           <Route path="/" element={<Navigate href="/info" />} />
           <Route path="/info" component={InfoIndex} />
           <Route path="/led-strips-configuration" component={LedStripConfiguration} />
+          <Route path="/led-strips-configuration/display/:displayId" component={SingleDisplayConfig} />
           <Route path="/white-balance" component={WhiteBalance} />
           <Route path="/led-strip-test" element={<LedStripTest />} />
           <Route path="/settings" component={Settings} />
