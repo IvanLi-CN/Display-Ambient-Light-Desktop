@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 
 use futures::future::join_all;
 use mdns_sd::{ServiceDaemon, ServiceEvent};
@@ -163,6 +163,36 @@ impl UdpRpc {
         }
 
         Ok(())
+    }
+
+    pub async fn send_to(&self, buff: &Vec<u8>, target_addr: SocketAddr) -> anyhow::Result<()> {
+        let boards = self.boards.read().await;
+
+        if boards.is_empty() {
+            log::debug!("No boards available to send colors to");
+            return Err(anyhow::anyhow!("No boards available"));
+        }
+
+        let target_board = boards.values().find(|board| {
+            if let Some(socket_addr) = board.get_socket_addr() {
+                socket_addr == target_addr
+            } else {
+                false
+            }
+        });
+
+        if let Some(board) = target_board {
+            log::debug!(
+                "Sending {} bytes to specific board: {}",
+                buff.len(),
+                target_addr
+            );
+            board.send_colors(buff).await;
+            Ok(())
+        } else {
+            warn!("Target board with address {} not found", target_addr);
+            Err(anyhow::anyhow!("Target board not found"))
+        }
     }
 
     pub async fn check_boards(&self) {

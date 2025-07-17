@@ -1,5 +1,7 @@
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
+use std::net::SocketAddr;
+use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::{OnceCell, RwLock};
 
@@ -69,6 +71,8 @@ impl LedDataPacket {
 pub struct LedDataSender {
     /// 当前发送模式
     current_mode: Arc<RwLock<DataSendMode>>,
+    /// 测试模式下的目标地址
+    test_target_address: Arc<RwLock<Option<SocketAddr>>>,
 }
 
 impl LedDataSender {
@@ -80,9 +84,31 @@ impl LedDataSender {
             .get_or_init(|| async {
                 LedDataSender {
                     current_mode: Arc::new(RwLock::new(DataSendMode::default())),
+                    test_target_address: Arc::new(RwLock::new(None)),
                 }
             })
             .await
+    }
+
+    /// 设置测试模式的目标地址
+    pub async fn set_test_target(&self, address: Option<String>) {
+        let mut target = self.test_target_address.write().await;
+        *target = match address {
+            Some(addr_str) => match SocketAddr::from_str(&addr_str) {
+                Ok(addr) => {
+                    info!("Test target address set to: {}", addr);
+                    Some(addr)
+                }
+                Err(e) => {
+                    error!("Failed to parse test target address '{}': {}", addr_str, e);
+                    None
+                }
+            },
+            None => {
+                info!("Test target address cleared");
+                None
+            }
+        };
     }
 
     /// 获取当前发送模式
@@ -141,7 +167,23 @@ impl LedDataSender {
             packet_data.len()
         );
 
-        match udp_rpc.send_to_all(&packet_data).await {
+        // 根据模式选择发送方式
+        let send_result = if expected_mode == DataSendMode::TestEffect {
+            if let Some(target_addr) = *self.test_target_address.read().await {
+                log::debug!(
+                    "Sending test effect data to specific address: {}",
+                    target_addr
+                );
+                udp_rpc.send_to(&packet_data, target_addr).await
+            } else {
+                warn!("TestEffect mode is active, but no target address is set. Data not sent.");
+                return Ok(()); // Not an error, just nothing to do
+            }
+        } else {
+            udp_rpc.send_to_all(&packet_data).await
+        };
+
+        match send_result {
             Ok(_) => {
                 log::debug!(
                     "✅ Successfully sent LED packet: {} (offset={}, {} bytes)",

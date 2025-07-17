@@ -1,4 +1,8 @@
-use std::{sync::Arc, time::Duration};
+use std::{
+    net::{IpAddr, SocketAddr},
+    sync::Arc,
+    time::Duration,
+};
 
 use paris::{error, info, warn};
 use tokio::{io, net::UdpSocket, sync::RwLock, task::yield_now, time::timeout};
@@ -27,6 +31,11 @@ impl Board {
             state_of_displays_changed_subscriber_handler: None,
             led_strip_config_changed_subscriber_handler: None,
         }
+    }
+
+    pub fn get_socket_addr(&self) -> Option<SocketAddr> {
+        let info = self.info.try_read().ok()?;
+        Some(SocketAddr::new(IpAddr::V4(info.address), info.port))
     }
 
     pub async fn init_socket(&mut self) -> anyhow::Result<()> {

@@ -269,9 +269,10 @@ async fn start_led_test_effect(
     let publisher = ambient_light::LedColorsPublisher::global().await;
     publisher.enable_test_mode().await;
 
-    // Set data send mode to TestEffect for LED test effects
+    // Set data send mode to TestEffect and set target address
     let sender = LedDataSender::global().await;
     sender.set_mode(DataSendMode::TestEffect).await;
+    sender.set_test_target(Some(board_address.clone())).await;
 
     let handle_storage = EFFECT_HANDLE
         .get_or_init(|| async { Arc::new(RwLock::new(None)) })
@@ -296,7 +297,7 @@ async fn start_led_test_effect(
 
     // Start new effect
     let effect_config = Arc::new(effect_config);
-    let board_address = Arc::new(board_address);
+    let _board_address = Arc::new(board_address);
     let start_time = std::time::Instant::now();
 
     // Create new cancellation token
@@ -316,9 +317,10 @@ async fn start_led_test_effect(
                     let byte_offset = LedTestEffects::calculate_byte_offset(&effect_config);
 
                     // Send to board with calculated offset
-                    if let Err(e) = send_test_colors_to_board_internal(&board_address, byte_offset, colors).await {
+                    let sender = LedDataSender::global().await;
+                    if let Err(e) = sender.send_test_effect_data(byte_offset, colors).await {
                         error!("Failed to send test effect colors: {}", e);
-                        break;
+                        // Don't break the loop, just log the error
                     }
                 }
                 _ = cancel_token_clone.cancelled() => {
@@ -380,30 +382,23 @@ async fn stop_led_test_effect(
     };
     let buffer = vec![0u8; (led_count * bytes_per_led) as usize];
 
-    send_test_colors_to_board_internal(&board_address, 0, buffer)
-        .await
-        .map_err(|e| e.to_string())?;
+    // Use force_send_packet to ensure the off command is sent regardless of mode
+    let sender = LedDataSender::global().await;
+    let packet = led_data_sender::LedDataPacket::new(0, buffer, "StopEffect".to_string());
+    if let Err(e) = sender.force_send_packet(packet).await {
+        error!("Failed to send LED off command: {}", e);
+    }
 
     info!("💡 Sent LED off command");
 
-    // Disable test mode to resume normal publishing
+    // Disable test mode and clear test target to resume normal publishing
     let publisher = ambient_light::LedColorsPublisher::global().await;
     publisher.disable_test_mode().await;
+    sender.set_test_target(None).await;
 
     info!("🔄 Test mode disabled, normal publishing resumed");
     info!("✅ LED test effect stopped completely");
 
-    Ok(())
-}
-
-// Internal helper function
-async fn send_test_colors_to_board_internal(
-    _board_address: &str, // Keep for API compatibility but not used
-    offset: u16,
-    buffer: Vec<u8>,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let sender = LedDataSender::global().await;
-    sender.send_test_effect_data(offset, buffer).await?;
     Ok(())
 }
 
