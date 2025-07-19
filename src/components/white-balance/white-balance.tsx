@@ -140,11 +140,10 @@ export const WhiteBalance = () => {
   // listen to config_changed event
   createEffect(() => {
     const unlisten = listen('config_changed', (event) => {
-      const { strips, mappers, color_calibration } =
+      const { strips, color_calibration } =
         event.payload as LedStripConfigContainer;
       setLedStripStore({
         strips,
-        mappers,
         colorCalibration: color_calibration,
       });
     });

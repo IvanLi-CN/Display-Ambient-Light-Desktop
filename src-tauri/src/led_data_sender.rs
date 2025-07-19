@@ -1,8 +1,12 @@
+use dirs::config_dir;
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
+use tokio::fs::OpenOptions;
+use tokio::io::AsyncWriteExt;
 use tokio::sync::{OnceCell, RwLock};
 
 use crate::rpc::UdpRpc;
@@ -90,6 +94,60 @@ impl LedDataSender {
             .await
     }
 
+    /// 获取UDP日志文件路径
+    fn get_udp_log_path() -> PathBuf {
+        let config_dir = config_dir().unwrap_or_else(|| std::env::current_dir().unwrap());
+        config_dir
+            .join("cc.ivanli.ambient_light")
+            .join("udp_packets.log")
+    }
+
+    /// 写入UDP数据包到日志文件
+    async fn write_udp_packet_to_file(&self, offset: u16, packet_data: &[u8]) {
+        let log_path = Self::get_udp_log_path();
+
+        // 确保目录存在
+        if let Some(parent) = log_path.parent() {
+            if let Err(e) = tokio::fs::create_dir_all(parent).await {
+                error!("Failed to create UDP log directory: {}", e);
+                return;
+            }
+        }
+
+        // 格式化时间戳
+        let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.3f");
+
+        // 格式化十六进制数据
+        let hex_data = packet_data
+            .iter()
+            .map(|b| format!("{:02x}", b))
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        // 构建日志行
+        let log_line = format!(
+            "[{}] UDP Packet (offset={}): {}\n",
+            timestamp, offset, hex_data
+        );
+
+        // 写入文件
+        match OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&log_path)
+            .await
+        {
+            Ok(mut file) => {
+                if let Err(e) = file.write_all(log_line.as_bytes()).await {
+                    error!("Failed to write UDP packet to log file: {}", e);
+                }
+            }
+            Err(e) => {
+                error!("Failed to open UDP log file: {}", e);
+            }
+        }
+    }
+
     /// 设置测试模式的目标地址
     pub async fn set_test_target(&self, address: Option<String>) {
         let mut target = self.test_target_address.write().await;
@@ -167,19 +225,63 @@ impl LedDataSender {
             packet_data.len()
         );
 
+        // 打印UDP数据包的十六进制内容（仅前64字节以避免日志过长）
+        let hex_data = if packet_data.len() <= 64 {
+            packet_data
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<Vec<_>>()
+                .join(" ")
+        } else {
+            let preview = &packet_data[..64];
+            let hex_preview = preview
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<Vec<_>>()
+                .join(" ");
+            format!(
+                "{} ... (truncated, total {} bytes)",
+                hex_preview,
+                packet_data.len()
+            )
+        };
+        log::info!(
+            "📦 UDP packet data (offset={}): {}",
+            packet.offset,
+            hex_data
+        );
+
+        // 写入UDP数据包到日志文件
+        self.write_udp_packet_to_file(packet.offset, &packet_data)
+            .await;
+
         // 根据模式选择发送方式
-        let send_result = if expected_mode == DataSendMode::TestEffect {
-            if let Some(target_addr) = *self.test_target_address.read().await {
-                log::debug!(
-                    "Sending test effect data to specific address: {}",
+        log::info!("🔍 Checking send mode: expected_mode={:?}", expected_mode);
+        let send_result = if expected_mode == DataSendMode::TestEffect
+            || expected_mode == DataSendMode::StripConfig
+        {
+            let target_addr_option = *self.test_target_address.read().await;
+            log::info!("🎯 Target address option: {:?}", target_addr_option);
+
+            if let Some(target_addr) = target_addr_option {
+                log::info!(
+                    "✅ Sending {} data to specific address: {}",
+                    packet.source,
                     target_addr
                 );
                 udp_rpc.send_to(&packet_data, target_addr).await
             } else {
-                warn!("TestEffect mode is active, but no target address is set. Data not sent.");
-                return Ok(()); // Not an error, just nothing to do
+                warn!(
+                    "⚠️ {} mode is active, but no target address is set. Using broadcast mode.",
+                    packet.source
+                );
+                udp_rpc.send_to_all(&packet_data).await
             }
         } else {
+            log::info!(
+                "📡 Sending {} data to all devices (broadcast mode)",
+                packet.source
+            );
             udp_rpc.send_to_all(&packet_data).await
         };
 
@@ -206,7 +308,64 @@ impl LedDataSender {
         }
     }
 
-    /// 发送屏幕氛围光数据
+    /// 发送完整的LED数据流（由发布服务负责拆包）
+    pub async fn send_complete_led_data(
+        &self,
+        start_offset: u16,
+        complete_data: Vec<u8>,
+        source: &str,
+    ) -> anyhow::Result<()> {
+        let mode = match source {
+            "AmbientLight" => DataSendMode::AmbientLight,
+            "StripConfig" => DataSendMode::StripConfig,
+            "TestEffect" => DataSendMode::TestEffect,
+            _ => DataSendMode::AmbientLight,
+        };
+
+        // 拆分数据为UDP包
+        let max_data_size = 500; // 每个UDP包的最大数据大小
+        let mut current_offset = start_offset;
+        let mut remaining_data = complete_data.as_slice();
+
+        log::info!(
+            "📦 Splitting complete LED data: total_size={} bytes, start_offset={}, source={}",
+            complete_data.len(),
+            start_offset,
+            source
+        );
+
+        let mut packet_count = 0;
+        while !remaining_data.is_empty() {
+            let chunk_size = std::cmp::min(max_data_size, remaining_data.len());
+            let chunk = remaining_data[..chunk_size].to_vec();
+            remaining_data = &remaining_data[chunk_size..];
+
+            packet_count += 1;
+            log::info!(
+                "📤 Sending packet {}: offset={}, size={} bytes, progress={}/{}",
+                packet_count,
+                current_offset,
+                chunk.len(),
+                complete_data.len() - remaining_data.len(),
+                complete_data.len()
+            );
+
+            let packet = LedDataPacket::new(current_offset, chunk, source.to_string());
+            self.send_packet(packet, mode).await?;
+
+            current_offset += chunk_size as u16;
+        }
+
+        log::info!(
+            "🎉 All data sent: {} packets, {} total bytes",
+            packet_count,
+            complete_data.len()
+        );
+
+        Ok(())
+    }
+
+    /// 发送屏幕氛围光数据（单个数据包，保持向后兼容）
     pub async fn send_ambient_light_data(&self, offset: u16, data: Vec<u8>) -> anyhow::Result<()> {
         let packet = LedDataPacket::new(offset, data, "AmbientLight".to_string());
         self.send_packet(packet, DataSendMode::AmbientLight).await

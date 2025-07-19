@@ -14,13 +14,13 @@ import {
   untrack,
   useContext,
 } from 'solid-js';
-import { LedStripConfig, LedStripPixelMapper } from '../../models/led-strip-config';
+import { LedStripConfig } from '../../models/led-strip-config';
 import { ledStripStore } from '../../stores/led-strip.store';
 import { invoke } from '@tauri-apps/api/core';
 import { LedStripConfigurationContext } from '../../contexts/led-strip-configuration.context';
 import background from '../../assets/transparent-grid-background.svg?url';
 
-const SorterItem: Component<{ strip: LedStripConfig; mapper: LedStripPixelMapper }> = (
+const SorterItem: Component<{ strip: LedStripConfig; stripIndex: number }> = (
   props,
 ) => {
   const [leds, setLeds] = createSignal<Array<string | null>>([]);
@@ -32,10 +32,20 @@ const SorterItem: Component<{ strip: LedStripConfig; mapper: LedStripPixelMapper
   const [stripConfiguration, { setSelectedStripPart, setHoveredStripPart }] = useContext(LedStripConfigurationContext);
   const [rootWidth, setRootWidth] = createSignal<number>(0);
 
-  let root: HTMLDivElement;
+  let root: HTMLDivElement | undefined;
+
+  // 计算当前 strip 在全局 LED 数组中的起始位置
+  const getStripStartPosition = () => {
+    let position = 0;
+    for (let i = 0; i < props.stripIndex; i++) {
+      position += ledStripStore.strips[i]?.len || 0;
+    }
+    return position;
+  };
 
   const move = (targetStart: number) => {
-    if (targetStart === props.mapper.start) {
+    const currentStart = getStripStartPosition();
+    if (targetStart === currentStart) {
       return;
     }
     invoke('move_strip_part', {
@@ -47,7 +57,8 @@ const SorterItem: Component<{ strip: LedStripConfig; mapper: LedStripPixelMapper
 
   // reset translateX on config updated
   createEffect(() => {
-    const indexDiff = props.mapper.start - dragStartIndex();
+    const currentStart = getStripStartPosition();
+    const indexDiff = currentStart - dragStartIndex();
     const start = untrack(dragStart);
     const curr = untrack(dragCurr);
     const _dragging = untrack(dragging);
@@ -58,7 +69,7 @@ const SorterItem: Component<{ strip: LedStripConfig; mapper: LedStripPixelMapper
     if (_dragging && indexDiff !== 0) {
       const compensation = indexDiff * cellWidth();
       batch(() => {
-        setDragStartIndex(props.mapper.start);
+        setDragStartIndex(currentStart);
         setDragStart({
           x: start.x + compensation,
           y: curr.y,
@@ -66,7 +77,7 @@ const SorterItem: Component<{ strip: LedStripConfig; mapper: LedStripPixelMapper
       });
     } else {
       batch(() => {
-        setDragStartIndex(props.mapper.start);
+        setDragStartIndex(currentStart);
         setDragStart(null);
         setDragCurr(null);
       });
@@ -83,7 +94,7 @@ const SorterItem: Component<{ strip: LedStripConfig; mapper: LedStripPixelMapper
         setDragStart({ x: ev.clientX, y: ev.clientY });
       }
       setDragCurr({ x: ev.clientX, y: ev.clientY });
-      setDragStartIndex(props.mapper.start);
+      setDragStartIndex(getStripStartPosition());
     });
   };
 
@@ -101,7 +112,7 @@ const SorterItem: Component<{ strip: LedStripConfig; mapper: LedStripPixelMapper
     if (moved === 0) {
       return;
     }
-    move(props.mapper.start + moved);
+    move(getStripStartPosition() + moved);
   };
 
   const onPointerMove = (ev: PointerEvent) => {
@@ -178,35 +189,35 @@ const SorterItem: Component<{ strip: LedStripConfig; mapper: LedStripPixelMapper
 
   // update fullLeds
   createEffect(() => {
-    const { start, end, pos } = props.mapper;
+    const stripStartPos = getStripStartPosition();
+    const stripLength = props.strip.len;
 
-    const leds = new Array(Math.abs(start - end)).fill(null);
+    const leds = new Array(stripLength).fill(null);
 
-    if (start < end) {
-      for (let i = 0, j = pos; i < leds.length; i++, j++) {
-        setColor(i, j, leds);
-      }
-    } else {
-      for (let i = leds.length - 1, j = pos; i >= 0; i--, j++) {
-        setColor(i, j, leds);
-      }
+    // 简化逻辑：直接按顺序设置颜色
+    for (let i = 0; i < leds.length; i++) {
+      setColor(i, stripStartPos + i, leds);
     }
 
     setLeds(leds);
   });
 
   // update rootWidth
-  createEffect(() => {
+  onMount(() => {
+    if (!root) return;
+
     let observer: ResizeObserver;
-    onMount(() => {
-      observer = new ResizeObserver(() => {
+    observer = new ResizeObserver(() => {
+      if (root) {
         setRootWidth(root.clientWidth);
-      });
-      observer.observe(root);
+      }
     });
+    observer.observe(root);
 
     onCleanup(() => {
-      observer?.unobserve(root);
+      if (root) {
+        observer?.unobserve(root);
+      }
     });
   });
   // update cellWidth
@@ -216,11 +227,12 @@ const SorterItem: Component<{ strip: LedStripConfig; mapper: LedStripPixelMapper
   });
 
   const style = createMemo<JSX.CSSProperties>(() => {
+    const stripStartPos = getStripStartPosition();
     return {
       transform: `translateX(${
         (dragCurr()?.x ?? 0) -
         (dragStart()?.x ?? 0) +
-        cellWidth() * Math.min(props.mapper.start, props.mapper.end)
+        cellWidth() * stripStartPos
       }px)`,
       width: `${cellWidth() * leds().length}px`,
     };
@@ -320,7 +332,7 @@ export const LedStripPartsSorter: Component = () => {
         {(strip, index) => (
           <Switch>
             <Match when={strip().len > 0}>
-              <SorterItem strip={strip()} mapper={ledStripStore.mappers[index]} />
+              <SorterItem strip={strip()} stripIndex={index} />
             </Match>
           </Switch>
         )}

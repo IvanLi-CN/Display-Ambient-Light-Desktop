@@ -34,6 +34,7 @@ hex = "0.4.3"
 toml = "0.7.3"
 # paho-mqtt = "0.12.1"  # Temporarily disabled due to CMake issues
 time = {version="0.3.35", features= ["formatting"] }
+chrono = { version = "0.4", features = ["serde"] }
 itertools = "0.10.5"
 core-foundation = "0.9.3"
 tokio-stream = "0.1.14"

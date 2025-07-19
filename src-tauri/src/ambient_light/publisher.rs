@@ -145,12 +145,21 @@ impl LedColorsPublisher {
                         }
                     }
                 } else {
-                    log::info!(
-                        "Skipping color send for display #{}: test_mode={}, enabled={}",
-                        display_id,
-                        test_mode_active,
-                        ambient_light_enabled
-                    );
+                    // In test mode or when ambient light is disabled, skip sending
+                    // The test mode will handle its own data sending
+                    if test_mode_active {
+                        log::debug!(
+                            "Skipping ambient light data for display #{}: test mode active",
+                            display_id
+                        );
+                    } else {
+                        log::info!(
+                            "Skipping color send for display #{}: test_mode={}, enabled={}",
+                            display_id,
+                            test_mode_active,
+                            ambient_light_enabled
+                        );
+                    }
                 }
 
                 match display_colors_tx.send((
@@ -374,12 +383,20 @@ impl LedColorsPublisher {
             configs.sample_point_groups.len()
         );
 
+        // Get the updated configs with proper display IDs assigned
+        let updated_configs = Self::get_updated_configs_with_display_ids(&original_configs).await;
+        if let Err(err) = updated_configs {
+            warn!("Failed to get updated configs: {}", err);
+            return;
+        }
+        let updated_configs = updated_configs.unwrap();
+
         let (display_colors_tx, display_colors_rx) = broadcast::channel::<(u32, Vec<u8>)>(8);
 
-        // Calculate start offsets for each display
+        // Calculate start offsets for each display using updated configs
         let mut cumulative_led_offset = 0;
         let mut display_start_offsets = std::collections::HashMap::new();
-        for strip in &original_configs.strips {
+        for strip in &updated_configs.strips {
             display_start_offsets
                 .entry(strip.display_id)
                 .or_insert(cumulative_led_offset);
@@ -391,8 +408,8 @@ impl LedColorsPublisher {
             let sample_points = sample_point_group.points;
             let bound_scale_factor = sample_point_group.bound_scale_factor;
 
-            // Get strips for this display
-            let display_strips: Vec<LedStripConfig> = original_configs
+            // Get strips for this display using updated configs
+            let display_strips: Vec<LedStripConfig> = updated_configs
                 .strips
                 .iter()
                 .filter(|strip| strip.display_id == display_id)
@@ -408,7 +425,7 @@ impl LedColorsPublisher {
                 sample_point_group.mappers,
                 display_colors_tx.clone(),
                 display_strips,
-                original_configs.color_calibration,
+                updated_configs.color_calibration,
                 start_led_offset,
             )
             .await;
@@ -424,7 +441,36 @@ impl LedColorsPublisher {
 
     pub async fn send_colors(offset: u16, payload: Vec<u8>) -> anyhow::Result<()> {
         let sender = LedDataSender::global().await;
-        sender.send_ambient_light_data(offset, payload).await
+        sender
+            .send_complete_led_data(offset, payload, "AmbientLight")
+            .await
+    }
+
+    /// Get updated configs with proper display IDs assigned
+    async fn get_updated_configs_with_display_ids(
+        configs: &LedStripConfigGroup,
+    ) -> anyhow::Result<LedStripConfigGroup> {
+        let displays = display_info::DisplayInfo::all()
+            .map_err(|e| anyhow::anyhow!("Failed to get displays: {}", e))?;
+
+        // Create a mutable copy of configs with proper display IDs
+        let mut updated_configs = configs.clone();
+        for strip in updated_configs.strips.iter_mut() {
+            if strip.display_id == 0 {
+                // Assign display ID based on strip index
+                let display_index = strip.index / 4;
+                if display_index < displays.len() {
+                    strip.display_id = displays[display_index].id;
+                    log::info!(
+                        "Assigned display ID {} to strip {}",
+                        strip.display_id,
+                        strip.index
+                    );
+                }
+            }
+        }
+
+        Ok(updated_configs)
     }
 
     pub async fn send_colors_by_display(
@@ -443,20 +489,22 @@ impl LedColorsPublisher {
             start_led_offset
         );
 
-        // 直接基于strips配置发送数据，不再使用mappers
+        // 第一步：合并所有LED数据到一个完整的数据流
+        let mut complete_led_data = Vec::<u8>::new();
         let mut color_offset = 0;
-        let mut led_offset = start_led_offset; // 硬件中的LED偏移量
+        let mut total_leds = 0;
+
+        log::info!("🔄 Step 1: Merging all LED strip data into complete data stream");
 
         for (strip_index, strip) in strips.iter().enumerate() {
             let strip_len = strip.len;
 
             log::info!(
-                "Processing LED strip {}: border={:?}, len={}, color_offset={}, led_offset={}, led_type={:?}",
+                "Merging LED strip {}: border={:?}, len={}, color_offset={}, led_type={:?}",
                 strip_index,
                 strip.border,
                 strip_len,
                 color_offset,
-                led_offset,
                 strip.led_type
             );
 
@@ -471,20 +519,12 @@ impl LedColorsPublisher {
                 );
                 // 仍然需要更新偏移量，即使跳过这个灯条
                 color_offset += strip_len;
-                led_offset += strip_len;
                 continue;
             }
 
             let led_type = strip.led_type;
 
-            let bytes_per_led = match led_type {
-                LedType::WS2812B => 3,
-                LedType::SK6812 => 4,
-            };
-
-            let mut buffer = Vec::<u8>::with_capacity(strip_len * bytes_per_led);
-
-            // 处理这个灯条的颜色数据
+            // 将这个灯带的数据添加到完整数据流中
             for i in 0..strip_len {
                 let color_index = color_offset + i;
                 if color_index < colors.len() {
@@ -517,7 +557,7 @@ impl LedColorsPublisher {
                             ]
                         }
                     };
-                    buffer.extend_from_slice(&bytes);
+                    complete_led_data.extend_from_slice(&bytes);
                 } else {
                     log::warn!(
                         "Color index {} out of bounds for colors array of length {}",
@@ -526,57 +566,29 @@ impl LedColorsPublisher {
                     );
                     // Add black color as fallback
                     match led_type {
-                        LedType::WS2812B => buffer.extend_from_slice(&[0, 0, 0]),
-                        LedType::SK6812 => buffer.extend_from_slice(&[0, 0, 0, 0]),
+                        LedType::WS2812B => complete_led_data.extend_from_slice(&[0, 0, 0]),
+                        LedType::SK6812 => complete_led_data.extend_from_slice(&[0, 0, 0, 0]),
                     }
                 }
             }
 
-            // 计算字节偏移量（基于LED偏移量和LED类型）
-            let byte_offset = led_offset * bytes_per_led;
-
-            log::info!(
-                "Sending LED data: strip={}, led_offset={}, byte_offset={}, buffer_size={}",
-                strip_index,
-                led_offset,
-                byte_offset,
-                buffer.len()
-            );
-
-            if !buffer.is_empty() {
-                log::info!(
-                    "📤 Attempting to send LED data for strip {}: {} bytes",
-                    strip_index,
-                    buffer.len()
-                );
-
-                match sender
-                    .send_ambient_light_data(byte_offset as u16, buffer)
-                    .await
-                {
-                    Ok(_) => {
-                        log::info!("✅ Successfully sent LED data for strip {}", strip_index);
-                    }
-                    Err(e) => {
-                        log::error!(
-                            "❌ Failed to send LED data for strip {}: {}",
-                            strip_index,
-                            e
-                        );
-                        // Continue with next strip instead of returning error
-                    }
-                }
-
-                // Add a small delay between packets to avoid overwhelming the network
-                tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
-            } else {
-                log::warn!("Empty buffer for strip {}, skipping", strip_index);
-            }
-
-            // 更新偏移量，为下一个灯条做准备
-            color_offset += strip_len;
-            led_offset += strip_len;
+            total_leds += strip_len;
         }
+
+        log::info!(
+            "✅ Step 1 complete: Merged {} LEDs into {} bytes of data",
+            total_leds,
+            complete_led_data.len()
+        );
+
+        // 第二步：将完整数据流提交给统一的发布服务进行拆包
+        log::info!("📦 Step 2: Submitting complete data to unified publisher for packet splitting");
+
+        let byte_offset = start_led_offset * 3; // 计算字节偏移量
+
+        sender
+            .send_complete_led_data(byte_offset as u16, complete_led_data, "AmbientLight")
+            .await?;
 
         Ok(())
     }
@@ -685,16 +697,17 @@ impl LedColorsPublisher {
         self.colors_rx.read().await.clone()
     }
 
-    /// Enable test mode - this will pause normal LED data publishing
+    /// Enable test mode - this will pause normal LED data publishing but keep connection alive
     pub async fn enable_test_mode(&self) {
         let mut test_mode = self.test_mode_active.write().await;
         *test_mode = true;
 
-        // Set data send mode to None to pause ambient light data sending
+        // Keep data send mode as AmbientLight to maintain connection with hardware
+        // The test mode flag will prevent actual color data from being sent
         let sender = LedDataSender::global().await;
-        sender.set_mode(DataSendMode::None).await;
+        sender.set_mode(DataSendMode::AmbientLight).await;
 
-        log::info!("Test mode enabled - normal LED publishing paused");
+        log::info!("Test mode enabled - normal LED publishing paused but connection maintained");
     }
 
     /// Disable test mode - this will resume normal LED data publishing

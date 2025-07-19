@@ -44,10 +44,9 @@ export const LedStripConfiguration = () => {
   // listen to config_changed event
   createEffect(() => {
     const unlisten = listen('config_changed', (event) => {
-      const { strips, mappers } = event.payload as LedStripConfigContainer;
+      const { strips } = event.payload as LedStripConfigContainer;
       setLedStripStore({
         strips,
-        mappers,
       });
     });
 

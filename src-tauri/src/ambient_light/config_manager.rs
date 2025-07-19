@@ -38,8 +38,41 @@ impl ConfigManager {
                         }
                     }
                     Err(e) => {
-                        log::error!("❌ Failed to load LED strip configuration: {}", e);
-                        panic!("Failed to initialize ConfigManager: {}", e);
+                        log::warn!("⚠️ Failed to load LED strip configuration: {}", e);
+                        log::info!("🔄 Using default configuration instead...");
+
+                        match LedStripConfigGroup::get_default_config().await {
+                            Ok(default_config) => {
+                                log::info!(
+                                    "✅ Successfully loaded default LED strip configuration"
+                                );
+                                let (config_update_sender, config_update_receiver) =
+                                    tokio::sync::watch::channel(default_config.clone());
+
+                                if let Err(err) = config_update_sender.send(default_config.clone())
+                                {
+                                    log::error!(
+                                        "Failed to send config update when read default config: {}",
+                                        err
+                                    );
+                                }
+                                drop(config_update_receiver);
+                                ConfigManager {
+                                    config: Arc::new(RwLock::new(default_config)),
+                                    config_update_sender,
+                                }
+                            }
+                            Err(default_err) => {
+                                log::error!(
+                                    "❌ Failed to create default configuration: {}",
+                                    default_err
+                                );
+                                panic!(
+                                    "Failed to initialize ConfigManager with default config: {}",
+                                    default_err
+                                );
+                            }
+                        }
                     }
                 }
             })

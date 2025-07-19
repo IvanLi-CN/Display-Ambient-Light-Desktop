@@ -18,6 +18,15 @@ interface LedStripConfig {
   endOffset: number;   // 0-100%
 }
 
+// 硬件设备信息类型
+interface BoardInfo {
+  fullname: string;
+  host: string;
+  address: string;
+  port: number;
+  connect_status: 'Connected' | 'Disconnected' | { Connecting: number };
+}
+
 
 
 // 常量定义
@@ -615,10 +624,7 @@ export function SingleDisplayConfig() {
 
         if (savedConfigs && Array.isArray(savedConfigs) && savedConfigs.length > 0) {
           // 转换后端数据为前端格式
-          const mappers = (allConfigs as any).mappers || [];
           const convertedStrips: LedStripConfig[] = savedConfigs.map((config: any) => {
-            const mapper = mappers.find((_m: any, i: number) => i === config.index);
-            const isReversed = mapper ? mapper.start > mapper.end : false;
             return {
               id: `strip-${config.border.toLowerCase()}-${config.index}`,
               displayId: config.display_id,
@@ -627,9 +633,9 @@ export function SingleDisplayConfig() {
               ledType: config.led_type, // 直接映射
               driver: 'Driver1', // 默认驱动器
               sequence: config.index, // 直接使用后端的 index 作为 sequence
-              startOffset: config.len > 0 ? Math.floor((config.start_pos / config.len) * 100) : 0,
+              startOffset: 0, // 保持用户设置的值，不要自动计算
               endOffset: 100, // 默认延伸到边缘末端
-              reverse: isReversed
+              reverse: false // 默认不反转，新系统中通过其他方式处理
             };
           });
 
@@ -653,78 +659,19 @@ export function SingleDisplayConfig() {
 
           return; // 成功加载，不需要使用测试数据
         } else {
-          console.log('No saved configuration found, using test data');
+          console.log('No saved configuration found, starting with empty configuration');
         }
       } else {
-        throw new Error('Not in Tauri environment, using test data');
+        console.log('Not in Tauri environment, starting with empty configuration');
       }
     } catch (error) {
-      console.log('Failed to load saved configuration, using test data:', error);
+      console.log('Failed to load saved configuration, starting with empty configuration:', error);
     }
 
-    // 如果没有保存的配置或加载失败，使用测试数据
-    console.log('Loading test data...');
-      const testStrips: LedStripConfig[] = [
-        {
-          id: 'test-right-1',
-          displayId: displayId(),
-          border: 'Right',
-          count: 22,
-          ledType: 'WS2812B',
-          driver: 'Driver1',
-          sequence: 2,
-          startOffset: 5,
-          endOffset: 84,
-          reverse: false,
-        },
-        {
-          id: 'test-right-2',
-          displayId: displayId(),
-          border: 'Right',
-          count: 18,
-          ledType: 'WS2812B',
-          driver: 'Driver1',
-          sequence: 3,
-          startOffset: 0,
-          endOffset: 100,
-          reverse: false,
-        },
-        {
-          id: 'test-bottom-1',
-          displayId: displayId(),
-          border: 'Bottom',
-          count: 38,
-          ledType: 'WS2812B',
-          driver: 'Driver1',
-          sequence: 4,
-          startOffset: 0,
-          endOffset: 100,
-          reverse: false,
-        },
-        {
-          id: 'test-bottom-2',
-          displayId: displayId(),
-          border: 'Bottom',
-          count: 32,
-          ledType: 'WS2812B',
-          driver: 'Driver1',
-          sequence: 5,
-          startOffset: 0,
-          endOffset: 100,
-          reverse: false,
-        }
-      ];
-      setLedStrips(testStrips);
-      setSelectedStrip(testStrips[0]);
-
-      // 注意：测试数据不会自动保存，只有用户点击保存按钮才会保存
-      console.log('Loaded test data (not saved automatically):', testStrips);
-
-      // 立即启动30Hz测试颜色发送
-      console.log('=== 立即启动测试颜色发送 ===');
-      setTimeout(() => {
-        startTestColorSending();
-      }, 100); // 稍微延迟确保状态已更新
+    // 如果没有保存的配置或加载失败，使用空配置
+    console.log('Starting with empty LED strip configuration');
+    setLedStrips([]);
+    setSelectedStrip(null);
   });
 
   // 组件卸载时的清理
@@ -851,23 +798,23 @@ export function SingleDisplayConfig() {
     const colors = [];
     const halfCount = Math.floor(ledCount / 2);
 
-    // 定义每个边框的两个颜色
+    // 定义每个边框的两个颜色 - 恢复原来正确的颜色方案
     const borderColorPairs = {
-      'top': [
-        { r: 255, g: 0, b: 0 },    // 红色
-        { r: 255, g: 165, b: 0 }   // 橙色
+      'bottom': [
+        { r: 255, g: 0, b: 255 },  // 紫色 (原来的左边颜色)
+        { r: 0, g: 255, b: 255 }   // 青色 (原来的右边颜色)
       ],
       'right': [
         { r: 0, g: 255, b: 0 },    // 绿色
-        { r: 0, g: 255, b: 255 }   // 青色
+        { r: 0, g: 0, b: 255 }     // 蓝色
       ],
-      'bottom': [
+      'top': [
         { r: 0, g: 0, b: 255 },    // 蓝色
-        { r: 128, g: 0, b: 128 }   // 紫色
+        { r: 255, g: 255, b: 0 }   // 黄色
       ],
       'left': [
         { r: 255, g: 255, b: 0 },  // 黄色
-        { r: 255, g: 0, b: 255 }   // 洋红色
+        { r: 255, g: 0, b: 0 }     // 红色
       ]
     };
 
@@ -894,59 +841,54 @@ export function SingleDisplayConfig() {
   // 30Hz测试颜色发送定时器
   let testColorTimer: number | null = null;
 
-  // 发送测试颜色到单个灯带
-  const sendTestColorsToStrip = async (strip: LedStripConfig, ledOffset: number) => {
-    try {
+
+
+  // 生成所有灯带的合并测试数据
+  const generateMergedTestData = (strips: LedStripConfig[]): Uint8Array => {
+    const sortedStrips = [...strips].sort((a, b) => a.sequence - b.sequence);
+    const allColorBytes: number[] = [];
+
+    for (const strip of sortedStrips) {
       // 生成该边框的预设颜色（两个颜色平分，考虑反向设置）
       const borderColors = generateBorderTestColors(strip.border, strip.count, strip.reverse);
 
-      // 发送到硬件
-      if (typeof window !== 'undefined' && (window as any).__TAURI__) {
-        try {
-          // 转换为硬件期望的格式
-          let colorBytes = [];
-
-          if (strip.ledType === 'SK6812') {
-            // SK6812 RGBW格式：G,R,B,W
-            colorBytes = borderColors.map(color => [color.g, color.r, color.b, 0]).flat();
-          } else {
-            // WS2812B RGB格式：G,R,B
-            colorBytes = borderColors.map(color => [color.g, color.r, color.b]).flat();
-          }
-
-          const bytesPerLed = strip.ledType === 'SK6812' ? 4 : 3;
-
-          // 计算偏移量：基于累积的LED偏移量
-          const byteOffset = ledOffset * bytesPerLed;
-
-          // 只在第一次发送时显示详细信息
-          if (!testColorTimer || Math.random() < 0.001) { // 0.1%概率显示，避免日志过多
-            console.log(`🚀 发送颜色: ${strip.id}, 偏移=${byteOffset}, 长度=${colorBytes.length}`);
-          }
-
-          // 获取第一个可用的设备地址
-          const boards = await invoke('get_boards') as any[];
-          if (boards.length === 0) {
-            console.error('❌ 没有找到可用的设备');
-            return;
-          }
-
-          const board = boards[0];
-          const boardAddress = `${board.address}:${board.port}`;
-
-          // 使用 send_test_colors_to_board 直接发送，不依赖设备连接状态
-          await invoke('send_test_colors_to_board', {
-            boardAddress: boardAddress,
-            offset: byteOffset,
-            buffer: colorBytes
-          });
-
-        } catch (error) {
-          console.error('❌ 发送颜色到硬件失败:', strip.id, error);
+      // 转换为字节数据
+      for (const color of borderColors) {
+        if (strip.ledType === 'SK6812') {
+          // GRBW 格式
+          allColorBytes.push(color.g, color.r, color.b, 255); // W通道设为255
+        } else {
+          // GRB 格式 (WS2812B)
+          allColorBytes.push(color.g, color.r, color.b);
         }
       }
+    }
+
+    return new Uint8Array(allColorBytes);
+  };
+
+  // 发送合并的测试数据
+  const sendMergedTestData = async (strips: LedStripConfig[]) => {
+    try {
+      const boards = await invoke('get_boards') as BoardInfo[];
+      if (boards.length === 0) {
+        console.warn('⚠️ 没有找到可用的硬件设备');
+        return;
+      }
+
+      const mergedData = generateMergedTestData(strips);
+      const board = boards[0];
+      const boardAddress = `${board.address}:${board.port}`;
+
+      // 使用统一的发布服务发送完整数据
+      await invoke('send_test_colors_to_board', {
+        boardAddress: boardAddress,
+        offset: 0, // 总是从0开始
+        buffer: Array.from(mergedData)
+      });
+
     } catch (error) {
-      console.error('Failed to generate test colors for strip:', strip.id, error);
+      console.error('❌ 发送合并测试数据失败:', error);
     }
   };
 
@@ -957,17 +899,12 @@ export function SingleDisplayConfig() {
     }
 
     const strips = ledStrips();
-    console.log('=== 启动30Hz测试颜色发送 ===');
+    console.log('=== 启动30Hz测试颜色发送（统一架构）===');
     console.log(`发送频率: 30Hz (每33.33ms发送一次)`);
     console.log(`目标灯带数量: ${strips.length}`);
 
     // 立即发送一次
-    const sortedStrips = [...strips].sort((a, b) => a.sequence - b.sequence);
-    let cumulativeLedOffset = 0;
-    for (const strip of sortedStrips) {
-      sendTestColorsToStrip(strip, cumulativeLedOffset);
-      cumulativeLedOffset += strip.count;
-    }
+    sendMergedTestData(strips);
 
     let frameCount = 0;
     const startTime = Date.now();
@@ -977,11 +914,32 @@ export function SingleDisplayConfig() {
       const currentStrips = ledStrips();
       if (currentStrips.length > 0) {
         const sortedStrips = [...currentStrips].sort((a, b) => a.sequence - b.sequence);
-        let cumulativeLedOffset = 0;
-        for (const strip of sortedStrips) {
-          sendTestColorsToStrip(strip, cumulativeLedOffset);
-          cumulativeLedOffset += strip.count;
+
+        // 显示排序后的灯带信息（仅在开始时显示一次）
+        if (frameCount === 0) {
+          console.log(`🔄 灯带排序结果:`);
+          sortedStrips.forEach((strip, index) => {
+            console.log(`  ${index + 1}. ${strip.id} (${strip.border}) - 序列${strip.sequence}, ${strip.count}个LED, LED类型: ${strip.ledType}`);
+          });
+
+          // 检查是否有重复的序列号
+          const sequences = sortedStrips.map(s => s.sequence);
+          const duplicates = sequences.filter((seq, index) => sequences.indexOf(seq) !== index);
+          if (duplicates.length > 0) {
+            console.warn(`⚠️ 发现重复的序列号: ${duplicates.join(', ')}`);
+          }
+
+          // 计算总字节数
+          let totalBytes = 0;
+          for (const strip of sortedStrips) {
+            const bytesPerLed = strip.ledType === 'SK6812' ? 4 : 3;
+            totalBytes += strip.count * bytesPerLed;
+          }
+          console.log(`✅ 总字节数: ${totalBytes}`);
         }
+
+        // 发送合并的测试数据
+        sendMergedTestData(currentStrips);
 
         frameCount++;
         // 每秒显示一次统计信息
@@ -1001,6 +959,52 @@ export function SingleDisplayConfig() {
       testColorTimer = null;
       console.log('=== 停止30Hz测试颜色发送 ===');
     }
+  };
+
+  // 调试函数：显示当前配置信息
+  const debugCurrentConfig = () => {
+    const currentStrips = ledStrips();
+    console.log('🔍 当前LED灯带配置调试信息:');
+    console.log(`总灯带数量: ${currentStrips.length}`);
+
+    if (currentStrips.length === 0) {
+      console.log('⚠️ 没有找到任何LED灯带配置');
+      return;
+    }
+
+    const sortedStrips = [...currentStrips].sort((a, b) => a.sequence - b.sequence);
+    console.log('📋 灯带详细信息:');
+
+    let cumulativeLedOffset = 0;
+    sortedStrips.forEach((strip, index) => {
+      const bytesPerLed = strip.ledType === 'SK6812' ? 4 : 3;
+      const byteOffset = cumulativeLedOffset * bytesPerLed;
+
+      console.log(`${index + 1}. 灯带 ${strip.id}:`);
+      console.log(`   - 边框: ${strip.border}`);
+      console.log(`   - 序列号: ${strip.sequence}`);
+      console.log(`   - LED数量: ${strip.count}`);
+      console.log(`   - LED类型: ${strip.ledType} (${bytesPerLed}字节/LED)`);
+      console.log(`   - 反转: ${strip.reverse}`);
+      console.log(`   - 起始偏移: ${strip.startOffset}%`);
+      console.log(`   - 结束偏移: ${strip.endOffset}%`);
+      console.log(`   - 累积LED偏移: ${cumulativeLedOffset}`);
+      console.log(`   - 字节偏移: ${byteOffset}`);
+      console.log(`   - 数据长度: ${strip.count * bytesPerLed} 字节`);
+
+      cumulativeLedOffset += strip.count;
+    });
+
+    // 检查序列号重复
+    const sequences = sortedStrips.map(s => s.sequence);
+    const duplicates = sequences.filter((seq, index) => sequences.indexOf(seq) !== index);
+    if (duplicates.length > 0) {
+      console.error(`❌ 发现重复的序列号: ${[...new Set(duplicates)].join(', ')}`);
+    } else {
+      console.log('✅ 所有序列号都是唯一的');
+    }
+
+    console.log(`📊 总计: ${cumulativeLedOffset} 个LED`);
   };
 
   // 当灯带配置变化时，重新启动测试颜色发送
@@ -1080,6 +1084,13 @@ export function SingleDisplayConfig() {
             {isSaving() ? '保存中...' : '保存配置'}
           </button>
 
+          <button
+            class="btn btn-outline btn-info"
+            onClick={debugCurrentConfig}
+            title="在控制台显示调试信息"
+          >
+            调试信息
+          </button>
           <button
             class="btn btn-outline btn-error"
             onClick={clearAllConfig}

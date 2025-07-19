@@ -65,7 +65,6 @@ function App() {
     invoke<LedStripConfigContainer>('read_config').then((config) => {
       setLedStripStore({
         strips: config.strips,
-        mappers: config.mappers,
         colorCalibration: config.color_calibration,
       });
     }).catch((error) => {

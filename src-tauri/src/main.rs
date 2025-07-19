@@ -105,12 +105,8 @@ fn list_display_info() -> Result<String, String> {
 
 #[tauri::command]
 async fn read_led_strip_configs() -> Result<LedStripConfigGroup, String> {
-    let config = ambient_light::LedStripConfigGroup::read_config()
-        .await
-        .map_err(|e| {
-            error!("can not read led strip configs: {}", e);
-            e.to_string()
-        })?;
+    let config_manager = ambient_light::ConfigManager::global().await;
+    let config = config_manager.configs().await;
     Ok(config)
 }
 
@@ -210,7 +206,7 @@ async fn send_colors(offset: u16, buffer: Vec<u8>) -> Result<(), String> {
 
 #[tauri::command]
 async fn send_test_colors_to_board(
-    _board_address: String, // Keep for API compatibility but not used
+    board_address: String, // Use the board address parameter
     offset: u16,
     buffer: Vec<u8>,
 ) -> Result<(), String> {
@@ -218,19 +214,30 @@ async fn send_test_colors_to_board(
     let sender = LedDataSender::global().await;
     sender.set_mode(DataSendMode::StripConfig).await;
 
-    // Send the data through unified sender
+    // Set the target address for strip config mode
+    sender.set_test_target(Some(board_address.clone())).await;
+    info!("Set strip config target address to: {}", board_address);
+
+    // Send the data through unified sender using the new complete data interface
+    info!(
+        "🚀 About to call send_complete_led_data with offset={}, buffer_len={}, source=StripConfig",
+        offset,
+        buffer.len()
+    );
     sender
-        .send_strip_config_data(offset, buffer.clone())
+        .send_complete_led_data(offset, buffer.clone(), "StripConfig")
         .await
         .map_err(|e| {
             error!("Failed to send strip config colors: {}", e);
             e.to_string()
         })?;
+    info!("✅ send_complete_led_data call completed successfully");
 
     info!(
-        "Sent strip config colors with offset {} and {} bytes",
+        "Sent strip config colors with offset {} and {} bytes to {}",
         offset,
-        buffer.len()
+        buffer.len(),
+        board_address
     );
     Ok(())
 }
@@ -316,9 +323,9 @@ async fn start_led_test_effect(
                     // Calculate byte offset for 0x02 packet
                     let byte_offset = LedTestEffects::calculate_byte_offset(&effect_config);
 
-                    // Send to board with calculated offset
+                    // Send to board with calculated offset using the new complete data interface
                     let sender = LedDataSender::global().await;
-                    if let Err(e) = sender.send_test_effect_data(byte_offset, colors).await {
+                    if let Err(e) = sender.send_complete_led_data(byte_offset, colors, "TestEffect").await {
                         error!("Failed to send test effect colors: {}", e);
                         // Don't break the loop, just log the error
                     }
@@ -1150,12 +1157,7 @@ async fn main() {
         }
     });
 
-    // Start WebSocket server for screen streaming
-    tokio::spawn(async move {
-        if let Err(e) = start_websocket_server().await {
-            error!("Failed to start WebSocket server: {}", e);
-        }
-    });
+    // WebSocket server will be started in the Tauri setup hook
 
     let _volume = VolumeManager::global().await;
 

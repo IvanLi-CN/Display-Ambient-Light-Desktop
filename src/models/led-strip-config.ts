@@ -5,11 +5,7 @@ export enum LedType {
   SK6812 = 'SK6812',
 }
 
-export type LedStripPixelMapper = {
-  start: number;
-  end: number;
-  pos: number;
-};
+
 
 export class ColorCalibration {
   r: number = 1;
@@ -20,7 +16,6 @@ export class ColorCalibration {
 
 export type LedStripConfigContainer = {
   strips: LedStripConfig[];
-  mappers: LedStripPixelMapper[];
   color_calibration: ColorCalibration;
 };
 

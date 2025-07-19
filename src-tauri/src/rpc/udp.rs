@@ -173,6 +173,21 @@ impl UdpRpc {
             return Err(anyhow::anyhow!("No boards available"));
         }
 
+        log::info!("🔍 Looking for target board: {}", target_addr);
+        log::info!("📋 Available boards:");
+        for (name, board) in boards.iter() {
+            if let Some(socket_addr) = board.get_socket_addr() {
+                log::info!(
+                    "  - {}: {} (match: {})",
+                    name,
+                    socket_addr,
+                    socket_addr == target_addr
+                );
+            } else {
+                log::info!("  - {}: No socket address", name);
+            }
+        }
+
         let target_board = boards.values().find(|board| {
             if let Some(socket_addr) = board.get_socket_addr() {
                 socket_addr == target_addr
@@ -182,15 +197,15 @@ impl UdpRpc {
         });
 
         if let Some(board) = target_board {
-            log::debug!(
-                "Sending {} bytes to specific board: {}",
+            log::info!(
+                "✅ Found target board! Sending {} bytes to: {}",
                 buff.len(),
                 target_addr
             );
             board.send_colors(buff).await;
             Ok(())
         } else {
-            warn!("Target board with address {} not found", target_addr);
+            warn!("❌ Target board with address {} not found", target_addr);
             Err(anyhow::anyhow!("Target board not found"))
         }
     }

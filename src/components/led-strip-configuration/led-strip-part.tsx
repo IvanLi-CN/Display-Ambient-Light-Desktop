@@ -53,22 +53,20 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
       return;
     }
 
-    const index = ledStripStore.strips.findIndex(
+    const strip = ledStripStore.strips.find(
       (s) =>
         s.display_id === localProps.config!.display_id &&
         s.border === localProps.config!.border,
     );
 
-    if (index === -1) {
+    if (!strip) {
       return;
     }
 
-    const mapper = ledStripStore.mappers[index];
-    if (!mapper) {
-      return;
-    }
-
-    const offset = mapper.start * 3;
+    // 基于 strip 的索引计算颜色偏移
+    // 在新系统中，我们需要根据 strip 的索引来计算偏移
+    const stripIndex = ledStripStore.strips.findIndex(s => s === strip);
+    const offset = stripIndex * strip.len * 3;
 
     const colors = new Array(localProps.config.len).fill(null).map((_, i) => {
       const index = offset + i * 3;
