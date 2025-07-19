@@ -1048,9 +1048,20 @@ async fn handle_tray_event<R: Runtime>(app: &tauri::AppHandle<R>, event: TrayIco
 
 // Helper function to extract page name from URL
 fn extract_page_from_url(url: &str) -> Option<String> {
-    let nav_re = regex::Regex::new(r"ambient-light://navigate/([a-zA-Z0-9\-_]+)").unwrap();
+    // Handle navigation requests: ambient-light://navigate/page_name or ambient-light://navigate/page_name/display/id
+    let nav_re =
+        regex::Regex::new(r"ambient-light://navigate/([a-zA-Z0-9\-_]+)(?:/display/(\d+))?")
+            .unwrap();
     if let Some(captures) = nav_re.captures(url) {
-        Some(captures[1].to_string())
+        let page_name = &captures[1];
+        let display_id = captures.get(2).map(|m| m.as_str());
+
+        if let Some(display_id) = display_id {
+            // For display-specific pages, create a combined page identifier
+            Some(format!("{}-display-{}", page_name, display_id))
+        } else {
+            Some(page_name.to_string())
+        }
     } else {
         None
     }
@@ -1090,36 +1101,38 @@ fn handle_ambient_light_protocol<R: Runtime>(
             let route = if let Some(display_id) = display_id {
                 // Handle display-specific navigation
                 if page_name == "led-strips-configuration" || page_name == "led-config" {
-                    format!("#/led-strips-configuration/display/{}", display_id)
+                    format!("/led-strips-configuration/display/{}", display_id)
                 } else {
                     match page_name {
-                        "info" => "#/info".to_string(),
-                        "white-balance" => "#/white-balance".to_string(),
-                        "led-strip-test" | "led-test" => "#/led-strip-test".to_string(),
+                        "info" => "/info".to_string(),
+                        "white-balance" => "/white-balance".to_string(),
+                        "led-strip-test" | "led-test" => "/led-strip-test".to_string(),
                         "led-data-sender-test" | "data-sender-test" => {
-                            "#/led-data-sender-test".to_string()
+                            "/led-data-sender-test".to_string()
                         }
-                        "settings" => "#/settings".to_string(),
-                        _ => "#/info".to_string(), // Default to info page
+                        "settings" => "/settings".to_string(),
+                        _ => "/info".to_string(), // Default to info page
                     }
                 }
             } else {
                 match page_name {
-                    "info" => "#/info",
-                    "led-strips-configuration" | "led-config" => "#/led-strips-configuration",
-                    "white-balance" => "#/white-balance",
-                    "led-strip-test" | "led-test" => "#/led-strip-test",
-                    "led-data-sender-test" | "data-sender-test" => "#/led-data-sender-test",
-                    "settings" => "#/settings",
-                    _ => "#/info", // Default to info page
+                    "info" => "/info",
+                    "led-strips-configuration" | "led-config" => "/led-strips-configuration",
+                    "white-balance" => "/white-balance",
+                    "led-strip-test" | "led-test" => "/led-strip-test",
+                    "led-data-sender-test" | "data-sender-test" => "/led-data-sender-test",
+                    "settings" => "/settings",
+                    _ => "/info", // Default to info page
                 }
                 .to_string()
             };
 
             let _ = window.show();
             let _ = window.set_focus();
-            let _ = window.eval(&format!("window.location.hash = '{}'", route));
-            info!("URL scheme navigation executed: {}", route);
+
+            // Use the new event-driven navigation system
+            let _ = window.emit("navigate", &route);
+            info!("URL scheme navigation event emitted: {}", route);
         }
 
         let response_body = "Navigation request received";
