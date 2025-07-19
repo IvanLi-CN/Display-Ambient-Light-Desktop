@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LED配置数据测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .button:hover {
+            background: #0056b3;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 20px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .status.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .status.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 LED配置数据测试工具</h1>
+        <p>这个工具用于测试LED配置界面的数据发送功能，帮助调试数据传输问题。</p>
+        
+        <div id="status" class="status">准备就绪</div>
+        
+        <h3>测试操作</h3>
+        <button class="button" onclick="testLedConfigData()">🚀 发送LED配置测试数据</button>
+        <button class="button" onclick="testGetBoards()">📡 获取硬件设备列表</button>
+        <button class="button" onclick="testEnableTestMode()">🔧 启用测试模式</button>
+        <button class="button" onclick="clearLog()">🗑️ 清空日志</button>
+        
+        <h3>测试日志</h3>
+        <div id="log" class="log"></div>
+    </div>
+
+    <script>
+        function log(message) {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.innerHTML += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function setStatus(message, type = 'success') {
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = message;
+            statusElement.className = `status ${type}`;
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        // 模拟LED配置数据生成
+        function generateTestLedData() {
+            // 模拟4个LED灯带的配置
+            const strips = [
+                { border: 'bottom', count: 38, ledType: 'SK6812', sequence: 1 },
+                { border: 'right', count: 22, ledType: 'WS2812B', sequence: 2 },
+                { border: 'top', count: 38, ledType: 'SK6812', sequence: 3 },
+                { border: 'left', count: 22, ledType: 'WS2812B', sequence: 4 }
+            ];
+
+            // 生成边框测试颜色
+            const borderColors = {
+                'bottom': [{ r: 255, g: 0, b: 255 }, { r: 0, g: 255, b: 255 }], // 紫色 + 青色
+                'right': [{ r: 0, g: 255, b: 0 }, { r: 0, g: 0, b: 255 }],     // 绿色 + 蓝色
+                'top': [{ r: 0, g: 0, b: 255 }, { r: 255, g: 255, b: 0 }],     // 蓝色 + 黄色
+                'left': [{ r: 255, g: 255, b: 0 }, { r: 255, g: 0, b: 0 }]     // 黄色 + 红色
+            };
+
+            const allColorBytes = [];
+            
+            // 按序列号排序
+            strips.sort((a, b) => a.sequence - b.sequence);
+            
+            for (const strip of strips) {
+                const colors = borderColors[strip.border];
+                const halfCount = Math.floor(strip.count / 2);
+                
+                log(`生成 ${strip.border} 边框数据: ${strip.count} 个LED (${strip.ledType})`);
+                
+                // 前半部分使用第一种颜色
+                for (let i = 0; i < halfCount; i++) {
+                    const color = colors[0];
+                    if (strip.ledType === 'SK6812') {
+                        allColorBytes.push(color.g, color.r, color.b, 255); // GRBW
+                    } else {
+                        allColorBytes.push(color.g, color.r, color.b); // GRB
+                    }
+                }
+                
+                // 后半部分使用第二种颜色
+                for (let i = halfCount; i < strip.count; i++) {
+                    const color = colors[1];
+                    if (strip.ledType === 'SK6812') {
+                        allColorBytes.push(color.g, color.r, color.b, 255); // GRBW
+                    } else {
+                        allColorBytes.push(color.g, color.r, color.b); // GRB
+                    }
+                }
+            }
+            
+            log(`总共生成 ${allColorBytes.length} 字节的LED数据`);
+            return allColorBytes;
+        }
+
+        // 测试获取硬件设备列表
+        async function testGetBoards() {
+            try {
+                log('🔍 获取硬件设备列表...');
+                
+                // 检查是否在Tauri环境中
+                if (typeof window.__TAURI__ === 'undefined') {
+                    throw new Error('不在Tauri环境中，无法调用后端API');
+                }
+                
+                const boards = await window.__TAURI__.core.invoke('get_boards');
+                log(`✅ 找到 ${boards.length} 个硬件设备:`);
+                
+                boards.forEach((board, index) => {
+                    log(`  设备 ${index + 1}: ${board.address}:${board.port}`);
+                });
+                
+                setStatus(`找到 ${boards.length} 个硬件设备`, 'success');
+                return boards;
+                
+            } catch (error) {
+                log(`❌ 获取硬件设备失败: ${error.message}`);
+                setStatus(`获取硬件设备失败: ${error.message}`, 'error');
+                return [];
+            }
+        }
+
+        // 测试启用测试模式
+        async function testEnableTestMode() {
+            try {
+                log('🔧 启用测试模式...');
+                
+                if (typeof window.__TAURI__ === 'undefined') {
+                    throw new Error('不在Tauri环境中，无法调用后端API');
+                }
+                
+                await window.__TAURI__.core.invoke('enable_test_mode');
+                log('✅ 测试模式已启用');
+                setStatus('测试模式已启用', 'success');
+                
+            } catch (error) {
+                log(`❌ 启用测试模式失败: ${error.message}`);
+                setStatus(`启用测试模式失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 测试LED配置数据发送
+        async function testLedConfigData() {
+            try {
+                log('🚀 开始LED配置数据测试...');
+                setStatus('正在测试...', 'success');
+                
+                // 检查是否在Tauri环境中
+                if (typeof window.__TAURI__ === 'undefined') {
+                    throw new Error('不在Tauri环境中，无法调用后端API');
+                }
+                
+                // 1. 启用测试模式
+                await testEnableTestMode();
+                
+                // 2. 获取硬件设备列表
+                const boards = await testGetBoards();
+                
+                if (boards.length === 0) {
+                    throw new Error('没有找到可用的硬件设备');
+                }
+                
+                // 3. 生成测试数据
+                const testData = generateTestLedData();
+                
+                // 4. 发送到所有设备（包括虚拟设备）
+                const allTargets = [
+                    ...boards.map(board => `${board.address}:${board.port}`),
+                    '127.0.0.1:8888' // 虚拟调试设备
+                ];
+                
+                log(`🎯 准备发送到 ${allTargets.length} 个目标设备:`);
+                allTargets.forEach(target => log(`  - ${target}`));
+                
+                for (const boardAddress of allTargets) {
+                    try {
+                        log(`📤 发送到 ${boardAddress}...`);
+                        
+                        await window.__TAURI__.core.invoke('send_test_colors_to_board', {
+                            boardAddress: boardAddress,
+                            offset: 0,
+                            buffer: testData
+                        });
+                        
+                        log(`✅ 成功发送到 ${boardAddress}`);
+                        
+                    } catch (error) {
+                        log(`❌ 发送到 ${boardAddress} 失败: ${error.message}`);
+                    }
+                }
+                
+                setStatus('LED配置数据测试完成', 'success');
+                log('🎉 LED配置数据测试完成');
+                
+            } catch (error) {
+                log(`❌ LED配置数据测试失败: ${error.message}`);
+                setStatus(`测试失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 页面加载时的初始化
+        window.addEventListener('load', () => {
+            log('🔧 LED配置数据测试工具已加载');
+            
+            if (typeof window.__TAURI__ === 'undefined') {
+                log('⚠️ 警告: 不在Tauri环境中，某些功能可能无法使用');
+                setStatus('不在Tauri环境中', 'error');
+            } else {
+                log('✅ Tauri环境检测成功');
+                setStatus('Tauri环境就绪', 'success');
+            }
+        });
+    </script>
+</body>
+</html>

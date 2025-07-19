@@ -269,7 +269,22 @@ impl LedDataSender {
                     packet.source,
                     target_addr
                 );
-                udp_rpc.send_to(&packet_data, target_addr).await
+
+                // 首先尝试发送到已知设备
+                match udp_rpc.send_to(&packet_data, target_addr).await {
+                    Ok(()) => {
+                        log::info!("📤 Successfully sent to known device: {}", target_addr);
+                        Ok(())
+                    }
+                    Err(e) => {
+                        log::warn!(
+                            "⚠️ Failed to send to known device: {}, trying direct send...",
+                            e
+                        );
+                        // 如果失败，尝试直接发送（用于调试设备）
+                        udp_rpc.send_to_direct(&packet_data, target_addr).await
+                    }
+                }
             } else {
                 warn!(
                     "⚠️ {} mode is active, but no target address is set. Using broadcast mode.",
@@ -323,7 +338,7 @@ impl LedDataSender {
         };
 
         // 拆分数据为UDP包
-        let max_data_size = 500; // 每个UDP包的最大数据大小
+        let max_data_size = 400; // 每个UDP包的最大数据大小（硬件限制：不超过400字节）
         let mut current_offset = start_offset;
         let mut remaining_data = complete_data.as_slice();
 

@@ -14,14 +14,10 @@ import {
   LedStripConfigurationContextType,
 } from '../../contexts/led-strip-configuration.context';
 import { useLanguage } from '../../i18n/index';
-import { SingleDisplayConfig } from './single-display-config';
 
 
 export const LedStripConfiguration = () => {
   const { t } = useLanguage();
-
-  // 临时测试：直接渲染SingleDisplayConfig
-  // return <SingleDisplayConfig />;
 
   console.log('🔧 LedStripConfiguration component loaded');
   createEffect(() => {

@@ -40,6 +40,9 @@ impl UdpRpc {
     async fn initialize(&self) {
         let shared_self = Arc::new(self.clone());
 
+        // 添加虚拟设备用于调试
+        self.add_virtual_debug_device().await;
+
         let shared_self_for_search = shared_self.clone();
         tokio::spawn(async move {
             loop {
@@ -59,6 +62,51 @@ impl UdpRpc {
         tokio::spawn(async move {
             shared_self_for_check.check_boards().await;
         });
+    }
+
+    /// 添加虚拟调试设备到设备列表
+    async fn add_virtual_debug_device(&self) {
+        use std::net::Ipv4Addr;
+
+        // 检查是否在调试模式或开发环境
+        if cfg!(debug_assertions) {
+            let virtual_board_info = BoardInfo::new(
+                "Virtual LED Board Debug._ambient_light._udp.local.".to_string(),
+                "virtual-led-board-debug.local.".to_string(),
+                Ipv4Addr::new(127, 0, 0, 1),
+                8888,
+            );
+
+            let mut virtual_board = Board::new(virtual_board_info.clone());
+
+            // 尝试初始化socket连接到虚拟设备
+            match virtual_board.init_socket().await {
+                Ok(_) => {
+                    info!(
+                        "✅ Virtual debug device added successfully: {:?}",
+                        virtual_board_info
+                    );
+
+                    let mut boards = self.boards.write().await;
+                    boards.insert(virtual_board_info.fullname.clone(), virtual_board);
+
+                    // 通知设备列表更新
+                    let tx_boards = boards
+                        .values()
+                        .map(|it| async move { it.info.read().await.clone() });
+                    let tx_boards = futures::future::join_all(tx_boards).await;
+
+                    drop(boards);
+
+                    if let Err(err) = self.boards_change_sender.send(tx_boards) {
+                        error!("Failed to notify board list change: {:?}", err);
+                    }
+                }
+                Err(err) => {
+                    warn!("⚠️ Virtual debug device not available (this is normal if virtual board is not running): {:?}", err);
+                }
+            }
+        }
     }
 
     async fn search_boards(&self) -> anyhow::Result<()> {
@@ -207,6 +255,37 @@ impl UdpRpc {
         } else {
             warn!("❌ Target board with address {} not found", target_addr);
             Err(anyhow::anyhow!("Target board not found"))
+        }
+    }
+
+    /// 直接发送数据到指定地址，不检查设备列表（用于调试和测试）
+    pub async fn send_to_direct(
+        &self,
+        buff: &Vec<u8>,
+        target_addr: SocketAddr,
+    ) -> anyhow::Result<()> {
+        log::info!(
+            "🚀 Direct send: {} bytes to {} (bypassing device check)",
+            buff.len(),
+            target_addr
+        );
+
+        // 创建临时UDP socket直接发送
+        let socket = tokio::net::UdpSocket::bind("0.0.0.0:0").await?;
+
+        match socket.send_to(buff, target_addr).await {
+            Ok(bytes_sent) => {
+                log::info!(
+                    "✅ Direct send successful: {} bytes sent to {}",
+                    bytes_sent,
+                    target_addr
+                );
+                Ok(())
+            }
+            Err(err) => {
+                error!("❌ Direct send failed to {}: {}", target_addr, err);
+                Err(anyhow::anyhow!("Direct send failed: {}", err))
+            }
         }
     }
 

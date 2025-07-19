@@ -871,21 +871,41 @@ export function SingleDisplayConfig() {
   const sendMergedTestData = async (strips: LedStripConfig[]) => {
     try {
       const boards = await invoke('get_boards') as BoardInfo[];
+      const mergedData = generateMergedTestData(strips);
+
+      // 确定目标地址
+      let boardAddress: string;
+
       if (boards.length === 0) {
-        console.warn('⚠️ 没有找到可用的硬件设备');
-        return;
+        // 没有真实硬件设备时，发送到虚拟驱动板进行调试
+        boardAddress = '127.0.0.1:8888';
+        console.log('⚠️ 没有找到真实硬件设备，发送到虚拟驱动板进行调试');
+      } else {
+        // 有真实硬件设备时，同时发送到真实设备和虚拟设备
+        const board = boards[0];
+        boardAddress = `${board.address}:${board.port}`;
+
+        // 先发送到虚拟驱动板用于调试验证
+        try {
+          await invoke('send_test_colors_to_board', {
+            boardAddress: '127.0.0.1:8888',
+            offset: 0,
+            buffer: Array.from(mergedData)
+          });
+          console.log('✅ 已发送到虚拟驱动板 (调试验证)');
+        } catch (error) {
+          console.warn('⚠️ 发送到虚拟驱动板失败:', error);
+        }
       }
 
-      const mergedData = generateMergedTestData(strips);
-      const board = boards[0];
-      const boardAddress = `${board.address}:${board.port}`;
-
-      // 使用统一的发布服务发送完整数据
+      // 发送到目标设备
       await invoke('send_test_colors_to_board', {
         boardAddress: boardAddress,
         offset: 0, // 总是从0开始
         buffer: Array.from(mergedData)
       });
+
+      console.log(`✅ 已发送到目标设备: ${boardAddress}`);
 
     } catch (error) {
       console.error('❌ 发送合并测试数据失败:', error);

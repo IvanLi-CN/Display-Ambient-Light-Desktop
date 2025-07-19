@@ -281,6 +281,108 @@ export const LedStripTest = () => {
     }
   };
 
+  // 测试LED配置数据发送
+  const testLedConfigData = async () => {
+    if (!selectedBoard()) {
+      console.error('No board selected');
+      return;
+    }
+
+    try {
+      console.log('🚀 开始LED配置数据测试...');
+
+      // 1. 启用测试模式
+      await invoke('enable_test_mode');
+      console.log('✅ 测试模式已启用');
+
+      // 2. 生成模拟LED配置数据
+      const testData = generateLedConfigTestData();
+      console.log(`📦 生成了 ${testData.length} 字节的测试数据`);
+
+      // 3. 发送到选中的设备和虚拟设备
+      const targets = [
+        `${selectedBoard()!.address}:${selectedBoard()!.port}`,
+        '127.0.0.1:8888' // 虚拟调试设备
+      ];
+
+      console.log('🎯 发送测试数据到以下设备:', targets);
+
+      for (const boardAddress of targets) {
+        try {
+          console.log(`📤 发送到 ${boardAddress}...`);
+
+          await invoke('send_test_colors_to_board', {
+            boardAddress: boardAddress,
+            offset: 0,
+            buffer: testData
+          });
+
+          console.log(`✅ 成功发送到 ${boardAddress}`);
+        } catch (error) {
+          console.error(`❌ 发送到 ${boardAddress} 失败:`, error);
+        }
+      }
+
+      console.log('🎉 LED配置数据测试完成');
+
+    } catch (error) {
+      console.error('❌ LED配置数据测试失败:', error);
+    }
+  };
+
+  // 生成LED配置测试数据
+  const generateLedConfigTestData = (): number[] => {
+    // 模拟4个LED灯带的配置
+    const strips = [
+      { border: 'bottom', count: 38, ledType: 'SK6812', sequence: 1 },
+      { border: 'right', count: 22, ledType: 'WS2812B', sequence: 2 },
+      { border: 'top', count: 38, ledType: 'SK6812', sequence: 3 },
+      { border: 'left', count: 22, ledType: 'WS2812B', sequence: 4 }
+    ];
+
+    // 生成边框测试颜色
+    const borderColors: Record<string, Array<{r: number, g: number, b: number}>> = {
+      'bottom': [{ r: 255, g: 0, b: 255 }, { r: 0, g: 255, b: 255 }], // 紫色 + 青色
+      'right': [{ r: 0, g: 255, b: 0 }, { r: 0, g: 0, b: 255 }],     // 绿色 + 蓝色
+      'top': [{ r: 0, g: 0, b: 255 }, { r: 255, g: 255, b: 0 }],     // 蓝色 + 黄色
+      'left': [{ r: 255, g: 255, b: 0 }, { r: 255, g: 0, b: 0 }]     // 黄色 + 红色
+    };
+
+    const allColorBytes: number[] = [];
+
+    // 按序列号排序
+    strips.sort((a, b) => a.sequence - b.sequence);
+
+    for (const strip of strips) {
+      const colors = borderColors[strip.border];
+      const halfCount = Math.floor(strip.count / 2);
+
+      console.log(`生成 ${strip.border} 边框数据: ${strip.count} 个LED (${strip.ledType})`);
+
+      // 前半部分使用第一种颜色
+      for (let i = 0; i < halfCount; i++) {
+        const color = colors[0];
+        if (strip.ledType === 'SK6812') {
+          allColorBytes.push(color.g, color.r, color.b, 255); // GRBW
+        } else {
+          allColorBytes.push(color.g, color.r, color.b); // GRB
+        }
+      }
+
+      // 后半部分使用第二种颜色
+      for (let i = halfCount; i < strip.count; i++) {
+        const color = colors[1];
+        if (strip.ledType === 'SK6812') {
+          allColorBytes.push(color.g, color.r, color.b, 255); // GRBW
+        } else {
+          allColorBytes.push(color.g, color.r, color.b); // GRB
+        }
+      }
+    }
+
+    return allColorBytes;
+  };
+
 
 
   return (
@@ -439,7 +541,19 @@ export const LedStripTest = () => {
               )}
             </For>
           </div>
-          
+
+          {/* LED配置数据测试按钮 */}
+          <div class="divider">LED配置数据测试</div>
+          <div class="flex gap-4">
+            <button
+              class="btn btn-secondary"
+              onClick={testLedConfigData}
+              disabled={!selectedBoard()}
+            >
+              🔧 测试LED配置数据发送
+            </button>
+          </div>
+
           <Show when={isRunning()}>
             <div class="alert alert-info mt-4">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6">
