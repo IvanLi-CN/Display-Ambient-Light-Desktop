@@ -758,6 +758,79 @@ async fn open_external_url(url: String, app_handle: tauri::AppHandle) -> Result<
 }
 
 #[tauri::command]
+async fn navigate_to_page(page: String, app_handle: tauri::AppHandle) -> Result<(), String> {
+    info!("Navigation command received for page: {}", page);
+
+    if let Some(window) = app_handle.get_webview_window("main") {
+        let route = match page.as_str() {
+            "info" => "/info",
+            "led-strips-configuration" | "led-config" => "/led-strips-configuration",
+            "white-balance" => "/white-balance",
+            "led-strip-test" | "led-test" => "/led-strip-test",
+            "led-data-sender-test" | "data-sender-test" => "/led-data-sender-test",
+            "settings" => "/settings",
+            _ => {
+                // Check if it's a display-specific page like "led-config-display-3"
+                if page.starts_with("led-config-display-") {
+                    let display_id = &page["led-config-display-".len()..];
+                    return navigate_to_display_config(display_id.to_string(), app_handle).await;
+                }
+                return Err(format!("Unknown page: {}", page));
+            }
+        };
+
+        let _ = window.show();
+        let _ = window.set_focus();
+
+        // Add a longer delay to ensure the window is ready
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+        // Use Tauri event system for more reliable navigation
+        let _ = window.emit("navigate", route);
+        info!("Navigation event emitted: {}", route);
+
+        Ok(())
+    } else {
+        Err("Main window not found".to_string())
+    }
+}
+
+#[tauri::command]
+async fn navigate_to_display_config(
+    display_id: String,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
+    info!(
+        "Navigation command received for display config: {}",
+        display_id
+    );
+
+    if let Some(window) = app_handle.get_webview_window("main") {
+        let route = format!("/led-strips-configuration/display/{}", display_id);
+
+        let _ = window.show();
+        let _ = window.set_focus();
+
+        // Add a longer delay to ensure the window is ready
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+        // Use Tauri event system for more reliable navigation
+        let _ = window.emit("navigate", &route);
+        info!("Display config navigation event emitted: {}", route);
+
+        Ok(())
+    } else {
+        Err("Main window not found".to_string())
+    }
+}
+
+#[tauri::command]
+async fn report_current_page(page_info: String) -> Result<(), String> {
+    info!("🔍 Frontend page report: {}", page_info);
+    Ok(())
+}
+
+#[tauri::command]
 async fn show_about_window<R: tauri::Runtime>(
     app_handle: tauri::AppHandle<R>,
 ) -> Result<(), String> {
@@ -973,20 +1046,95 @@ async fn handle_tray_event<R: Runtime>(app: &tauri::AppHandle<R>, event: TrayIco
     }
 }
 
+// Helper function to extract page name from URL
+fn extract_page_from_url(url: &str) -> Option<String> {
+    let nav_re = regex::Regex::new(r"ambient-light://navigate/([a-zA-Z0-9\-_]+)").unwrap();
+    if let Some(captures) = nav_re.captures(url) {
+        Some(captures[1].to_string())
+    } else {
+        None
+    }
+}
+
 // Protocol handler for ambient-light://
 fn handle_ambient_light_protocol<R: Runtime>(
-    _ctx: tauri::UriSchemeContext<R>,
+    ctx: tauri::UriSchemeContext<R>,
     request: Request<Vec<u8>>,
 ) -> Response<Vec<u8>> {
     let url = request.uri();
-    // info!("Handling ambient-light protocol request: {}", url);
+    info!("Handling ambient-light protocol request: {}", url);
 
     // Parse the URL to extract parameters
     let url_str = url.to_string();
-    let re =
+
+    // Handle navigation requests: ambient-light://navigate/page_name or ambient-light://navigate/page_name/display/id
+    let nav_re =
+        regex::Regex::new(r"ambient-light://navigate/([a-zA-Z0-9\-_]+)(?:/display/(\d+))?")
+            .unwrap();
+    if let Some(captures) = nav_re.captures(&url_str) {
+        let page_name = &captures[1];
+        let display_id = captures.get(2).map(|m| m.as_str());
+
+        if let Some(display_id) = display_id {
+            info!(
+                "Navigation request to page: {} with display: {}",
+                page_name, display_id
+            );
+        } else {
+            info!("Navigation request to page: {}", page_name);
+        }
+
+        // Get the app handle and navigate to the requested page
+        let app_handle = ctx.app_handle();
+        if let Some(window) = app_handle.get_webview_window("main") {
+            let route = if let Some(display_id) = display_id {
+                // Handle display-specific navigation
+                if page_name == "led-strips-configuration" || page_name == "led-config" {
+                    format!("#/led-strips-configuration/display/{}", display_id)
+                } else {
+                    match page_name {
+                        "info" => "#/info".to_string(),
+                        "white-balance" => "#/white-balance".to_string(),
+                        "led-strip-test" | "led-test" => "#/led-strip-test".to_string(),
+                        "led-data-sender-test" | "data-sender-test" => {
+                            "#/led-data-sender-test".to_string()
+                        }
+                        "settings" => "#/settings".to_string(),
+                        _ => "#/info".to_string(), // Default to info page
+                    }
+                }
+            } else {
+                match page_name {
+                    "info" => "#/info",
+                    "led-strips-configuration" | "led-config" => "#/led-strips-configuration",
+                    "white-balance" => "#/white-balance",
+                    "led-strip-test" | "led-test" => "#/led-strip-test",
+                    "led-data-sender-test" | "data-sender-test" => "#/led-data-sender-test",
+                    "settings" => "#/settings",
+                    _ => "#/info", // Default to info page
+                }
+                .to_string()
+            };
+
+            let _ = window.show();
+            let _ = window.set_focus();
+            let _ = window.eval(&format!("window.location.hash = '{}'", route));
+            info!("URL scheme navigation executed: {}", route);
+        }
+
+        let response_body = "Navigation request received";
+
+        return Response::builder()
+            .status(200)
+            .body(response_body.as_bytes().to_vec())
+            .unwrap();
+    }
+
+    // Handle screenshot requests: ambient-light://displays/id?width=w&height=h
+    let screenshot_re =
         regex::Regex::new(r"ambient-light://displays/(\d+)\?width=(\d+)&height=(\d+)").unwrap();
 
-    if let Some(captures) = re.captures(&url_str) {
+    if let Some(captures) = screenshot_re.captures(&url_str) {
         let display_id: u32 = captures[1].parse().unwrap_or(0);
         let width: u32 = captures[2].parse().unwrap_or(400);
         let height: u32 = captures[3].parse().unwrap_or(300);
@@ -1092,6 +1240,33 @@ fn handle_ambient_light_protocol<R: Runtime>(
 async fn main() {
     env_logger::init();
 
+    // Parse command line arguments
+    let args: Vec<String> = std::env::args().collect();
+    let mut target_page: Option<String> = None;
+    let mut display_id: Option<String> = None;
+
+    // Look for --page and --display arguments
+    for i in 0..args.len() {
+        if args[i] == "--page" && i + 1 < args.len() {
+            target_page = Some(args[i + 1].clone());
+            info!("Command line argument detected: --page {}", args[i + 1]);
+        } else if args[i] == "--display" && i + 1 < args.len() {
+            display_id = Some(args[i + 1].clone());
+            info!("Command line argument detected: --display {}", args[i + 1]);
+        }
+    }
+
+    // If both page and display are specified, combine them
+    if let (Some(page), Some(display)) = (&target_page, &display_id) {
+        if page == "led-strips-configuration" || page == "led-config" {
+            target_page = Some(format!("led-config-display-{}", display));
+            info!(
+                "Combined navigation target: {}",
+                target_page.as_ref().unwrap()
+            );
+        }
+    }
+
     // Initialize display info (removed debug output)
 
     tokio::spawn(async move {
@@ -1164,6 +1339,7 @@ async fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_deep_link::init())
         .invoke_handler(tauri::generate_handler![
             greet,
             get_app_version,
@@ -1214,6 +1390,9 @@ async fn main() {
             test_tray_visibility,
             get_app_version_string,
             open_external_url,
+            navigate_to_page,
+            navigate_to_display_config,
+            report_current_page,
             show_about_window
         ])
         .register_uri_scheme_protocol("ambient-light", handle_ambient_light_protocol)
@@ -1224,6 +1403,27 @@ async fn main() {
             });
         })
         .setup(move |app| {
+            // Setup deep link event listener
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                let app_handle = app.handle().clone();
+                app.deep_link().on_open_url(move |event| {
+                    let urls = event.urls();
+                    info!("Deep link received: {:?}", urls);
+                    for url in urls {
+                        if let Some(page) = extract_page_from_url(&url.to_string()) {
+                            info!("Navigating to page: {}", page);
+                            let app_handle_clone = app_handle.clone();
+                            tauri::async_runtime::spawn(async move {
+                                if let Err(e) = navigate_to_page(page, app_handle_clone).await {
+                                    error!("Failed to navigate via deep link: {}", e);
+                                }
+                            });
+                        }
+                    }
+                });
+            }
+
             // Restore window state from user preferences
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -1441,6 +1641,21 @@ async fn main() {
                     error!("Failed to start WebSocket server: {}", e);
                 }
             });
+
+            // Handle command line arguments for page navigation
+            if let Some(page) = target_page {
+                let app_handle = app.handle().clone();
+                tokio::spawn(async move {
+                    // Wait longer for the app to fully initialize and load
+                    info!("Waiting for app initialization before navigation...");
+                    tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
+
+                    info!("Starting navigation to page: {}", page);
+                    if let Err(e) = navigate_to_page(page.clone(), app_handle).await {
+                        error!("Failed to navigate to page '{}': {}", page, e);
+                    }
+                });
+            }
 
             Ok(())
         })

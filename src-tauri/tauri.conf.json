@@ -46,5 +46,12 @@
     "macOS": {
       "minimumSystemVersion": "13"
     }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["ambient-light"]
+      }
+    }
   }
 }

@@ -1,12 +1,13 @@
-import { Routes, Route, useLocation, A, Navigate } from '@solidjs/router';
+import { Routes, Route, useLocation, useNavigate, A, Navigate } from '@solidjs/router';
 import { LedStripConfiguration } from './components/led-strip-configuration/led-strip-configuration';
 import { SingleDisplayConfig } from './components/led-strip-configuration/single-display-config';
 import { WhiteBalance } from './components/white-balance/white-balance';
 import { LedStripTest } from './components/led-strip-test/led-strip-test';
 import { LedDataSenderTest } from './components/led-data-sender-test/led-data-sender-test';
 import { Settings } from './components/settings/settings';
-import { createEffect, createSignal } from 'solid-js';
+import { createEffect, createSignal, onMount } from 'solid-js';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { setLedStripStore } from './stores/led-strip.store';
 import { LedStripConfigContainer } from './models/led-strip-config';
 import { InfoIndex } from './components/info/info-index';
@@ -19,6 +20,7 @@ import { userPreferencesStore } from './stores/user-preferences.store';
 
 function App() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [previousPath, setPreviousPath] = createSignal<string>('');
   const { t } = useLanguage();
   const [appVersion, setAppVersion] = createSignal<AppVersion>({ version: '1.0.0', is_dev: false });
@@ -39,12 +41,59 @@ function App() {
     });
   });
 
+  // Listen for navigation events from backend
+  onMount(async () => {
+    try {
+      const unlisten = await listen<string>('navigate', (event) => {
+        const targetPath = event.payload;
+        console.log('🎯 Received navigation event from backend:', targetPath);
+
+        // Use SolidJS navigate function for proper routing
+        navigate(targetPath);
+
+        // Report successful navigation
+        invoke('report_current_page', {
+          pageInfo: `Navigation event processed: ${targetPath}`
+        }).catch((error) => {
+          console.error('Failed to report navigation event:', error);
+        });
+      });
+
+      console.log('✅ Navigation event listener registered');
+
+      // Cleanup function will be called when component unmounts
+      return unlisten;
+    } catch (error) {
+      console.error('❌ Failed to register navigation event listener:', error);
+    }
+  });
+
 
 
   // Monitor route changes and cleanup LED tests when leaving the test page
   createEffect(() => {
     const currentPath = location.pathname;
     const prevPath = previousPath();
+
+    // Report current page to backend for verification
+    const getPageName = (path: string) => {
+      if (path === '/info') return 'info';
+      if (path === '/led-strips-configuration') return 'led-strips-configuration';
+      if (path.startsWith('/led-strips-configuration/display/')) {
+        const displayId = path.split('/').pop();
+        return `led-strips-configuration/display/${displayId}`;
+      }
+      if (path === '/white-balance') return 'white-balance';
+      if (path === '/led-strip-test') return 'led-strip-test';
+      if (path === '/led-data-sender-test') return 'led-data-sender-test';
+      if (path === '/settings') return 'settings';
+      return path;
+    };
+
+    const currentPageName = getPageName(currentPath);
+    invoke('report_current_page', { pageInfo: `Current page: ${currentPageName} (path: ${currentPath})` }).catch((error) => {
+      console.error('Failed to report current page:', error);
+    });
 
     // Check if we're leaving the LED test page
     const isLeavingTestPage = prevPath === '/led-strip-test' && currentPath !== '/led-strip-test';
