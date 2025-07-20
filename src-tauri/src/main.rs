@@ -205,6 +205,37 @@ async fn send_colors(offset: u16, buffer: Vec<u8>) -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn start_single_display_config_publisher(
+    strips: Vec<ambient_light::LedStripConfig>,
+    border_colors: ambient_light::BorderColors,
+) -> Result<(), String> {
+    log::info!("🎯 Tauri命令被调用: start_single_display_config_publisher");
+    log::info!("   - 灯带数量: {}", strips.len());
+    log::info!("   - 边框颜色: {:?}", border_colors);
+    let publisher = ambient_light::LedColorsPublisher::global().await;
+    publisher
+        .start_single_display_config_mode(strips, border_colors)
+        .await
+        .map_err(|e| {
+            error!("Failed to start single display config publisher: {}", e);
+            e.to_string()
+        })
+}
+
+#[tauri::command]
+async fn stop_single_display_config_publisher() -> Result<(), String> {
+    log::info!("🛑 Tauri命令被调用: stop_single_display_config_publisher");
+    let publisher = ambient_light::LedColorsPublisher::global().await;
+    publisher
+        .stop_single_display_config_mode()
+        .await
+        .map_err(|e| {
+            error!("Failed to stop single display config publisher: {}", e);
+            e.to_string()
+        })
+}
+
+#[tauri::command]
 async fn send_test_colors_to_board(
     board_address: String, // Use the board address parameter
     offset: u16,
@@ -1337,6 +1368,87 @@ async fn main() {
         {
             Ok(_) => {
                 info!("✅ LED color publisher started successfully");
+
+                // 自动启动单屏配置模式进行测试
+                info!("🎯 自动启动单屏配置模式进行测试");
+
+                // 加载真实的灯带配置
+                let config_manager = ambient_light::ConfigManager::global().await;
+                let config_group = config_manager.configs().await;
+
+                let test_strips = if !config_group.strips.is_empty() {
+                    info!("✅ 加载了真实配置，包含 {} 个灯带", config_group.strips.len());
+                    config_group.strips
+                } else {
+                    warn!("⚠️ 配置为空，使用测试配置");
+                        // 创建测试配置
+                        vec![
+                            ambient_light::LedStripConfig {
+                                index: 0,
+                                border: ambient_light::Border::Bottom,
+                                display_id: 1,
+                                len: 10, // 测试用小数量
+                                led_type: ambient_light::LedType::SK6812,
+                                reversed: false,
+                            },
+                            ambient_light::LedStripConfig {
+                                index: 1,
+                                border: ambient_light::Border::Right,
+                                display_id: 1,
+                                len: 10,
+                                led_type: ambient_light::LedType::WS2812B,
+                                reversed: false,
+                            },
+                            ambient_light::LedStripConfig {
+                                index: 2,
+                                border: ambient_light::Border::Top,
+                                display_id: 1,
+                                len: 10,
+                                led_type: ambient_light::LedType::WS2812B,
+                                reversed: false,
+                            },
+                            ambient_light::LedStripConfig {
+                                index: 3,
+                                border: ambient_light::Border::Left,
+                                display_id: 1,
+                                len: 10,
+                                led_type: ambient_light::LedType::SK6812,
+                                reversed: false,
+                            },
+                        ]
+                };
+
+                // 设置LED数据发送模式为StripConfig
+                info!("🔧 设置LED数据发送模式为StripConfig");
+                let led_sender = led_data_sender::LedDataSender::global().await;
+                led_sender.set_mode(led_data_sender::DataSendMode::StripConfig).await;
+                info!("✅ LED数据发送模式已设置为StripConfig");
+
+                // 设置目标硬件地址
+                info!("🔧 设置目标硬件地址");
+                led_sender.set_test_target(Some("192.168.31.182:23042".to_string())).await;
+                info!("✅ 目标硬件地址已设置为 192.168.31.182:23042");
+
+                // 使用正确的设计颜色方案 - 每边两种颜色
+                let border_colors = ambient_light::BorderColors {
+                    top: [[0, 100, 255], [150, 0, 255]],       // 蓝色 + 紫色
+                    bottom: [[255, 100, 0], [255, 255, 0]],    // 深橙色 + 黄色
+                    left: [[255, 0, 150], [255, 0, 0]],        // 玫红色 + 红色
+                    right: [[0, 255, 0], [0, 255, 255]],       // 纯绿色 + 青色
+                };
+
+                info!("🔥🔥🔥 准备调用 start_single_display_config_mode 方法");
+                info!("🔥 灯带数量: {}", test_strips.len());
+                info!("🔥 边框颜色: {:?}", border_colors);
+
+                match led_color_publisher.start_single_display_config_mode(test_strips, border_colors).await {
+                    Err(e) => {
+                        error!("❌ 自动启动单屏配置模式失败: {}", e);
+                    }
+                    Ok(_) => {
+                        info!("✅ 自动启动单屏配置模式成功");
+                    }
+                }
             }
             Err(_) => {
                 error!("❌ LED color publisher start() timed out after 30 seconds");
@@ -1365,6 +1477,8 @@ async fn main() {
             patch_led_strip_type,
             send_colors,
             send_test_colors_to_board,
+            start_single_display_config_publisher,
+            stop_single_display_config_publisher,
             enable_test_mode,
             disable_test_mode,
             is_test_mode_active,

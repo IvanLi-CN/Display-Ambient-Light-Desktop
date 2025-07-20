@@ -280,7 +280,14 @@ impl ConfigManager {
     pub async fn set_items(&self, items: Vec<config::LedStripConfig>) -> anyhow::Result<()> {
         let mut config = self.config.write().await;
 
-        config.strips = items;
+        // 按序列号排序灯带，确保正确的顺序
+        let mut sorted_items = items;
+        sorted_items.sort_by_key(|strip| strip.index);
+
+        config.strips = sorted_items;
+
+        // 重建 mappers 以匹配新的 strips 配置
+        config.generate_mappers();
 
         let cloned_config = config.clone();
 
@@ -341,9 +348,9 @@ mod tests {
                     2 => Border::Left,
                     _ => Border::Right,
                 },
-                start_pos: j * 30,
                 len: 30,
                 led_type: LedType::WS2812B,
+                reversed: false,
             };
             strips.push(strip);
             mappers.push(SamplePointMapper {

@@ -258,9 +258,9 @@ mod tests {
             index: 0,
             border,
             display_id: 1,
-            start_pos: 0,
             len,
             led_type: crate::ambient_light::LedType::WS2812B,
+            reversed: false,
         }
     }
 
