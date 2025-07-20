@@ -109,25 +109,13 @@ const LedBorderStrips: Component<{
     const stripThickness = 8; // 灯带厚度
     const stripGap = 4;       // 灯带之间的间隙
 
-    // 获取LED颜色服务
-    const ledColorService = LedColorService.getInstance();
-
-    // 生成该边框的预设颜色
-    const borderColors = ledColorService.generateBorderColors(strip.border.toLowerCase(), strip.count);
-
-    // 计算平均颜色用于显示
-    const avgColor = borderColors.reduce(
-      (acc, color) => ({
-        r: acc.r + color.r / borderColors.length,
-        g: acc.g + color.g / borderColors.length,
-        b: acc.b + color.b / borderColors.length,
-      }),
-      { r: 0, g: 0, b: 0 }
-    );
+    // 所有灯带使用统一的颜色显示 - 不显示测试颜色的差异
+    // 使用一个中性的LED灯带颜色，表示这是LED灯带的示意
+    const uniformColor = { r: 255, g: 140, b: 0 }; // 橙色，代表LED灯带
 
     // 应用基础亮度 - 为了UI可见性，使用更高的亮度
     const baseBrightness = 0.8; // 进一步提高亮度让灯带更明显
-    const displayColor = `rgb(${Math.round(avgColor.r * baseBrightness)}, ${Math.round(avgColor.g * baseBrightness)}, ${Math.round(avgColor.b * baseBrightness)})`;
+    const displayColor = `rgb(${Math.round(uniformColor.r * baseBrightness)}, ${Math.round(uniformColor.g * baseBrightness)}, ${Math.round(uniformColor.b * baseBrightness)})`;
 
     const baseStyle = {
       position: 'absolute' as const,
@@ -798,23 +786,24 @@ export function SingleDisplayConfig() {
     const colors = [];
     const halfCount = Math.floor(ledCount / 2);
 
-    // 定义每个边框的两个颜色 - 恢复原来正确的颜色方案
+    // 定义每个边框的两个颜色 - 最终正确方案
+    // 四个角落：左下(青-红)、右下(绿-黄)、右上(紫-白)、左上(黑-橙)
     const borderColorPairs = {
       'bottom': [
-        { r: 255, g: 0, b: 255 },  // 紫色 (原来的左边颜色)
-        { r: 0, g: 255, b: 255 }   // 青色 (原来的右边颜色)
+        { r: 255, g: 0, b: 0 },     // 红色 (HSV: 0°)
+        { r: 0, g: 255, b: 0 }      // 绿色 (HSV: 120°)
       ],
       'right': [
-        { r: 0, g: 255, b: 0 },    // 绿色
-        { r: 0, g: 0, b: 255 }     // 蓝色
+        { r: 255, g: 255, b: 0 },   // 黄色 (HSV: 60°)
+        { r: 128, g: 0, b: 128 }    // 紫色 (HSV: 300°)
       ],
       'top': [
-        { r: 0, g: 0, b: 255 },    // 蓝色
-        { r: 255, g: 255, b: 0 }   // 黄色
+        { r: 255, g: 255, b: 255 }, // 白色 - 最亮
+        { r: 0, g: 0, b: 0 }        // 黑色 - 最深
       ],
       'left': [
-        { r: 255, g: 255, b: 0 },  // 黄色
-        { r: 255, g: 0, b: 0 }     // 红色
+        { r: 255, g: 165, b: 0 },   // 橙色 (HSV: 39°)
+        { r: 0, g: 255, b: 255 }    // 青色 (HSV: 180°)
       ]
     };
 

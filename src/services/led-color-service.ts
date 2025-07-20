@@ -42,40 +42,40 @@ export class LedColorService {
     
     switch (border.toLowerCase()) {
       case 'bottom':
-        // 底边：左半部分红色，右半部分绿色
+        // 底边：左半部分深橙色，右半部分黄色
         for (let i = 0; i < ledCount; i++) {
           if (i < halfCount) {
-            colors.push({ r: 255, g: 0, b: 0 }); // 红色
+            colors.push({ r: 255, g: 100, b: 0 }); // 深橙色
           } else {
-            colors.push({ r: 0, g: 255, b: 0 }); // 绿色
+            colors.push({ r: 255, g: 255, b: 0 }); // 黄色
           }
         }
         break;
       case 'right':
-        // 右边：下半部分绿色，上半部分蓝色
+        // 右边：下半部分纯绿色，上半部分青色
         for (let i = 0; i < ledCount; i++) {
           if (i < halfCount) {
-            colors.push({ r: 0, g: 255, b: 0 }); // 绿色
+            colors.push({ r: 0, g: 255, b: 0 }); // 纯绿色
           } else {
-            colors.push({ r: 0, g: 0, b: 255 }); // 蓝色
+            colors.push({ r: 0, g: 255, b: 255 }); // 青色
           }
         }
         break;
       case 'top':
-        // 顶边：右半部分蓝色，左半部分黄色
+        // 顶边：右半部分蓝色，左半部分紫色
         for (let i = 0; i < ledCount; i++) {
           if (i < halfCount) {
-            colors.push({ r: 0, g: 0, b: 255 }); // 蓝色
+            colors.push({ r: 0, g: 100, b: 255 }); // 蓝色
           } else {
-            colors.push({ r: 255, g: 255, b: 0 }); // 黄色
+            colors.push({ r: 150, g: 0, b: 255 }); // 紫色
           }
         }
         break;
       case 'left':
-        // 左边：上半部分黄色，下半部分红色
+        // 左边：上半部分玫红色，下半部分红色
         for (let i = 0; i < ledCount; i++) {
           if (i < halfCount) {
-            colors.push({ r: 255, g: 255, b: 0 }); // 黄色
+            colors.push({ r: 255, g: 0, b: 150 }); // 玫红色
           } else {
             colors.push({ r: 255, g: 0, b: 0 }); // 红色
           }

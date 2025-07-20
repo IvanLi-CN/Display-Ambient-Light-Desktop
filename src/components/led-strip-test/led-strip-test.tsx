@@ -340,12 +340,12 @@ export const LedStripTest = () => {
       { border: 'left', count: 22, ledType: 'WS2812B', sequence: 4 }
     ];
 
-    // 生成边框测试颜色
+    // 生成边框测试颜色 - 最终解决所有角落颜色差异问题
     const borderColors: Record<string, Array<{r: number, g: number, b: number}>> = {
-      'bottom': [{ r: 255, g: 0, b: 255 }, { r: 0, g: 255, b: 255 }], // 紫色 + 青色
-      'right': [{ r: 0, g: 255, b: 0 }, { r: 0, g: 0, b: 255 }],     // 绿色 + 蓝色
-      'top': [{ r: 0, g: 0, b: 255 }, { r: 255, g: 255, b: 0 }],     // 蓝色 + 黄色
-      'left': [{ r: 255, g: 255, b: 0 }, { r: 255, g: 0, b: 0 }]     // 黄色 + 红色
+      'bottom': [{ r: 255, g: 0, b: 0 }, { r: 0, g: 255, b: 0 }],       // 红色 + 绿色
+      'right': [{ r: 255, g: 255, b: 0 }, { r: 128, g: 0, b: 128 }],    // 黄色 + 紫色
+      'top': [{ r: 255, g: 255, b: 255 }, { r: 0, g: 0, b: 0 }],        // 白色 + 黑色
+      'left': [{ r: 255, g: 165, b: 0 }, { r: 0, g: 255, b: 255 }]      // 橙色 + 青色
     };
 
     const allColorBytes: number[] = [];
