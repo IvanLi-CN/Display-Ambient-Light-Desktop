@@ -39,29 +39,72 @@ const DEFAULT_CONFIG = {
   driver: 'Driver1',
 };
 
-// 颜色预览组件
-const ColorPreview: Component<{ border: string; section: number }> = (props) => {
-  // 8种不同的颜色，确保不重复
-  const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#ffa500', '#800080'];
+// HSV到RGB转换函数（用于颜色预览）
+const hsvToRgbPreview = (h: number, s: number, v: number): { r: number; g: number; b: number } => {
+  const c = v * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = v - c;
 
-  // 根据边框和分区计算唯一的颜色索引
-  let colorIndex = 0;
-  switch (props.border) {
-    case 'Top':
-      colorIndex = props.section; // 0, 1
-      break;
-    case 'Right':
-      colorIndex = 2 + props.section; // 2, 3
-      break;
-    case 'Bottom':
-      colorIndex = 4 + props.section; // 4, 5
-      break;
-    case 'Left':
-      colorIndex = 6 + props.section; // 6, 7
-      break;
+  let r_prime = 0, g_prime = 0, b_prime = 0;
+
+  if (h < 60) {
+    r_prime = c; g_prime = x; b_prime = 0;
+  } else if (h < 120) {
+    r_prime = x; g_prime = c; b_prime = 0;
+  } else if (h < 180) {
+    r_prime = 0; g_prime = c; b_prime = x;
+  } else if (h < 240) {
+    r_prime = 0; g_prime = x; b_prime = c;
+  } else if (h < 300) {
+    r_prime = x; g_prime = 0; b_prime = c;
+  } else {
+    r_prime = c; g_prime = 0; b_prime = x;
   }
 
-  const color = colors[colorIndex];
+  return {
+    r: Math.round((r_prime + m) * 255),
+    g: Math.round((g_prime + m) * 255),
+    b: Math.round((b_prime + m) * 255)
+  };
+};
+
+// 颜色预览组件
+const ColorPreview: Component<{ border: string; section: number }> = (props) => {
+  // 色环每45度的颜色定义 (HSV: H=色相, S=1.0, V=1.0)
+  const colorWheel45Degrees = [
+    hsvToRgbPreview(0, 1.0, 1.0),    // 0° - 红色
+    hsvToRgbPreview(45, 1.0, 1.0),   // 45° - 橙色
+    hsvToRgbPreview(90, 1.0, 1.0),   // 90° - 黄色
+    hsvToRgbPreview(135, 1.0, 1.0),  // 135° - 黄绿色
+    hsvToRgbPreview(180, 1.0, 1.0),  // 180° - 青色
+    hsvToRgbPreview(225, 1.0, 1.0),  // 225° - 蓝色
+    hsvToRgbPreview(270, 1.0, 1.0),  // 270° - 紫色
+    hsvToRgbPreview(315, 1.0, 1.0),  // 315° - 玫红色
+  ];
+
+  // 定义每个边框的两个颜色 - 按色环45度间隔分配
+  const borderColorPairs = {
+    'Bottom': [
+      colorWheel45Degrees[0],  // 红色 (0°)
+      colorWheel45Degrees[1]   // 橙色 (45°)
+    ],
+    'Right': [
+      colorWheel45Degrees[2],  // 黄色 (90°)
+      colorWheel45Degrees[3]   // 黄绿色 (135°)
+    ],
+    'Top': [
+      colorWheel45Degrees[4],  // 青色 (180°)
+      colorWheel45Degrees[5]   // 蓝色 (225°)
+    ],
+    'Left': [
+      colorWheel45Degrees[6],  // 紫色 (270°)
+      colorWheel45Degrees[7]   // 玫红色 (315°)
+    ]
+  };
+
+  const colorPair = borderColorPairs[props.border as keyof typeof borderColorPairs] || borderColorPairs['Top'];
+  const selectedColor = colorPair[props.section]; // section 0 或 1
+  const color = `rgb(${selectedColor.r}, ${selectedColor.g}, ${selectedColor.b})`;
 
   return (
     <div
