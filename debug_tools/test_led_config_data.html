@@ -126,7 +126,7 @@
                 for (let i = 0; i < halfCount; i++) {
                     const color = colors[0];
                     if (strip.ledType === 'SK6812') {
-                        allColorBytes.push(color.g, color.r, color.b, 255); // GRBW
+                        allColorBytes.push(color.g, color.r, color.b, 0); // GRBW - 白色通道不点亮
                     } else {
                         allColorBytes.push(color.g, color.r, color.b); // GRB
                     }
@@ -136,7 +136,7 @@
                 for (let i = halfCount; i < strip.count; i++) {
                     const color = colors[1];
                     if (strip.ledType === 'SK6812') {
-                        allColorBytes.push(color.g, color.r, color.b, 255); // GRBW
+                        allColorBytes.push(color.g, color.r, color.b, 0); // GRBW - 白色通道不点亮
                     } else {
                         allColorBytes.push(color.g, color.r, color.b); // GRB
                     }
@@ -217,11 +217,8 @@
                 // 3. 生成测试数据
                 const testData = generateTestLedData();
                 
-                // 4. 发送到所有设备（包括虚拟设备）
-                const allTargets = [
-                    ...boards.map(board => `${board.address}:${board.port}`),
-                    '127.0.0.1:8888' // 虚拟调试设备
-                ];
+                // 4. 发送到所有真实硬件设备
+                const allTargets = boards.map(board => `${board.address}:${board.port}`);
                 
                 log(`🎯 准备发送到 ${allTargets.length} 个目标设备:`);
                 allTargets.forEach(target => log(`  - ${target}`));

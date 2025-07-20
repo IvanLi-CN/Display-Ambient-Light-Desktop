@@ -33,61 +33,110 @@ export class LedColorService {
     return LedColorService.instance;
   }
 
-  // 生成边框颜色（左下角为原点，顺时针）
+  // HSV到RGB转换函数
+  private hsvToRgb(h: number, s: number, v: number): { r: number; g: number; b: number } {
+    const c = v * s;
+    const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+    const m = v - c;
+
+    let r_prime = 0, g_prime = 0, b_prime = 0;
+
+    if (h < 60) {
+      r_prime = c; g_prime = x; b_prime = 0;
+    } else if (h < 120) {
+      r_prime = x; g_prime = c; b_prime = 0;
+    } else if (h < 180) {
+      r_prime = 0; g_prime = c; b_prime = x;
+    } else if (h < 240) {
+      r_prime = 0; g_prime = x; b_prime = c;
+    } else if (h < 300) {
+      r_prime = x; g_prime = 0; b_prime = c;
+    } else {
+      r_prime = c; g_prime = 0; b_prime = x;
+    }
+
+    return {
+      r: Math.round((r_prime + m) * 255),
+      g: Math.round((g_prime + m) * 255),
+      b: Math.round((b_prime + m) * 255)
+    };
+  }
+
+  // 生成边框颜色（左下角为原点，顺时针）- 使用色环每45度的颜色
   public generateBorderColors(border: string, ledCount: number): LedColorData[] {
     const colors: LedColorData[] = [];
-    
+
     // 每个边被两个颜色平分
     const halfCount = Math.floor(ledCount / 2);
-    
+
+    // 色环每45度的颜色定义 (HSV: H=色相, S=1.0, V=1.0)
+    const colorWheel45Degrees = [
+      this.hsvToRgb(0, 1.0, 1.0),    // 0° - 红色
+      this.hsvToRgb(45, 1.0, 1.0),   // 45° - 橙色
+      this.hsvToRgb(90, 1.0, 1.0),   // 90° - 黄色
+      this.hsvToRgb(135, 1.0, 1.0),  // 135° - 黄绿色
+      this.hsvToRgb(180, 1.0, 1.0),  // 180° - 青色
+      this.hsvToRgb(225, 1.0, 1.0),  // 225° - 蓝色
+      this.hsvToRgb(270, 1.0, 1.0),  // 270° - 紫色
+      this.hsvToRgb(315, 1.0, 1.0),  // 315° - 玫红色
+    ];
+
     switch (border.toLowerCase()) {
       case 'bottom':
-        // 底边：左半部分深橙色，右半部分黄色
+        // 底边：左半部分红色(0°)，右半部分橙色(45°)
         for (let i = 0; i < ledCount; i++) {
           if (i < halfCount) {
-            colors.push({ r: 255, g: 100, b: 0 }); // 深橙色
+            const color = colorWheel45Degrees[0]; // 红色
+            colors.push({ r: color.r, g: color.g, b: color.b, w: 0 }); // 白色通道设为0
           } else {
-            colors.push({ r: 255, g: 255, b: 0 }); // 黄色
+            const color = colorWheel45Degrees[1]; // 橙色
+            colors.push({ r: color.r, g: color.g, b: color.b, w: 0 }); // 白色通道设为0
           }
         }
         break;
       case 'right':
-        // 右边：下半部分纯绿色，上半部分青色
+        // 右边：下半部分黄色(90°)，上半部分黄绿色(135°)
         for (let i = 0; i < ledCount; i++) {
           if (i < halfCount) {
-            colors.push({ r: 0, g: 255, b: 0 }); // 纯绿色
+            const color = colorWheel45Degrees[2]; // 黄色
+            colors.push({ r: color.r, g: color.g, b: color.b, w: 0 }); // 白色通道设为0
           } else {
-            colors.push({ r: 0, g: 255, b: 255 }); // 青色
+            const color = colorWheel45Degrees[3]; // 黄绿色
+            colors.push({ r: color.r, g: color.g, b: color.b, w: 0 }); // 白色通道设为0
           }
         }
         break;
       case 'top':
-        // 顶边：右半部分蓝色，左半部分紫色
+        // 顶边：右半部分青色(180°)，左半部分蓝色(225°)
         for (let i = 0; i < ledCount; i++) {
           if (i < halfCount) {
-            colors.push({ r: 0, g: 100, b: 255 }); // 蓝色
+            const color = colorWheel45Degrees[4]; // 青色
+            colors.push({ r: color.r, g: color.g, b: color.b, w: 0 }); // 白色通道设为0
           } else {
-            colors.push({ r: 150, g: 0, b: 255 }); // 紫色
+            const color = colorWheel45Degrees[5]; // 蓝色
+            colors.push({ r: color.r, g: color.g, b: color.b, w: 0 }); // 白色通道设为0
           }
         }
         break;
       case 'left':
-        // 左边：上半部分玫红色，下半部分红色
+        // 左边：上半部分紫色(270°)，下半部分玫红色(315°)
         for (let i = 0; i < ledCount; i++) {
           if (i < halfCount) {
-            colors.push({ r: 255, g: 0, b: 150 }); // 玫红色
+            const color = colorWheel45Degrees[6]; // 紫色
+            colors.push({ r: color.r, g: color.g, b: color.b, w: 0 }); // 白色通道设为0
           } else {
-            colors.push({ r: 255, g: 0, b: 0 }); // 红色
+            const color = colorWheel45Degrees[7]; // 玫红色
+            colors.push({ r: color.r, g: color.g, b: color.b, w: 0 }); // 白色通道设为0
           }
         }
         break;
       default:
-        // 默认白色
+        // 默认白色 - 对于SK6812不点亮白色通道
         for (let i = 0; i < ledCount; i++) {
-          colors.push({ r: 255, g: 255, b: 255 });
+          colors.push({ r: 255, g: 255, b: 255, w: 0 }); // 白色通道设为0
         }
     }
-    
+
     return colors;
   }
 
@@ -179,9 +228,9 @@ export class LedColorService {
 
   // 发送颜色到硬件
   public async sendColorsToHardware(
-    strip: VirtualLedStrip, 
-    colors: LedColorData[], 
-    boardAddress: string = '192.168.4.1:8888'
+    strip: VirtualLedStrip,
+    colors: LedColorData[],
+    boardAddress: string
   ): Promise<void> {
     try {
       const colorBytes = this.colorsToBytes(colors, strip.ledType);
@@ -204,7 +253,7 @@ export class LedColorService {
     strip: VirtualLedStrip,
     isSelected: boolean = false,
     isHovered: boolean = false,
-    boardAddress: string = '192.168.4.1:8888'
+    boardAddress: string
   ): Promise<void> {
     // 生成基础颜色
     const baseColors = this.generateBorderColors(strip.border, strip.count);

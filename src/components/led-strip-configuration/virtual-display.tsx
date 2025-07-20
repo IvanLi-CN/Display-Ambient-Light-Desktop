@@ -57,16 +57,19 @@ export const VirtualDisplay: Component<VirtualDisplayProps> = (props) => {
     colorService.cleanup();
   });
 
-  // 更新灯带颜色效果
+  // 更新灯带颜色效果 (仅用于UI展示，不发送到硬件)
   const updateStripColors = async (strip: VirtualLedStrip) => {
     const isSelected = props.selectedStrip?.id === strip.id;
     const isHovered = props.hoveredStrip?.id === strip.id;
 
-    try {
-      await colorService.updateStripColors(strip, isSelected, isHovered);
-    } catch (error) {
-      console.error('Failed to update strip colors:', error);
-    }
+    // 注意：VirtualDisplay组件主要用于UI展示，不直接发送数据到硬件
+    // 实际的硬件数据发送由父组件处理
+    console.log('Virtual display strip color update:', {
+      stripId: strip.id,
+      border: strip.border,
+      isSelected,
+      isHovered
+    });
   };
 
   // 监听选中状态变化

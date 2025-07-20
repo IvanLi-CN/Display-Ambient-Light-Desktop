@@ -299,28 +299,23 @@ export const LedStripTest = () => {
       const testData = generateLedConfigTestData();
       console.log(`📦 生成了 ${testData.length} 字节的测试数据`);
 
-      // 3. 发送到选中的设备和虚拟设备
-      const targets = [
-        `${selectedBoard()!.address}:${selectedBoard()!.port}`,
-        '127.0.0.1:8888' // 虚拟调试设备
-      ];
+      // 3. 发送到选中的设备
+      const boardAddress = `${selectedBoard()!.address}:${selectedBoard()!.port}`;
 
-      console.log('🎯 发送测试数据到以下设备:', targets);
+      console.log('🎯 发送测试数据到设备:', boardAddress);
 
-      for (const boardAddress of targets) {
-        try {
-          console.log(`📤 发送到 ${boardAddress}...`);
+      try {
+        console.log(`📤 发送到 ${boardAddress}...`);
 
-          await invoke('send_test_colors_to_board', {
-            boardAddress: boardAddress,
-            offset: 0,
-            buffer: testData
-          });
+        await invoke('send_test_colors_to_board', {
+          boardAddress: boardAddress,
+          offset: 0,
+          buffer: testData
+        });
 
-          console.log(`✅ 成功发送到 ${boardAddress}`);
-        } catch (error) {
-          console.error(`❌ 发送到 ${boardAddress} 失败:`, error);
-        }
+        console.log(`✅ 成功发送到 ${boardAddress}`);
+      } catch (error) {
+        console.error(`❌ 发送到 ${boardAddress} 失败:`, error);
       }
 
       console.log('🎉 LED配置数据测试完成');
@@ -363,7 +358,7 @@ export const LedStripTest = () => {
       for (let i = 0; i < halfCount; i++) {
         const color = colors[0];
         if (strip.ledType === 'SK6812') {
-          allColorBytes.push(color.g, color.r, color.b, 255); // GRBW
+          allColorBytes.push(color.g, color.r, color.b, 0); // GRBW - 白色通道不点亮
         } else {
           allColorBytes.push(color.g, color.r, color.b); // GRB
         }
@@ -373,7 +368,7 @@ export const LedStripTest = () => {
       for (let i = halfCount; i < strip.count; i++) {
         const color = colors[1];
         if (strip.ledType === 'SK6812') {
-          allColorBytes.push(color.g, color.r, color.b, 255); // GRBW
+          allColorBytes.push(color.g, color.r, color.b, 0); // GRBW - 白色通道不点亮
         } else {
           allColorBytes.push(color.g, color.r, color.b); // GRB
         }

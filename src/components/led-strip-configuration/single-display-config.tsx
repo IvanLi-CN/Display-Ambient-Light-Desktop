@@ -781,29 +781,69 @@ export function SingleDisplayConfig() {
     }
   };
 
-  // 生成边框预设颜色：每个边框被两个颜色平分
+  // HSV到RGB转换函数
+  const hsvToRgb = (h: number, s: number, v: number): { r: number; g: number; b: number } => {
+    const c = v * s;
+    const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+    const m = v - c;
+
+    let r_prime = 0, g_prime = 0, b_prime = 0;
+
+    if (h < 60) {
+      r_prime = c; g_prime = x; b_prime = 0;
+    } else if (h < 120) {
+      r_prime = x; g_prime = c; b_prime = 0;
+    } else if (h < 180) {
+      r_prime = 0; g_prime = c; b_prime = x;
+    } else if (h < 240) {
+      r_prime = 0; g_prime = x; b_prime = c;
+    } else if (h < 300) {
+      r_prime = x; g_prime = 0; b_prime = c;
+    } else {
+      r_prime = c; g_prime = 0; b_prime = x;
+    }
+
+    return {
+      r: Math.round((r_prime + m) * 255),
+      g: Math.round((g_prime + m) * 255),
+      b: Math.round((b_prime + m) * 255)
+    };
+  };
+
+  // 生成边框预设颜色：每个边框被两个颜色平分 - 使用色环每45度的颜色
   const generateBorderTestColors = (border: string, ledCount: number, reverse: boolean = false) => {
     const colors = [];
     const halfCount = Math.floor(ledCount / 2);
 
-    // 定义每个边框的两个颜色 - 最终正确方案
-    // 四个角落：左下(青-红)、右下(绿-黄)、右上(紫-白)、左上(黑-橙)
+    // 色环每45度的颜色定义 (HSV: H=色相, S=1.0, V=1.0)
+    const colorWheel45Degrees = [
+      hsvToRgb(0, 1.0, 1.0),    // 0° - 红色
+      hsvToRgb(45, 1.0, 1.0),   // 45° - 橙色
+      hsvToRgb(90, 1.0, 1.0),   // 90° - 黄色
+      hsvToRgb(135, 1.0, 1.0),  // 135° - 黄绿色
+      hsvToRgb(180, 1.0, 1.0),  // 180° - 青色
+      hsvToRgb(225, 1.0, 1.0),  // 225° - 蓝色
+      hsvToRgb(270, 1.0, 1.0),  // 270° - 紫色
+      hsvToRgb(315, 1.0, 1.0),  // 315° - 玫红色
+    ];
+
+    // 定义每个边框的两个颜色 - 按色环45度间隔分配
     const borderColorPairs = {
       'bottom': [
-        { r: 255, g: 0, b: 0 },     // 红色 (HSV: 0°)
-        { r: 0, g: 255, b: 0 }      // 绿色 (HSV: 120°)
+        colorWheel45Degrees[0],  // 红色 (0°)
+        colorWheel45Degrees[1]   // 橙色 (45°)
       ],
       'right': [
-        { r: 255, g: 255, b: 0 },   // 黄色 (HSV: 60°)
-        { r: 128, g: 0, b: 128 }    // 紫色 (HSV: 300°)
+        colorWheel45Degrees[2],  // 黄色 (90°)
+        colorWheel45Degrees[3]   // 黄绿色 (135°)
       ],
       'top': [
-        { r: 255, g: 255, b: 255 }, // 白色 - 最亮
-        { r: 0, g: 0, b: 0 }        // 黑色 - 最深
+        colorWheel45Degrees[4],  // 青色 (180°)
+        colorWheel45Degrees[5]   // 蓝色 (225°)
       ],
       'left': [
-        { r: 255, g: 165, b: 0 },   // 橙色 (HSV: 39°)
-        { r: 0, g: 255, b: 255 }    // 青色 (HSV: 180°)
+        colorWheel45Degrees[6],  // 紫色 (270°)
+        colorWheel45Degrees[7]   // 玫红色 (315°)
       ]
     };
 
@@ -844,8 +884,8 @@ export function SingleDisplayConfig() {
       // 转换为字节数据
       for (const color of borderColors) {
         if (strip.ledType === 'SK6812') {
-          // GRBW 格式
-          allColorBytes.push(color.g, color.r, color.b, 255); // W通道设为255
+          // GRBW 格式 - 白色通道不需要点亮，设为0
+          allColorBytes.push(color.g, color.r, color.b, 0); // W通道设为0
         } else {
           // GRB 格式 (WS2812B)
           allColorBytes.push(color.g, color.r, color.b);
@@ -866,25 +906,12 @@ export function SingleDisplayConfig() {
       let boardAddress: string;
 
       if (boards.length === 0) {
-        // 没有真实硬件设备时，发送到虚拟驱动板进行调试
-        boardAddress = '127.0.0.1:8888';
-        console.log('⚠️ 没有找到真实硬件设备，发送到虚拟驱动板进行调试');
+        console.log('⚠️ 没有找到硬件设备，无法发送测试数据');
+        return;
       } else {
-        // 有真实硬件设备时，同时发送到真实设备和虚拟设备
+        // 发送到第一个可用的硬件设备
         const board = boards[0];
         boardAddress = `${board.address}:${board.port}`;
-
-        // 先发送到虚拟驱动板用于调试验证
-        try {
-          await invoke('send_test_colors_to_board', {
-            boardAddress: '127.0.0.1:8888',
-            offset: 0,
-            buffer: Array.from(mergedData)
-          });
-          console.log('✅ 已发送到虚拟驱动板 (调试验证)');
-        } catch (error) {
-          console.warn('⚠️ 发送到虚拟驱动板失败:', error);
-        }
       }
 
       // 发送到目标设备

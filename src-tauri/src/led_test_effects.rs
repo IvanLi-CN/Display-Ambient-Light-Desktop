@@ -119,7 +119,7 @@ impl LedTestEffects {
             buffer.push(rgb.2);
 
             if Self::is_rgbw_type(&led_type) {
-                buffer.push(0); // White channel
+                buffer.push(0); // White channel - 不点亮白色通道
             }
         }
 
@@ -152,7 +152,7 @@ impl LedTestEffects {
             buffer.push(color.2);
 
             if Self::is_rgbw_type(&led_type) {
-                buffer.push(0); // White channel
+                buffer.push(0); // White channel - 不点亮白色通道
             }
         }
 
@@ -173,7 +173,7 @@ impl LedTestEffects {
                 buffer.push(255);
 
                 if Self::is_rgbw_type(&led_type) {
-                    buffer.push(255); // White channel
+                    buffer.push(0); // White channel - 不点亮白色通道
                 }
             } else {
                 // Off
@@ -182,7 +182,7 @@ impl LedTestEffects {
                 buffer.push(0);
 
                 if Self::is_rgbw_type(&led_type) {
-                    buffer.push(0); // White channel
+                    buffer.push(0); // White channel - 不点亮白色通道
                 }
             }
         }

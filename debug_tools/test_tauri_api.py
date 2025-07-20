@@ -156,7 +156,7 @@ def suggest_debugging_steps():
     print("3. 手动触发测试数据发送:")
     print("   - 在浏览器控制台中调用:")
     print("   - window.__TAURI__.core.invoke('send_test_colors_to_board', {")
-    print("       boardAddress: '127.0.0.1:8888',")
+    print("       boardAddress: '<BOARD_IP>:<BOARD_PORT>',")
     print("       offset: 0,")
     print("       buffer: [255, 0, 0, 0, 255, 0, 0, 0, 255]")
     print("     })")

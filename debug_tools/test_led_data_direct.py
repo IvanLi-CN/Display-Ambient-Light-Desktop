@@ -41,7 +41,7 @@ def create_led_test_data():
         for i in range(half_count):
             color = colors[0]
             if strip['ledType'] == 'SK6812':
-                all_color_bytes.extend([color['g'], color['r'], color['b'], 255])  # GRBW
+                all_color_bytes.extend([color['g'], color['r'], color['b'], 0])  # GRBW - 白色通道不点亮
             else:
                 all_color_bytes.extend([color['g'], color['r'], color['b']])  # GRB
         
@@ -49,7 +49,7 @@ def create_led_test_data():
         for i in range(half_count, strip['count']):
             color = colors[1]
             if strip['ledType'] == 'SK6812':
-                all_color_bytes.extend([color['g'], color['r'], color['b'], 255])  # GRBW
+                all_color_bytes.extend([color['g'], color['r'], color['b'], 0])  # GRBW - 白色通道不点亮
             else:
                 all_color_bytes.extend([color['g'], color['r'], color['b']])  # GRB
     
@@ -65,7 +65,7 @@ def create_led_packet(offset, data):
     packet.extend(data)  # LED数据
     return packet
 
-def send_led_data_to_virtual_board(data, target_host='127.0.0.1', target_port=8888):
+def send_led_data_to_virtual_board(data, target_host='localhost', target_port=8888):
     """发送LED数据到虚拟驱动板"""
     try:
         # 创建UDP socket
@@ -89,7 +89,7 @@ def send_led_data_to_virtual_board(data, target_host='127.0.0.1', target_port=88
     except Exception as e:
         print(f"❌ 发送数据包失败: {e}")
 
-def send_multiple_packets(data, max_packet_size=396, target_host='127.0.0.1', target_port=8888):
+def send_multiple_packets(data, max_packet_size=396, target_host='localhost', target_port=8888):
     """发送多个数据包（模拟大数据的分包发送）"""
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

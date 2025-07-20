@@ -318,7 +318,7 @@ def main():
         if MDNS_AVAILABLE:
             print("📢 mDNS服务已发布，桌面应用程序应该能自动发现此虚拟设备")
         else:
-            print("⚠️ mDNS服务未启用，需要手动配置桌面应用程序连接到 127.0.0.1:8888")
+            print("⚠️ mDNS服务未启用，需要手动配置桌面应用程序连接到虚拟设备")
         print("⌨️  按 Ctrl+C 停止")
         print()
 
