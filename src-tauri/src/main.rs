@@ -1766,7 +1766,7 @@ async fn main() {
 
             // If test mode is requested, run the test
             if test_single_display_config {
-                let app_handle = app.handle().clone();
+                let _app_handle = app.handle().clone();
                 tauri::async_runtime::spawn(async move {
                     info!("🧪 Starting single display config test mode...");
                     // Wait a bit for the app to fully initialize

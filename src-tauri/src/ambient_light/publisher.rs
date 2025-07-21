@@ -971,102 +971,142 @@ impl LedColorsPublisher {
     }
 
     /// 使用采样映射函数将边框颜色映射到完整灯带数据串缓冲区，并计算全局偏移量
+    /// 在单屏配置模式下，生成完整的LED数据流：当前显示器显示定位色，其他显示器显示白色填充
     pub fn map_edge_colors_to_led_buffer_with_offset(
         &self,
         config_group: &LedStripConfigGroup,
         all_configs: &LedStripConfigGroup,
         edge_colors: &std::collections::HashMap<Border, [LedColor; 2]>,
     ) -> anyhow::Result<(Vec<u8>, u16)> {
-        // 计算当前显示器灯带的总LED数量
-        let total_leds: usize = config_group.strips.iter().map(|s| s.len).sum();
+        // 按序列号排序所有灯带
+        let mut all_sorted_strips = all_configs.strips.clone();
+        all_sorted_strips.sort_by_key(|s| s.index);
 
-        // 按序列号排序当前显示器的灯带
-        let mut sorted_strips = config_group.strips.clone();
-        sorted_strips.sort_by_key(|s| s.index);
+        // 计算总LED数量和总字节数
+        let total_leds: usize = all_sorted_strips.iter().map(|s| s.len).sum();
+        let total_bytes: usize = all_sorted_strips.iter().map(|s| {
+            let bytes_per_led = match s.led_type {
+                LedType::WS2812B => 3,
+                LedType::SK6812 => 4,
+            };
+            s.len * bytes_per_led
+        }).sum();
 
-        // 计算全局偏移量：找到当前显示器第一个灯带在全局序列中的位置
-        let mut global_start_offset_bytes = 0u16;
-        if !sorted_strips.is_empty() {
-            let first_strip = &sorted_strips[0];
-            let global_start_pos = first_strip.calculate_start_pos(&all_configs.strips);
+        log::info!("🎨 生成完整LED数据流: 总LED数={}, 总字节数={}", total_leds, total_bytes);
 
-            // 计算字节偏移量（考虑不同LED类型的字节数）
-            let mut byte_offset = 0;
-            let mut all_sorted_strips = all_configs.strips.clone();
-            all_sorted_strips.sort_by_key(|s| s.index);
+        // 获取当前显示器的灯带ID集合
+        let current_display_strips: std::collections::HashSet<usize> =
+            config_group.strips.iter().map(|s| s.index).collect();
 
-            for strip in &all_sorted_strips {
-                if strip.index < first_strip.index {
-                    let bytes_per_led = match strip.led_type {
-                        LedType::WS2812B => 3,
-                        LedType::SK6812 => 4,
-                    };
-                    byte_offset += strip.len * bytes_per_led;
-                } else {
-                    break;
-                }
-            }
-            global_start_offset_bytes = byte_offset as u16;
-
-            log::info!("🎯 计算全局偏移量: 灯带{}从LED位置{}开始，字节偏移量{}",
-                first_strip.index, global_start_pos, global_start_offset_bytes);
-        }
+        // 定义白色填充颜色（20%亮度）
+        let white_fill_rgb = [51, 51, 51]; // 255 * 0.2 = 51
+        let white_fill_w = 51; // W通道也是20%
 
         let mut buffer = Vec::new();
 
-        for strip in &sorted_strips {
-            // 获取该边框的两种颜色
-            let default_colors = [LedColor::new(0, 0, 0), LedColor::new(0, 0, 0)];
-            let colors = edge_colors.get(&strip.border).unwrap_or(&default_colors);
+        // 遍历所有灯带，按序列号顺序生成完整的LED数据流
+        for strip in &all_sorted_strips {
+            let is_current_display = current_display_strips.contains(&strip.index);
 
-            // 计算分段：前半部分用第一种颜色，后半部分用第二种颜色
-            let half_count = strip.len / 2;
+            if is_current_display {
+                // 当前显示器的灯带：显示定位色
+                let default_colors = [LedColor::new(0, 0, 0), LedColor::new(0, 0, 0)];
+                let colors = edge_colors.get(&strip.border).unwrap_or(&default_colors);
 
-            log::debug!("🎨 灯带 {} ({}边): {} LEDs, 前{}个用第一种颜色，后{}个用第二种颜色",
-                strip.index,
-                match strip.border {
-                    Border::Top => "Top",
-                    Border::Bottom => "Bottom",
-                    Border::Left => "Left",
-                    Border::Right => "Right",
-                },
-                strip.len,
-                half_count,
-                strip.len - half_count
-            );
+                // 计算分段：前半部分用第一种颜色，后半部分用第二种颜色
+                let half_count = strip.len / 2;
 
-            // 为该灯带的所有LED生成颜色数据
-            for led_index in 0..strip.len {
-                // 选择颜色：前半部分用第一种，后半部分用第二种
-                let color = if led_index < half_count {
-                    &colors[0] // 第一种颜色
-                } else {
-                    &colors[1] // 第二种颜色
-                };
-                let rgb = color.get_rgb();
+                log::info!("🎨 当前显示器灯带 {} ({}边): {} LEDs, 前{}个用第一种颜色，后{}个用第二种颜色, 反向: {}",
+                    strip.index,
+                    match strip.border {
+                        Border::Top => "Top",
+                        Border::Bottom => "Bottom",
+                        Border::Left => "Left",
+                        Border::Right => "Right",
+                    },
+                    strip.len,
+                    half_count,
+                    strip.len - half_count,
+                    strip.reversed
+                );
 
-                match strip.led_type {
-                    LedType::WS2812B => {
-                        // GRB格式
-                        buffer.push(rgb[1]); // G
-                        buffer.push(rgb[0]); // R
-                        buffer.push(rgb[2]); // B
+                // 为该灯带的所有LED生成定位色数据
+                for physical_index in 0..strip.len {
+                    // 根据reversed字段决定逻辑索引
+                    let logical_index = if strip.reversed {
+                        strip.len - 1 - physical_index // 反向：最后一个LED对应第一个逻辑位置
+                    } else {
+                        physical_index // 正向：物理索引等于逻辑索引
+                    };
+
+                    // 选择颜色：前半部分用第一种，后半部分用第二种（基于逻辑索引）
+                    let color = if logical_index < half_count {
+                        &colors[0] // 第一种颜色
+                    } else {
+                        &colors[1] // 第二种颜色
+                    };
+                    let rgb = color.get_rgb();
+
+                    match strip.led_type {
+                        LedType::WS2812B => {
+                            // GRB格式
+                            buffer.push(rgb[1]); // G
+                            buffer.push(rgb[0]); // R
+                            buffer.push(rgb[2]); // B
+                        }
+                        LedType::SK6812 => {
+                            // GRBW格式
+                            buffer.push(rgb[1]); // G
+                            buffer.push(rgb[0]); // R
+                            buffer.push(rgb[2]); // B
+                            buffer.push(0); // W通道设为0
+                        }
                     }
-                    LedType::SK6812 => {
-                        // GRBW格式
-                        buffer.push(rgb[1]); // G
-                        buffer.push(rgb[0]); // R
-                        buffer.push(rgb[2]); // B
-                        buffer.push(0); // W通道设为0
+                }
+            } else {
+                // 其他显示器的灯带：显示白色填充（20%亮度）
+                log::info!("🤍 其他显示器灯带 {} ({}边): {} LEDs, 白色填充20%亮度",
+                    strip.index,
+                    match strip.border {
+                        Border::Top => "Top",
+                        Border::Bottom => "Bottom",
+                        Border::Left => "Left",
+                        Border::Right => "Right",
+                    },
+                    strip.len
+                );
+
+                // 为该灯带的所有LED生成白色填充数据
+                for _led_index in 0..strip.len {
+                    match strip.led_type {
+                        LedType::WS2812B => {
+                            // GRB格式，RGB全亮20%
+                            buffer.push(white_fill_rgb[1]); // G
+                            buffer.push(white_fill_rgb[0]); // R
+                            buffer.push(white_fill_rgb[2]); // B
+                        }
+                        LedType::SK6812 => {
+                            // GRBW格式，只亮W通道20%
+                            buffer.push(0); // G = 0
+                            buffer.push(0); // R = 0
+                            buffer.push(0); // B = 0
+                            buffer.push(white_fill_w); // W = 20%
+                        }
                     }
                 }
             }
         }
 
-        log::info!("🎨 生成了 {} 字节的LED数据缓冲区 (总LED数: {}), 全局字节偏移量: {}",
-            buffer.len(), total_leds, global_start_offset_bytes);
+        log::info!("🎨 生成了完整的LED数据缓冲区: {} 字节 (总LED数: {}), 从偏移量0开始发送",
+            buffer.len(), total_leds);
 
-        Ok((buffer, global_start_offset_bytes))
+        // 验证生成的数据长度是否正确
+        if buffer.len() != total_bytes {
+            log::warn!("⚠️ 数据长度不匹配: 期望{}字节, 实际{}字节", total_bytes, buffer.len());
+        }
+
+        // 返回完整的LED数据流，从偏移量0开始
+        Ok((buffer, 0))
     }
 }
 
