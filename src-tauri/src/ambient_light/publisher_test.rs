@@ -134,32 +134,57 @@ mod tests {
         // 总计: 12 + 12 + 6 = 30字节
         assert_eq!(buffer.len(), 30);
         
-        // 验证序列号0 (Bottom边, 红色, WS2812B格式: GRB)
+        // 验证序列号0 (Bottom边, 双色分段: 红色+橙色, WS2812B格式: GRB)
         let bottom_start = 0;
         for i in 0..4 {
             let offset = bottom_start + i * 3;
-            assert_eq!(buffer[offset], 0);     // G
-            assert_eq!(buffer[offset + 1], 255); // R  
-            assert_eq!(buffer[offset + 2], 0);   // B
+            if i < 2 {
+                // 前半部分应该是红色 [255, 0, 0] -> GRB: [0, 255, 0]
+                assert_eq!(buffer[offset], 0, "LED {} G channel should be 0", i);     // G
+                assert_eq!(buffer[offset + 1], 255, "LED {} R channel should be 255", i); // R
+                assert_eq!(buffer[offset + 2], 0, "LED {} B channel should be 0", i);   // B
+            } else {
+                // 后半部分应该是橙色 [255, 128, 0] -> GRB: [128, 255, 0]
+                assert_eq!(buffer[offset], 128, "LED {} G channel should be 128", i);     // G
+                assert_eq!(buffer[offset + 1], 255, "LED {} R channel should be 255", i); // R
+                assert_eq!(buffer[offset + 2], 0, "LED {} B channel should be 0", i);   // B
+            }
         }
         
-        // 验证序列号1 (Right边, 黄色, SK6812格式: GRBW)
+        // 验证序列号1 (Right边, 双色分段: 黄色+黄绿色, SK6812格式: GRBW)
         let right_start = 12;
         for i in 0..3 {
             let offset = right_start + i * 4;
-            assert_eq!(buffer[offset], 255);     // G
-            assert_eq!(buffer[offset + 1], 255); // R
-            assert_eq!(buffer[offset + 2], 0);   // B
-            assert_eq!(buffer[offset + 3], 0);   // W
+            if i < 1 {
+                // 前半部分（第1个LED）应该是黄色 [255, 255, 0] -> GRBW: [255, 255, 0, 0]
+                assert_eq!(buffer[offset], 255);     // G
+                assert_eq!(buffer[offset + 1], 255); // R
+                assert_eq!(buffer[offset + 2], 0);   // B
+                assert_eq!(buffer[offset + 3], 0);   // W
+            } else {
+                // 后半部分（第2-3个LED）应该是黄绿色 [128, 255, 0] -> GRBW: [255, 128, 0, 0]
+                assert_eq!(buffer[offset], 255);     // G
+                assert_eq!(buffer[offset + 1], 128); // R
+                assert_eq!(buffer[offset + 2], 0);   // B
+                assert_eq!(buffer[offset + 3], 0);   // W
+            }
         }
         
-        // 验证序列号2 (Top边, 青色, WS2812B格式: GRB)
+        // 验证序列号2 (Top边, 双色分段: 青色+蓝色, WS2812B格式: GRB)
         let top_start = 24;
         for i in 0..2 {
             let offset = top_start + i * 3;
-            assert_eq!(buffer[offset], 255);     // G
-            assert_eq!(buffer[offset + 1], 0);   // R
-            assert_eq!(buffer[offset + 2], 255); // B
+            if i < 1 {
+                // 前半部分（第1个LED）应该是青色 [0, 255, 255] -> GRB: [255, 0, 255]
+                assert_eq!(buffer[offset], 255);     // G
+                assert_eq!(buffer[offset + 1], 0);   // R
+                assert_eq!(buffer[offset + 2], 255); // B
+            } else {
+                // 后半部分（第2个LED）应该是蓝色 [0, 0, 255] -> GRB: [0, 0, 255]
+                assert_eq!(buffer[offset], 0);       // G
+                assert_eq!(buffer[offset + 1], 0);   // R
+                assert_eq!(buffer[offset + 2], 255); // B
+            }
         }
     }
 
@@ -250,28 +275,53 @@ mod tests {
         
         let mut byte_index = 0;
         
-        // 序列号0: Bottom边, 红色 [255,0,0], WS2812B
-        for _led in 0..4 {
-            assert_eq!(buffer[byte_index], 0);     // G
-            assert_eq!(buffer[byte_index + 1], 255); // R
-            assert_eq!(buffer[byte_index + 2], 0);   // B
+        // 序列号0: Bottom边, 双色分段: 红色+橙色, WS2812B
+        for led in 0..4 {
+            if led < 2 {
+                // 前半部分: 红色 [255,0,0] -> GRB: [0,255,0]
+                assert_eq!(buffer[byte_index], 0);     // G
+                assert_eq!(buffer[byte_index + 1], 255); // R
+                assert_eq!(buffer[byte_index + 2], 0);   // B
+            } else {
+                // 后半部分: 橙色 [255,128,0] -> GRB: [128,255,0]
+                assert_eq!(buffer[byte_index], 128);   // G
+                assert_eq!(buffer[byte_index + 1], 255); // R
+                assert_eq!(buffer[byte_index + 2], 0);   // B
+            }
             byte_index += 3;
         }
 
-        // 序列号1: Right边, 黄色 [255,255,0], SK6812
-        for _led in 0..3 {
-            assert_eq!(buffer[byte_index], 255);     // G
-            assert_eq!(buffer[byte_index + 1], 255); // R
-            assert_eq!(buffer[byte_index + 2], 0);   // B
-            assert_eq!(buffer[byte_index + 3], 0);   // W
+        // 序列号1: Right边, 双色分段: 黄色+黄绿色, SK6812
+        for led in 0..3 {
+            if led < 1 {
+                // 前半部分: 黄色 [255,255,0] -> GRBW: [255,255,0,0]
+                assert_eq!(buffer[byte_index], 255);     // G
+                assert_eq!(buffer[byte_index + 1], 255); // R
+                assert_eq!(buffer[byte_index + 2], 0);   // B
+                assert_eq!(buffer[byte_index + 3], 0);   // W
+            } else {
+                // 后半部分: 黄绿色 [128,255,0] -> GRBW: [255,128,0,0]
+                assert_eq!(buffer[byte_index], 255);     // G
+                assert_eq!(buffer[byte_index + 1], 128); // R
+                assert_eq!(buffer[byte_index + 2], 0);   // B
+                assert_eq!(buffer[byte_index + 3], 0);   // W
+            }
             byte_index += 4;
         }
         
-        // 序列号2: Top边, 青色 [0,255,255], WS2812B
-        for _led in 0..2 {
-            assert_eq!(buffer[byte_index], 255);     // G
-            assert_eq!(buffer[byte_index + 1], 0);   // R
-            assert_eq!(buffer[byte_index + 2], 255); // B
+        // 序列号2: Top边, 双色分段: 青色+蓝色, WS2812B
+        for led in 0..2 {
+            if led < 1 {
+                // 前半部分: 青色 [0,255,255] -> GRB: [255,0,255]
+                assert_eq!(buffer[byte_index], 255);     // G
+                assert_eq!(buffer[byte_index + 1], 0);   // R
+                assert_eq!(buffer[byte_index + 2], 255); // B
+            } else {
+                // 后半部分: 蓝色 [0,0,255] -> GRB: [0,0,255]
+                assert_eq!(buffer[byte_index], 0);       // G
+                assert_eq!(buffer[byte_index + 1], 0);   // R
+                assert_eq!(buffer[byte_index + 2], 255); // B
+            }
             byte_index += 3;
         }
         

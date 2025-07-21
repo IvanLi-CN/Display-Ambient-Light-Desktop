@@ -126,6 +126,8 @@ const LedBorderStrips: Component<{
   strips: LedStripConfig[];
   onSelectStrip: (strip: LedStripConfig) => void;
   selectedStrip: LedStripConfig | null;
+  hoveredStrip: LedStripConfig | null;
+  onHoverStrip: (strip: LedStripConfig | null) => void;
 }> = (props) => {
   // 获取该边框的LED灯带
   const borderStrips = createMemo(() => {
@@ -141,7 +143,7 @@ const LedBorderStrips: Component<{
   });
 
   // 为每个LED灯带生成独立的样式 - 条状平行显示
-  const getStripStyle = (stripIndex: number, _totalStrips: number, strip: LedStripConfig, isSelected: boolean = false) => {
+  const getStripStyle = (stripIndex: number, _totalStrips: number, strip: LedStripConfig, isSelected: boolean = false, isHovered: boolean = false) => {
     const stripThickness = 8; // 灯带厚度
     const stripGap = 4;       // 灯带之间的间隙
 
@@ -153,19 +155,35 @@ const LedBorderStrips: Component<{
     const baseBrightness = 0.8; // 进一步提高亮度让灯带更明显
     const displayColor = `rgb(${Math.round(uniformColor.r * baseBrightness)}, ${Math.round(uniformColor.g * baseBrightness)}, ${Math.round(uniformColor.b * baseBrightness)})`;
 
+    // 根据状态确定样式
+    let borderStyle, boxShadowStyle, zIndex;
+
+    if (isSelected) {
+      // 选中状态：蓝色边框和发光效果
+      borderStyle = '2px solid rgba(59, 130, 246, 0.8)';
+      boxShadowStyle = '0 4px 12px rgba(59, 130, 246, 0.4), 0 0 0 2px rgba(59, 130, 246, 0.2)';
+      zIndex = '1001';
+    } else if (isHovered) {
+      // 悬浮状态：绿色边框和发光效果
+      borderStyle = '2px solid rgba(34, 197, 94, 0.8)';
+      boxShadowStyle = '0 4px 12px rgba(34, 197, 94, 0.4), 0 0 0 2px rgba(34, 197, 94, 0.2)';
+      zIndex = '1000';
+    } else {
+      // 默认状态
+      borderStyle = '1px solid rgba(255, 255, 255, 0.3)';
+      boxShadowStyle = '0 1px 3px rgba(0, 0, 0, 0.3)';
+      zIndex = '999';
+    }
+
     const baseStyle = {
       position: 'absolute' as const,
-      'z-index': isSelected ? '1000' : '999',
+      'z-index': zIndex,
       cursor: 'pointer',
       transition: 'all 0.2s',
       'background-color': displayColor,
       'border-radius': '2px',
-      border: isSelected
-        ? '2px solid rgba(59, 130, 246, 0.8)' // 选中时蓝色边框
-        : '1px solid rgba(255, 255, 255, 0.3)', // 默认白色边框
-      'box-shadow': isSelected
-        ? '0 4px 12px rgba(59, 130, 246, 0.4), 0 0 0 2px rgba(59, 130, 246, 0.2)' // 选中时蓝色发光效果
-        : '0 1px 3px rgba(0, 0, 0, 0.3)', // 默认阴影
+      border: borderStyle,
+      'box-shadow': boxShadowStyle,
       transform: 'scale(1)', // 不缩放
       display: 'flex',
       'align-items': 'center',
@@ -234,15 +252,25 @@ const LedBorderStrips: Component<{
     >
       <For each={borderStrips()}>
         {(strip, index) => {
+          const isSelected = props.selectedStrip?.id === strip.id;
+          const isHovered = props.hoveredStrip?.id === strip.id;
 
           return (
             <div
-              style={getStripStyle(index(), borderStrips().length, strip, props.selectedStrip?.id === strip.id)}
+              style={getStripStyle(index(), borderStrips().length, strip, isSelected, isHovered)}
               onClick={() => {
                 console.log('LED strip clicked:', strip.id, strip);
                 props.onSelectStrip(strip);
               }}
-              class="hover:brightness-110 transition-all duration-200"
+              onMouseEnter={() => {
+                console.log('LED strip hovered:', strip.id, strip);
+                props.onHoverStrip(strip);
+              }}
+              onMouseLeave={() => {
+                console.log('LED strip hover ended:', strip.id);
+                props.onHoverStrip(null);
+              }}
+              class="transition-all duration-200"
             >
               <span style={{
                 color: 'white',
@@ -558,6 +586,7 @@ export function SingleDisplayConfig() {
   // LED灯带配置状态
   const [ledStrips, setLedStrips] = createSignal<LedStripConfig[]>([]);
   const [selectedStrip, setSelectedStrip] = createSignal<LedStripConfig | null>(null);
+  const [hoveredStrip, setHoveredStrip] = createSignal<LedStripConfig | null>(null);
 
   // 边框定义
   const borders: ('Top' | 'Bottom' | 'Left' | 'Right')[] = ['Top', 'Right', 'Bottom', 'Left'];
@@ -1058,6 +1087,44 @@ export function SingleDisplayConfig() {
     console.log(`📊 总计: ${cumulativeLedOffset} 个LED`);
   };
 
+  // 设置活跃灯带用于呼吸效果
+  const setActiveStripForBreathing = async (strip: LedStripConfig | null) => {
+    try {
+      if (strip) {
+        console.log('设置活跃灯带用于呼吸效果:', strip.id, strip.border);
+        await invoke('set_active_strip_for_breathing', {
+          displayId: strip.displayId,
+          border: strip.border,
+        });
+      } else {
+        console.log('清除活跃灯带呼吸效果');
+        await invoke('set_active_strip_for_breathing', {
+          displayId: displayId(),
+          border: null,
+        });
+      }
+    } catch (error) {
+      console.error('设置活跃灯带失败:', error);
+    }
+  };
+
+  // 监听选中和悬浮状态变化，设置活跃灯带
+  createEffect(() => {
+    const selected = selectedStrip();
+    const hovered = hoveredStrip();
+
+    // 悬浮优先，只能有一个是活动状态
+    const activeStrip = hovered || selected;
+
+    console.log('活跃灯带状态变化:', {
+      selected: selected?.id || 'none',
+      hovered: hovered?.id || 'none',
+      active: activeStrip?.id || 'none'
+    });
+
+    setActiveStripForBreathing(activeStrip);
+  });
+
   // 当灯带配置变化时，重新启动后端单屏配置模式
   createEffect(() => {
     const strips = ledStrips();
@@ -1203,6 +1270,11 @@ export function SingleDisplayConfig() {
                         console.log('Selected strip after set:', selectedStrip());
                       }}
                       selectedStrip={selectedStrip()}
+                      hoveredStrip={hoveredStrip()}
+                      onHoverStrip={(strip) => {
+                        console.log('Setting hovered strip:', strip?.id || 'null');
+                        setHoveredStrip(strip);
+                      }}
                     />
                   )}
                 </For>

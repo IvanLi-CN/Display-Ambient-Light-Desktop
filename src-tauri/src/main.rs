@@ -236,6 +236,25 @@ async fn stop_single_display_config_publisher() -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn set_active_strip_for_breathing(
+    display_id: u32,
+    border: Option<String>,
+) -> Result<(), String> {
+    log::info!("🫁 Tauri命令被调用: set_active_strip_for_breathing");
+    log::info!("   - 显示器ID: {}", display_id);
+    log::info!("   - 边框: {:?}", border);
+
+    let publisher = ambient_light::LedColorsPublisher::global().await;
+    publisher
+        .set_active_strip_for_breathing(display_id, border)
+        .await
+        .map_err(|e| {
+            error!("Failed to set active strip for breathing: {}", e);
+            e.to_string()
+        })
+}
+
+#[tauri::command]
 async fn test_single_display_config_mode() -> Result<(), String> {
     log::info!("🧪 测试命令被调用: test_single_display_config_mode");
 
@@ -1458,6 +1477,7 @@ async fn main() {
             send_test_colors_to_board,
             start_single_display_config_publisher,
             stop_single_display_config_publisher,
+            set_active_strip_for_breathing,
             test_single_display_config_mode,
             enable_test_mode,
             disable_test_mode,
