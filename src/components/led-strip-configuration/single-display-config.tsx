@@ -18,14 +18,7 @@ interface LedStripConfig {
   endOffset: number;   // 0-100%
 }
 
-// 硬件设备信息类型
-interface BoardInfo {
-  fullname: string;
-  host: string;
-  address: string;
-  port: number;
-  connect_status: 'Connected' | 'Disconnected' | { Connecting: number };
-}
+
 
 
 
@@ -539,11 +532,22 @@ const LedConfigPanel: Component<{
 };
 
 export function SingleDisplayConfig() {
+  console.log('🎯 SingleDisplayConfig component is rendering');
   const params = useParams();
   const navigate = useNavigate();
   const { t } = useLanguage();
 
-  const displayId = () => parseInt(params.displayId);
+  console.log('🔍 SingleDisplayConfig - URL params:', params);
+
+  const displayId = () => {
+    const id = parseInt(params.displayId || '1');
+    console.log('🔍 SingleDisplayConfig - displayId params:', params.displayId, 'parsed:', id);
+    if (isNaN(id)) {
+      console.error('❌ Invalid displayId parameter:', params.displayId);
+      return 1; // 默认返回显示器1
+    }
+    return id;
+  };
 
   // LED灯带配置状态
   const [ledStrips, setLedStrips] = createSignal<LedStripConfig[]>([]);
@@ -682,10 +686,10 @@ export function SingleDisplayConfig() {
 
           console.log('✅ 成功加载已保存的LED灯带配置');
 
-          // 立即启动30Hz测试颜色发送
-          console.log('=== 立即启动测试颜色发送（已保存配置）===');
+          // 立即启动后端单屏配置模式
+          console.log('=== 立即启动后端单屏配置模式（已保存配置）===');
           setTimeout(() => {
-            startTestColorSending();
+            startSingleDisplayConfigMode();
           }, 100); // 稍微延迟确保状态已更新
 
           return; // 成功加载，不需要使用测试数据
@@ -699,10 +703,68 @@ export function SingleDisplayConfig() {
       console.log('Failed to load saved configuration, starting with empty configuration:', error);
     }
 
-    // 如果没有保存的配置或加载失败，使用空配置
-    console.log('Starting with empty LED strip configuration');
-    setLedStrips([]);
-    setSelectedStrip(null);
+    // 如果没有保存的配置或加载失败，创建测试配置
+    console.log('Starting with test LED strip configuration');
+    const testStrips = [
+      {
+        id: 'test_bottom',
+        displayId: displayId(),
+        border: 'Bottom' as const,
+        count: 10,
+        reverse: false,
+        ledType: 'WS2812B' as const,
+        driver: 'Driver1',
+        sequence: 1,
+        startOffset: 0,
+        endOffset: 100,
+      },
+      {
+        id: 'test_right',
+        displayId: displayId(),
+        border: 'Right' as const,
+        count: 10,
+        reverse: false,
+        ledType: 'WS2812B' as const,
+        driver: 'Driver1',
+        sequence: 2,
+        startOffset: 0,
+        endOffset: 100,
+      },
+      {
+        id: 'test_top',
+        displayId: displayId(),
+        border: 'Top' as const,
+        count: 10,
+        reverse: false,
+        ledType: 'WS2812B' as const,
+        driver: 'Driver1',
+        sequence: 3,
+        startOffset: 0,
+        endOffset: 100,
+      },
+      {
+        id: 'test_left',
+        displayId: displayId(),
+        border: 'Left' as const,
+        count: 10,
+        reverse: false,
+        ledType: 'WS2812B' as const,
+        driver: 'Driver1',
+        sequence: 4,
+        startOffset: 0,
+        endOffset: 100,
+      }
+    ];
+
+    console.log('🔧 设置测试灯带配置:', testStrips);
+    setLedStrips(testStrips);
+    setSelectedStrip(testStrips[0]);
+
+    // 立即启动后端单屏配置模式
+    console.log('=== 立即启动后端单屏配置模式（测试配置）===');
+    setTimeout(() => {
+      startSingleDisplayConfigMode();
+    }, 100);
   });
 
   // 组件卸载时的清理
@@ -824,219 +886,70 @@ export function SingleDisplayConfig() {
     }
   };
 
-  // HSV到RGB转换函数
-  const hsvToRgb = (h: number, s: number, v: number): { r: number; g: number; b: number } => {
-    const c = v * s;
-    const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
-    const m = v - c;
-
-    let r_prime = 0, g_prime = 0, b_prime = 0;
-
-    if (h < 60) {
-      r_prime = c; g_prime = x; b_prime = 0;
-    } else if (h < 120) {
-      r_prime = x; g_prime = c; b_prime = 0;
-    } else if (h < 180) {
-      r_prime = 0; g_prime = c; b_prime = x;
-    } else if (h < 240) {
-      r_prime = 0; g_prime = x; b_prime = c;
-    } else if (h < 300) {
-      r_prime = x; g_prime = 0; b_prime = c;
-    } else {
-      r_prime = c; g_prime = 0; b_prime = x;
-    }
-
-    return {
-      r: Math.round((r_prime + m) * 255),
-      g: Math.round((g_prime + m) * 255),
-      b: Math.round((b_prime + m) * 255)
-    };
-  };
-
-  // 生成边框预设颜色：每个边框被两个颜色平分 - 使用色环每45度的颜色
-  const generateBorderTestColors = (border: string, ledCount: number, reverse: boolean = false) => {
-    const colors = [];
-    const halfCount = Math.floor(ledCount / 2);
-
-    // 色环每45度的颜色定义 (HSV: H=色相, S=1.0, V=1.0)
-    const colorWheel45Degrees = [
-      hsvToRgb(0, 1.0, 1.0),    // 0° - 红色
-      hsvToRgb(45, 1.0, 1.0),   // 45° - 橙色
-      hsvToRgb(90, 1.0, 1.0),   // 90° - 黄色
-      hsvToRgb(135, 1.0, 1.0),  // 135° - 黄绿色
-      hsvToRgb(180, 1.0, 1.0),  // 180° - 青色
-      hsvToRgb(225, 1.0, 1.0),  // 225° - 蓝色
-      hsvToRgb(270, 1.0, 1.0),  // 270° - 紫色
-      hsvToRgb(315, 1.0, 1.0),  // 315° - 玫红色
-    ];
-
-    // 定义每个边框的两个颜色 - 按色环45度间隔分配
-    const borderColorPairs = {
-      'bottom': [
-        colorWheel45Degrees[0],  // 红色 (0°)
-        colorWheel45Degrees[1]   // 橙色 (45°)
-      ],
-      'right': [
-        colorWheel45Degrees[2],  // 黄色 (90°)
-        colorWheel45Degrees[3]   // 黄绿色 (135°)
-      ],
-      'top': [
-        colorWheel45Degrees[4],  // 青色 (180°)
-        colorWheel45Degrees[5]   // 蓝色 (225°)
-      ],
-      'left': [
-        colorWheel45Degrees[6],  // 紫色 (270°)
-        colorWheel45Degrees[7]   // 玫红色 (315°)
-      ]
-    };
-
-    const colorPair = borderColorPairs[border.toLowerCase() as keyof typeof borderColorPairs] || borderColorPairs['top'];
-
-    // 前半部分使用第一个颜色
-    for (let i = 0; i < halfCount; i++) {
-      colors.push(colorPair[0]);
-    }
-
-    // 后半部分使用第二个颜色
-    for (let i = halfCount; i < ledCount; i++) {
-      colors.push(colorPair[1]);
-    }
-
-    // 如果设置了反向，则反转颜色数组
-    if (reverse) {
-      colors.reverse();
-    }
-
-    return colors;
-  };
-
-  // 30Hz测试颜色发送定时器
-  let testColorTimer: number | null = null;
 
 
 
-  // 生成所有灯带的合并测试数据
-  const generateMergedTestData = (strips: LedStripConfig[]): Uint8Array => {
-    const sortedStrips = [...strips].sort((a, b) => a.sequence - b.sequence);
-    const allColorBytes: number[] = [];
 
-    for (const strip of sortedStrips) {
-      // 生成该边框的预设颜色（两个颜色平分，考虑反向设置）
-      const borderColors = generateBorderTestColors(strip.border, strip.count, strip.reverse);
 
-      // 转换为字节数据
-      for (const color of borderColors) {
-        if (strip.ledType === 'SK6812') {
-          // GRBW 格式 - 白色通道不需要点亮，设为0
-          allColorBytes.push(color.g, color.r, color.b, 0); // W通道设为0
-        } else {
-          // GRB 格式 (WS2812B)
-          allColorBytes.push(color.g, color.r, color.b);
-        }
-      }
-    }
 
-    return new Uint8Array(allColorBytes);
-  };
 
-  // 发送合并的测试数据
-  const sendMergedTestData = async (strips: LedStripConfig[]) => {
+
+  // 启动后端单屏配置模式
+  const startSingleDisplayConfigMode = async () => {
     try {
-      const boards = await invoke('get_boards') as BoardInfo[];
-      const mergedData = generateMergedTestData(strips);
+      const currentStrips = ledStrips();
+      console.log('🔍 当前灯带数量:', currentStrips.length);
+      console.log('🔍 当前灯带详情:', currentStrips);
 
-      // 确定目标地址
-      let boardAddress: string;
-
-      if (boards.length === 0) {
-        console.log('⚠️ 没有找到硬件设备，无法发送测试数据');
+      if (currentStrips.length === 0) {
+        console.log('⚠️ 没有配置的灯带，无法启动单屏配置模式');
         return;
-      } else {
-        // 发送到第一个可用的硬件设备
-        const board = boards[0];
-        boardAddress = `${board.address}:${board.port}`;
       }
 
-      // 发送到目标设备
-      await invoke('send_test_colors_to_board', {
-        boardAddress: boardAddress,
-        offset: 0, // 总是从0开始
-        buffer: Array.from(mergedData)
+      // 转换为后端格式
+      const backendStrips = currentStrips.map(strip => ({
+        display_id: strip.displayId,
+        border: strip.border,
+        len: strip.count,
+        reverse: strip.reverse,
+        led_type: strip.ledType,
+        driver: strip.driver,
+        index: strip.sequence - 1, // 前端序号从1开始，后端从0开始
+        start_offset: strip.startOffset,
+        end_offset: strip.endOffset,
+      }));
+
+      // 定义边框颜色
+      const borderColors = {
+        Top: [255, 0, 0],    // 红色
+        Right: [0, 255, 0],  // 绿色
+        Bottom: [0, 0, 255], // 蓝色
+        Left: [255, 255, 0], // 黄色
+      };
+
+      console.log('=== 启动后端单屏配置模式 ===');
+      console.log('灯带配置:', backendStrips);
+      console.log('边框颜色:', borderColors);
+
+      await invoke('start_single_display_config_publisher', {
+        strips: backendStrips,
+        borderColors: borderColors
       });
 
-      console.log(`✅ 已发送到目标设备: ${boardAddress}`);
-
+      console.log('✅ 后端单屏配置模式已启动');
     } catch (error) {
-      console.error('❌ 发送合并测试数据失败:', error);
+      console.error('❌ 启动后端单屏配置模式失败:', error);
     }
   };
 
-  // 启动30Hz测试颜色发送
-  const startTestColorSending = () => {
-    if (testColorTimer) {
-      clearInterval(testColorTimer);
-    }
-
-    const strips = ledStrips();
-    console.log('=== 启动30Hz测试颜色发送（统一架构）===');
-    console.log(`发送频率: 30Hz (每33.33ms发送一次)`);
-    console.log(`目标灯带数量: ${strips.length}`);
-
-    // 立即发送一次
-    sendMergedTestData(strips);
-
-    let frameCount = 0;
-    const startTime = Date.now();
-
-    // 启动30Hz定时器 (1000ms / 30 = 33.33ms)
-    testColorTimer = setInterval(() => {
-      const currentStrips = ledStrips();
-      if (currentStrips.length > 0) {
-        const sortedStrips = [...currentStrips].sort((a, b) => a.sequence - b.sequence);
-
-        // 显示排序后的灯带信息（仅在开始时显示一次）
-        if (frameCount === 0) {
-          console.log(`🔄 灯带排序结果:`);
-          sortedStrips.forEach((strip, index) => {
-            console.log(`  ${index + 1}. ${strip.id} (${strip.border}) - 序列${strip.sequence}, ${strip.count}个LED, LED类型: ${strip.ledType}`);
-          });
-
-          // 检查是否有重复的序列号
-          const sequences = sortedStrips.map(s => s.sequence);
-          const duplicates = sequences.filter((seq, index) => sequences.indexOf(seq) !== index);
-          if (duplicates.length > 0) {
-            console.warn(`⚠️ 发现重复的序列号: ${duplicates.join(', ')}`);
-          }
-
-          // 计算总字节数
-          let totalBytes = 0;
-          for (const strip of sortedStrips) {
-            const bytesPerLed = strip.ledType === 'SK6812' ? 4 : 3;
-            totalBytes += strip.count * bytesPerLed;
-          }
-          console.log(`✅ 总字节数: ${totalBytes}`);
-        }
-
-        // 发送合并的测试数据
-        sendMergedTestData(currentStrips);
-
-        frameCount++;
-        // 每秒显示一次统计信息
-        if (frameCount % 30 === 0) {
-          const elapsed = (Date.now() - startTime) / 1000;
-          const actualFps = frameCount / elapsed;
-          console.log(`📊 30Hz发送统计: 已发送${frameCount}帧, 实际频率: ${actualFps.toFixed(1)}Hz`);
-        }
-      }
-    }, 33) as any; // 30Hz = 33.33ms间隔
-  };
-
-  // 停止测试颜色发送
-  const stopTestColorSending = () => {
-    if (testColorTimer) {
-      clearInterval(testColorTimer);
-      testColorTimer = null;
-      console.log('=== 停止30Hz测试颜色发送 ===');
+  // 停止后端单屏配置模式
+  const stopSingleDisplayConfigMode = async () => {
+    try {
+      console.log('=== 停止后端单屏配置模式 ===');
+      await invoke('stop_single_display_config_publisher');
+      console.log('✅ 后端单屏配置模式已停止');
+    } catch (error) {
+      console.error('❌ 停止后端单屏配置模式失败:', error);
     }
   };
 
@@ -1086,7 +999,7 @@ export function SingleDisplayConfig() {
     console.log(`📊 总计: ${cumulativeLedOffset} 个LED`);
   };
 
-  // 当灯带配置变化时，重新启动测试颜色发送
+  // 当灯带配置变化时，重新启动后端单屏配置模式
   createEffect(() => {
     const strips = ledStrips();
     // 通过访问每个灯带的所有属性来确保深度监听
@@ -1095,23 +1008,23 @@ export function SingleDisplayConfig() {
     ).join('|');
 
     if (strips.length > 0) {
-      console.log(`=== 检测到${strips.length}个已配置的灯带，启动30Hz测试颜色发送 ===`);
+      console.log(`=== 检测到${strips.length}个已配置的灯带，启动后端单屏配置模式 ===`);
       console.log(`配置签名: ${stripSignature}`);
       strips.forEach(strip => {
         console.log(`灯带: ${strip.id} (${strip.border}边) - ${strip.count}个LED, 反向: ${strip.reverse}`);
       });
-      // 重新启动30Hz发送（这会处理所有配置变化）
-      startTestColorSending();
+      // 重新启动后端单屏配置模式（这会处理所有配置变化）
+      startSingleDisplayConfigMode();
     } else {
-      console.log('=== 没有配置的灯带，停止测试颜色发送 ===');
-      stopTestColorSending();
+      console.log('=== 没有配置的灯带，停止后端单屏配置模式 ===');
+      stopSingleDisplayConfigMode();
     }
   });
 
   // 清理效果：离开界面时停止所有LED效果
   onCleanup(() => {
-    // 停止30Hz测试颜色发送
-    stopTestColorSending();
+    // 停止后端单屏配置模式
+    stopSingleDisplayConfigMode();
 
     // 恢复氛围光模式
     stopTestMode();

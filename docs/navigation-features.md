@@ -37,6 +37,8 @@ Ambient Light Control 应用支持通过命令行参数和 URL scheme 直接打�
 
 ### 命令行参数
 
+#### 生产环境（已构建的应用）
+
 ```bash
 # 启动应用并打开信息页面
 ./Ambient\ Light\ Control.app/Contents/MacOS/Ambient\ Light\ Control --page info
@@ -44,9 +46,35 @@ Ambient Light Control 应用支持通过命令行参数和 URL scheme 直接打�
 # 启动应用并打开 LED 配置页面
 ./Ambient\ Light\ Control.app/Contents/MacOS/Ambient\ Light\ Control --page led-strips-configuration
 
+# 启动应用并打开单屏灯带配置页面
+./Ambient\ Light\ Control.app/Contents/MacOS/Ambient\ Light\ Control --page led-strips-configuration --display 1
+
 # 启动应用并打开设置页面
 ./Ambient\ Light\ Control.app/Contents/MacOS/Ambient\ Light\ Control --page settings
 ```
+
+#### 开发环境
+
+由于 `npm run tauri dev` 无法直接传递命令行参数，在开发模式下需要使用环境变量：
+
+```bash
+# 启动开发服务器并打开信息页面
+TAURI_DEV_PAGE=info npm run tauri dev
+
+# 启动开发服务器并打开 LED 配置页面
+TAURI_DEV_PAGE=led-strips-configuration npm run tauri dev
+
+# 启动开发服务器并打开单屏灯带配置页面
+TAURI_DEV_PAGE=led-strips-configuration TAURI_DEV_DISPLAY=1 npm run tauri dev
+
+# 启动开发服务器并打开设置页面
+TAURI_DEV_PAGE=settings npm run tauri dev
+```
+
+**支持的环境变量：**
+
+- `TAURI_DEV_PAGE` - 指定要打开的页面名称
+- `TAURI_DEV_DISPLAY` - 指定显示器ID（用于单屏配置页面）
 
 ### URL Scheme
 

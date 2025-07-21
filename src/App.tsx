@@ -47,9 +47,12 @@ function App() {
       const unlisten = await listen<string>('navigate', (event) => {
         const targetPath = event.payload;
         console.log('🎯 Received navigation event from backend:', targetPath);
+        console.log('🎯 Current location before navigation:', window.location.href);
 
         // Use SolidJS navigate function for proper routing
         navigate(targetPath);
+
+        console.log('🎯 Navigation called, new location:', window.location.href);
 
         // Report successful navigation
         invoke('report_current_page', {
