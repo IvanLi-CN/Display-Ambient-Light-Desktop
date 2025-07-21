@@ -76,10 +76,10 @@ mod tests {
     /// 创建测试用的边框颜色
     fn create_test_border_colors() -> BorderColors {
         BorderColors {
-            top: [0, 255, 255],    // 青色 (Cyan)
-            bottom: [255, 0, 0],   // 红色 (Red)
-            left: [255, 0, 255],   // 紫色 (Magenta)
-            right: [255, 255, 0],  // 黄色 (Yellow)
+            top: [[0, 255, 255], [0, 0, 255]],       // 青色 + 蓝色
+            bottom: [[255, 0, 0], [255, 128, 0]],    // 红色 + 橙色
+            left: [[128, 0, 255], [255, 0, 128]],    // 紫色 + 玫红色
+            right: [[255, 255, 0], [128, 255, 0]],   // 黄色 + 黄绿色
         }
     }
 
@@ -93,21 +93,29 @@ mod tests {
         // 验证生成的边框颜色
         assert_eq!(edge_colors.len(), 4);
         
-        let top_color = edge_colors.get(&Border::Top).unwrap();
-        let top_rgb = top_color.get_rgb();
-        assert_eq!(top_rgb, [0, 255, 255]); // 青色
-        
-        let bottom_color = edge_colors.get(&Border::Bottom).unwrap();
-        let bottom_rgb = bottom_color.get_rgb();
-        assert_eq!(bottom_rgb, [255, 0, 0]); // 红色
-        
-        let left_color = edge_colors.get(&Border::Left).unwrap();
-        let left_rgb = left_color.get_rgb();
-        assert_eq!(left_rgb, [255, 0, 255]); // 紫色
-        
-        let right_color = edge_colors.get(&Border::Right).unwrap();
-        let right_rgb = right_color.get_rgb();
-        assert_eq!(right_rgb, [255, 255, 0]); // 黄色
+        let top_colors = edge_colors.get(&Border::Top).unwrap();
+        let top_rgb_1 = top_colors[0].get_rgb();
+        let top_rgb_2 = top_colors[1].get_rgb();
+        assert_eq!(top_rgb_1, [0, 255, 255]); // 青色 (第一种颜色)
+        assert_eq!(top_rgb_2, [0, 0, 255]); // 蓝色 (第二种颜色)
+
+        let bottom_colors = edge_colors.get(&Border::Bottom).unwrap();
+        let bottom_rgb_1 = bottom_colors[0].get_rgb();
+        let bottom_rgb_2 = bottom_colors[1].get_rgb();
+        assert_eq!(bottom_rgb_1, [255, 0, 0]); // 红色 (第一种颜色)
+        assert_eq!(bottom_rgb_2, [255, 128, 0]); // 橙色 (第二种颜色)
+
+        let left_colors = edge_colors.get(&Border::Left).unwrap();
+        let left_rgb_1 = left_colors[0].get_rgb();
+        let left_rgb_2 = left_colors[1].get_rgb();
+        assert_eq!(left_rgb_1, [128, 0, 255]); // 紫色 (第一种颜色)
+        assert_eq!(left_rgb_2, [255, 0, 128]); // 玫红色 (第二种颜色)
+
+        let right_colors = edge_colors.get(&Border::Right).unwrap();
+        let right_rgb_1 = right_colors[0].get_rgb();
+        let right_rgb_2 = right_colors[1].get_rgb();
+        assert_eq!(right_rgb_1, [255, 255, 0]); // 黄色 (第一种颜色)
+        assert_eq!(right_rgb_2, [128, 255, 0]); // 黄绿色 (第二种颜色)
     }
 
     #[tokio::test]
@@ -243,15 +251,15 @@ mod tests {
         let mut byte_index = 0;
         
         // 序列号0: Bottom边, 红色 [255,0,0], WS2812B
-        for led in 0..4 {
+        for _led in 0..4 {
             assert_eq!(buffer[byte_index], 0);     // G
             assert_eq!(buffer[byte_index + 1], 255); // R
             assert_eq!(buffer[byte_index + 2], 0);   // B
             byte_index += 3;
         }
-        
+
         // 序列号1: Right边, 黄色 [255,255,0], SK6812
-        for led in 0..3 {
+        for _led in 0..3 {
             assert_eq!(buffer[byte_index], 255);     // G
             assert_eq!(buffer[byte_index + 1], 255); // R
             assert_eq!(buffer[byte_index + 2], 0);   // B
@@ -260,7 +268,7 @@ mod tests {
         }
         
         // 序列号2: Top边, 青色 [0,255,255], WS2812B
-        for led in 0..2 {
+        for _led in 0..2 {
             assert_eq!(buffer[byte_index], 255);     // G
             assert_eq!(buffer[byte_index + 1], 0);   // R
             assert_eq!(buffer[byte_index + 2], 255); // B
