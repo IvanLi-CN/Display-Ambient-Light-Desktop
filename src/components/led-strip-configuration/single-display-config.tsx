@@ -533,6 +533,12 @@ const LedConfigPanel: Component<{
 
 export function SingleDisplayConfig() {
   console.log('🎯 SingleDisplayConfig component is rendering');
+
+  // 立即通过Tauri报告组件渲染状态
+  invoke('report_current_page', {
+    pageInfo: '🎯 SingleDisplayConfig 组件开始渲染'
+  }).catch(e => console.error('Failed to report component render:', e));
+
   const params = useParams();
   const navigate = useNavigate();
   const { t } = useLanguage();
@@ -630,8 +636,10 @@ export function SingleDisplayConfig() {
 
   // 加载LED灯带数据
   onMount(async () => {
+    console.log('🔄 onMount 开始执行');
     // 停止氛围光模式，启用测试模式
     await startTestMode();
+    console.log('✅ startTestMode 完成');
 
     try {
       // 检查是否在 Tauri 环境中
@@ -688,8 +696,10 @@ export function SingleDisplayConfig() {
 
           // 立即启动后端单屏配置模式
           console.log('=== 立即启动后端单屏配置模式（已保存配置）===');
-          setTimeout(() => {
-            startSingleDisplayConfigMode();
+          setTimeout(async () => {
+            console.log('⏰ setTimeout 回调执行，准备调用 startSingleDisplayConfigMode');
+            await startSingleDisplayConfigMode();
+            console.log('✅ startSingleDisplayConfigMode 调用完成');
           }, 100); // 稍微延迟确保状态已更新
 
           return; // 成功加载，不需要使用测试数据
@@ -705,6 +715,16 @@ export function SingleDisplayConfig() {
 
     // 如果没有保存的配置或加载失败，创建测试配置
     console.log('Starting with test LED strip configuration');
+
+    // 通过Tauri命令报告状态，这样会显示在后端日志中
+    try {
+      await invoke('report_current_page', {
+        pageInfo: '🔧 单屏配置页面：开始创建测试LED灯带配置'
+      });
+    } catch (e) {
+      console.error('Failed to report page info:', e);
+    }
+
     const testStrips = [
       {
         id: 'test_bottom',
@@ -760,16 +780,41 @@ export function SingleDisplayConfig() {
     setLedStrips(testStrips);
     setSelectedStrip(testStrips[0]);
 
+    // 通过Tauri命令报告状态
+    try {
+      await invoke('report_current_page', {
+        pageInfo: `🔧 单屏配置页面：已设置${testStrips.length}个测试灯带，准备启动单屏配置模式`
+      });
+    } catch (e) {
+      console.error('Failed to report page info:', e);
+    }
+
     // 立即启动后端单屏配置模式
     console.log('=== 立即启动后端单屏配置模式（测试配置）===');
-    setTimeout(() => {
-      startSingleDisplayConfigMode();
+    setTimeout(async () => {
+      try {
+        console.log('⏰ 测试配置 setTimeout 回调执行');
+        await invoke('report_current_page', {
+          pageInfo: '🚀 单屏配置页面：开始启动后端单屏配置模式'
+        });
+        console.log('📞 准备调用 startSingleDisplayConfigMode（测试配置）');
+        await startSingleDisplayConfigMode();
+        console.log('✅ startSingleDisplayConfigMode 调用完成（测试配置）');
+      } catch (e) {
+        console.error('Failed to start single display config mode:', e);
+        await invoke('report_current_page', {
+          pageInfo: `❌ 单屏配置页面：启动失败 - ${e}`
+        });
+      }
     }, 100);
   });
 
   // 组件卸载时的清理
   onCleanup(() => {
-    // 恢复氛围光模式
+    console.log('🧹 SingleDisplayConfig 组件卸载，停止单屏配置模式');
+    // 先停止单屏配置模式
+    stopSingleDisplayConfigMode();
+    // 然后恢复氛围光模式
     stopTestMode();
   });
 
@@ -897,6 +942,7 @@ export function SingleDisplayConfig() {
   // 启动后端单屏配置模式
   const startSingleDisplayConfigMode = async () => {
     try {
+      console.log('🚀 startSingleDisplayConfigMode 函数被调用');
       const currentStrips = ledStrips();
       console.log('🔍 当前灯带数量:', currentStrips.length);
       console.log('🔍 当前灯带详情:', currentStrips);
@@ -906,30 +952,40 @@ export function SingleDisplayConfig() {
         return;
       }
 
-      // 转换为后端格式
+      // 转换为后端格式 - 匹配LedStripConfig结构
       const backendStrips = currentStrips.map(strip => ({
-        display_id: strip.displayId,
+        index: strip.sequence, // 直接使用配置文件中的index值，不需要减1
         border: strip.border,
+        display_id: strip.displayId,
         len: strip.count,
-        reverse: strip.reverse,
         led_type: strip.ledType,
-        driver: strip.driver,
-        index: strip.sequence - 1, // 前端序号从1开始，后端从0开始
-        start_offset: strip.startOffset,
-        end_offset: strip.endOffset,
+        reversed: strip.reverse, // 注意：后端字段名是reversed，不是reverse
       }));
 
-      // 定义边框颜色
+      // 定义边框颜色 - 与ColorPreview组件和后端测试代码一致
       const borderColors = {
-        Top: [255, 0, 0],    // 红色
-        Right: [0, 255, 0],  // 绿色
-        Bottom: [0, 0, 255], // 蓝色
-        Left: [255, 255, 0], // 黄色
+        top: [[0, 255, 255], [0, 0, 255]],       // 青色 (180°) + 蓝色 (225°)
+        bottom: [[255, 0, 0], [255, 128, 0]],    // 红色 (0°) + 橙色 (45°)
+        left: [[128, 0, 255], [255, 0, 128]],    // 紫色 (270°) + 玫红色 (315°)
+        right: [[255, 255, 0], [128, 255, 0]],   // 黄色 (90°) + 黄绿色 (135°)
       };
 
       console.log('=== 启动后端单屏配置模式 ===');
       console.log('灯带配置:', backendStrips);
       console.log('边框颜色:', borderColors);
+
+      // 通过Tauri报告详细信息
+      await invoke('report_current_page', {
+        pageInfo: `🚀 准备启动后端单屏配置模式，灯带数量: ${backendStrips.length}`
+      });
+
+      // 报告每个灯带的详细信息
+      for (let i = 0; i < backendStrips.length; i++) {
+        const strip = backendStrips[i];
+        await invoke('report_current_page', {
+          pageInfo: `灯带${i}: index=${strip.index}, border=${strip.border}, display_id=${strip.display_id}, len=${strip.len}, led_type=${strip.led_type}`
+        });
+      }
 
       await invoke('start_single_display_config_publisher', {
         strips: backendStrips,
@@ -937,6 +993,9 @@ export function SingleDisplayConfig() {
       });
 
       console.log('✅ 后端单屏配置模式已启动');
+      await invoke('report_current_page', {
+        pageInfo: '✅ 后端单屏配置模式启动成功'
+      });
     } catch (error) {
       console.error('❌ 启动后端单屏配置模式失败:', error);
     }

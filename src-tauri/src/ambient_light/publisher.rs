@@ -770,6 +770,43 @@ impl LedColorsPublisher {
         log::info!("🎯 启动单屏灯带配置定位色发布模式");
         log::info!("🔄 收到 {} 个灯带配置", strips.len());
 
+        // 首先停止所有当前的发布任务，避免冲突
+        {
+            let mut version = self.inner_tasks_version.write().await;
+            *version += 1;
+        }
+        log::info!("✅ 已停止所有当前发布任务（增加任务版本号）");
+
+        // 等待一段时间确保所有任务完全停止
+        tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
+        log::info!("⏰ 等待任务完全停止");
+
+        // 设置LED数据发送模式为StripConfig
+        let sender = crate::led_data_sender::LedDataSender::global().await;
+        sender.set_mode(crate::led_data_sender::DataSendMode::StripConfig).await;
+        log::info!("✅ 设置LED数据发送模式为StripConfig");
+
+        // 验证模式设置是否成功
+        let current_mode = sender.get_mode().await;
+        log::info!("🔍 当前LED数据发送模式: {:?}", current_mode);
+
+        // 设置目标硬件地址（如果有可用的硬件设备）
+        let rpc = crate::rpc::UdpRpc::global().await;
+        if let Ok(rpc) = rpc {
+            let boards = rpc.get_boards().await;
+            if !boards.is_empty() {
+                let target_addr = format!("{}:{}", boards[0].address, boards[0].port);
+                sender.set_test_target(Some(target_addr.clone())).await;
+                log::info!("✅ 设置目标硬件地址为: {}", target_addr);
+            } else {
+                log::warn!("⚠️ 没有找到可用的硬件设备，将使用广播模式");
+                sender.set_test_target(None).await;
+            }
+        } else {
+            log::warn!("⚠️ UDP RPC不可用，将使用广播模式");
+            sender.set_test_target(None).await;
+        }
+
         // 设置单屏配置模式数据
         {
             let mut mode = self.single_display_config_mode.write().await;
@@ -817,6 +854,11 @@ impl LedColorsPublisher {
             *version += 1;
         }
 
+        // 恢复LED数据发送模式为AmbientLight
+        let sender = crate::led_data_sender::LedDataSender::global().await;
+        sender.set_mode(crate::led_data_sender::DataSendMode::AmbientLight).await;
+        log::info!("✅ 恢复LED数据发送模式为AmbientLight");
+
         log::info!("✅ 单屏灯带配置定位色发布模式已停止");
         Ok(())
     }
@@ -837,6 +879,7 @@ impl LedColorsPublisher {
         };
 
         let publisher = self.clone();
+        let inner_tasks_version = self.inner_tasks_version.clone();
 
         tokio::spawn(async move {
             log::info!("🚀 启动单屏配置模式30Hz发布任务 (版本: {})", current_version);
@@ -845,6 +888,13 @@ impl LedColorsPublisher {
 
             loop {
                 interval.tick().await;
+
+                // 检查任务版本是否已更改
+                let version = inner_tasks_version.read().await.clone();
+                if version != current_version {
+                    log::info!("🛑 单屏配置模式任务版本已更改，停止任务 ({} != {})", version, current_version);
+                    break;
+                }
 
                 // 生成并发布定位色数据
                 if let Err(e) = publisher.generate_and_publish_config_colors(&config_group, &border_colors).await {
@@ -865,12 +915,16 @@ impl LedColorsPublisher {
         // 1. 根据边框颜色常量生成四个边的颜色数据
         let edge_colors = self.generate_edge_colors_from_constants(border_colors);
 
-        // 2. 使用采样映射函数将数据映射到完整灯带数据串缓冲区
-        let complete_buffer = self.map_edge_colors_to_led_buffer(config_group, &edge_colors)?;
+        // 2. 读取完整的LED灯带配置以计算正确的全局偏移量
+        let config_manager = crate::ambient_light::ConfigManager::global().await;
+        let all_configs = config_manager.configs().await;
 
-        // 3. 委托发布服务将数据发给硬件
+        // 3. 使用采样映射函数将数据映射到完整灯带数据串缓冲区
+        let (complete_buffer, global_start_offset) = self.map_edge_colors_to_led_buffer_with_offset(config_group, &all_configs, &edge_colors)?;
+
+        // 4. 委托发布服务将数据发给硬件，使用正确的全局偏移量
         let sender = LedDataSender::global().await;
-        sender.send_complete_led_data(0, complete_buffer, "StripConfig").await?;
+        sender.send_complete_led_data(global_start_offset, complete_buffer, "StripConfig").await?;
 
         Ok(())
     }
@@ -912,12 +966,51 @@ impl LedColorsPublisher {
         config_group: &LedStripConfigGroup,
         edge_colors: &std::collections::HashMap<Border, [LedColor; 2]>,
     ) -> anyhow::Result<Vec<u8>> {
-        // 计算总LED数量
+        let (buffer, _) = self.map_edge_colors_to_led_buffer_with_offset(config_group, config_group, edge_colors)?;
+        Ok(buffer)
+    }
+
+    /// 使用采样映射函数将边框颜色映射到完整灯带数据串缓冲区，并计算全局偏移量
+    pub fn map_edge_colors_to_led_buffer_with_offset(
+        &self,
+        config_group: &LedStripConfigGroup,
+        all_configs: &LedStripConfigGroup,
+        edge_colors: &std::collections::HashMap<Border, [LedColor; 2]>,
+    ) -> anyhow::Result<(Vec<u8>, u16)> {
+        // 计算当前显示器灯带的总LED数量
         let total_leds: usize = config_group.strips.iter().map(|s| s.len).sum();
 
-        // 按序列号排序灯带
+        // 按序列号排序当前显示器的灯带
         let mut sorted_strips = config_group.strips.clone();
         sorted_strips.sort_by_key(|s| s.index);
+
+        // 计算全局偏移量：找到当前显示器第一个灯带在全局序列中的位置
+        let mut global_start_offset_bytes = 0u16;
+        if !sorted_strips.is_empty() {
+            let first_strip = &sorted_strips[0];
+            let global_start_pos = first_strip.calculate_start_pos(&all_configs.strips);
+
+            // 计算字节偏移量（考虑不同LED类型的字节数）
+            let mut byte_offset = 0;
+            let mut all_sorted_strips = all_configs.strips.clone();
+            all_sorted_strips.sort_by_key(|s| s.index);
+
+            for strip in &all_sorted_strips {
+                if strip.index < first_strip.index {
+                    let bytes_per_led = match strip.led_type {
+                        LedType::WS2812B => 3,
+                        LedType::SK6812 => 4,
+                    };
+                    byte_offset += strip.len * bytes_per_led;
+                } else {
+                    break;
+                }
+            }
+            global_start_offset_bytes = byte_offset as u16;
+
+            log::info!("🎯 计算全局偏移量: 灯带{}从LED位置{}开始，字节偏移量{}",
+                first_strip.index, global_start_pos, global_start_offset_bytes);
+        }
 
         let mut buffer = Vec::new();
 
@@ -970,9 +1063,10 @@ impl LedColorsPublisher {
             }
         }
 
-        log::debug!("🎨 生成了 {} 字节的LED数据缓冲区 (总LED数: {})", buffer.len(), total_leds);
+        log::info!("🎨 生成了 {} 字节的LED数据缓冲区 (总LED数: {}), 全局字节偏移量: {}",
+            buffer.len(), total_leds, global_start_offset_bytes);
 
-        Ok(buffer)
+        Ok((buffer, global_start_offset_bytes))
     }
 }
 

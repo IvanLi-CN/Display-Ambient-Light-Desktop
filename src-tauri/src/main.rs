@@ -239,48 +239,28 @@ async fn stop_single_display_config_publisher() -> Result<(), String> {
 async fn test_single_display_config_mode() -> Result<(), String> {
     log::info!("🧪 测试命令被调用: test_single_display_config_mode");
 
-    // 创建测试灯带配置
-    let test_strips = vec![
-        ambient_light::LedStripConfig {
-            index: 0,
-            border: ambient_light::Border::Bottom,
-            display_id: 1,
-            len: 10,
-            led_type: ambient_light::LedType::WS2812B,
-            reversed: false,
-        },
-        ambient_light::LedStripConfig {
-            index: 1,
-            border: ambient_light::Border::Right,
-            display_id: 1,
-            len: 10,
-            led_type: ambient_light::LedType::WS2812B,
-            reversed: false,
-        },
-        ambient_light::LedStripConfig {
-            index: 2,
-            border: ambient_light::Border::Top,
-            display_id: 1,
-            len: 10,
-            led_type: ambient_light::LedType::WS2812B,
-            reversed: false,
-        },
-        ambient_light::LedStripConfig {
-            index: 3,
-            border: ambient_light::Border::Left,
-            display_id: 1,
-            len: 10,
-            led_type: ambient_light::LedType::WS2812B,
-            reversed: false,
-        },
-    ];
+    // 读取用户的实际LED灯带配置
+    let config_manager = ambient_light::ConfigManager::global().await;
+    let config_group = config_manager.configs().await;
 
-    // 定义边框颜色
+    if config_group.strips.is_empty() {
+        return Err("没有找到LED灯带配置，请先配置LED灯带".to_string());
+    }
+
+    log::info!("📋 读取到用户配置: {} 个灯带", config_group.strips.len());
+    for strip in &config_group.strips {
+        log::info!("  - 灯带{}: {:?}边, {}个LED, 类型{:?}",
+            strip.index, strip.border, strip.len, strip.led_type);
+    }
+
+    let test_strips = config_group.strips;
+
+    // 定义边框颜色 - 使用ColorPreview组件中的正确颜色（HSV色环45度间隔）
     let border_colors = ambient_light::BorderColors {
-        top: [[255, 0, 0], [255, 100, 0]],       // 红色 + 橙色
-        bottom: [[0, 0, 255], [0, 100, 255]],    // 蓝色 + 浅蓝色
-        left: [[255, 255, 0], [255, 255, 100]],  // 黄色 + 浅黄色
-        right: [[0, 255, 0], [100, 255, 0]],     // 绿色 + 浅绿色
+        top: [[0, 255, 255], [0, 0, 255]],       // 青色 (180°) + 蓝色 (225°)
+        bottom: [[255, 0, 0], [255, 128, 0]],    // 红色 (0°) + 橙色 (45°)
+        left: [[128, 0, 255], [255, 0, 128]],    // 紫色 (270°) + 玫红色 (315°)
+        right: [[255, 255, 0], [128, 255, 0]],   // 黄色 (90°) + 黄绿色 (135°)
     };
 
     log::info!("🔧 启动测试单屏配置模式");
@@ -1351,7 +1331,8 @@ async fn main() {
     let mut target_page: Option<String> = None;
     let mut display_id: Option<String> = None;
 
-    // Look for --page and --display arguments
+    // Look for --page, --display, and --test-single-display-config arguments
+    let mut test_single_display_config = false;
     for i in 0..args.len() {
         if args[i] == "--page" && i + 1 < args.len() {
             target_page = Some(args[i + 1].clone());
@@ -1359,6 +1340,9 @@ async fn main() {
         } else if args[i] == "--display" && i + 1 < args.len() {
             display_id = Some(args[i + 1].clone());
             info!("Command line argument detected: --display {}", args[i + 1]);
+        } else if args[i] == "--test-single-display-config" {
+            test_single_display_config = true;
+            info!("Command line argument detected: --test-single-display-config");
         }
     }
 
@@ -1776,6 +1760,21 @@ async fn main() {
                     info!("Starting navigation to page: {}", page);
                     if let Err(e) = navigate_to_page(page.clone(), app_handle).await {
                         error!("Failed to navigate to page '{}': {}", page, e);
+                    }
+                });
+            }
+
+            // If test mode is requested, run the test
+            if test_single_display_config {
+                let app_handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    info!("🧪 Starting single display config test mode...");
+                    // Wait a bit for the app to fully initialize
+                    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+                    match test_single_display_config_mode().await {
+                        Ok(_) => info!("✅ Single display config test completed successfully"),
+                        Err(e) => error!("❌ Single display config test failed: {}", e),
                     }
                 });
             }
