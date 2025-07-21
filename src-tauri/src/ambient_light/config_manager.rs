@@ -220,16 +220,25 @@ impl ConfigManager {
     ) -> anyhow::Result<()> {
         let mut config = self.config.write().await;
 
-        for (index, strip) in config.clone().strips.iter().enumerate() {
+        // 找到对应的灯带并切换其reversed状态
+        for strip in config.strips.iter_mut() {
             if strip.display_id == display_id && strip.border == border {
-                let mapper = config.mappers[index].borrow_mut();
-
-                let start = mapper.start;
-                mapper.start = mapper.end;
-                mapper.end = start;
+                strip.reversed = !strip.reversed;
+                log::info!("🔄 切换灯带反向状态: 显示器{} {}边 -> reversed={}",
+                    display_id,
+                    match border {
+                        Border::Top => "Top",
+                        Border::Bottom => "Bottom",
+                        Border::Left => "Left",
+                        Border::Right => "Right",
+                    },
+                    strip.reversed
+                );
+                break;
             }
         }
 
+        // 重建mappers以反映新的reversed状态
         Self::rebuild_mappers(&mut config);
 
         let cloned_config = config.clone();
