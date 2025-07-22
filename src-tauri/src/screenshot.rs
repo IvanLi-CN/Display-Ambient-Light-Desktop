@@ -1,6 +1,6 @@
+use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::sync::Arc;
-use std::fmt::Debug;
 
 use serde::{Deserialize, Serialize};
 use tauri::async_runtime::RwLock;
@@ -81,7 +81,10 @@ impl Screenshot {
                 let result: Vec<LedSamplePoints> = points
                     .into_iter()
                     .map(|groups| -> Vec<Point> {
-                        groups.into_iter().map(|(x, y)| (x, height - 1 - y)).collect()
+                        groups
+                            .into_iter()
+                            .map(|(x, y)| (x, height - 1 - y))
+                            .collect()
                     })
                     .collect();
 
@@ -99,9 +102,17 @@ impl Screenshot {
                     let max_x = first_led.iter().map(|p| p.0).max().unwrap_or(0);
 
                     log::debug!("  First LED sample points: {} points", first_led.len());
-                    log::debug!("  Y range: {} - {} (expected near {})", min_y, max_y, height - 1);
+                    log::debug!(
+                        "  Y range: {} - {} (expected near {})",
+                        min_y,
+                        max_y,
+                        height - 1
+                    );
                     log::debug!("  X range: {} - {}", min_x, max_x);
-                    log::debug!("  Sample points: {:?}", &first_led[0..first_led.len().min(5)]);
+                    log::debug!(
+                        "  Sample points: {:?}",
+                        &first_led[0..first_led.len().min(5)]
+                    );
                 }
 
                 result
@@ -130,7 +141,10 @@ impl Screenshot {
                 points
                     .into_iter()
                     .map(|groups| -> Vec<Point> {
-                        groups.into_iter().map(|(x, y)| (width - 1 - y, x)).collect()
+                        groups
+                            .into_iter()
+                            .map(|(x, y)| (width - 1 - y, x))
+                            .collect()
                     })
                     .collect()
             }
@@ -179,7 +193,8 @@ impl Screenshot {
                     let y_offset = (row as f64 + 0.5) * width as f64 / samples_per_axis as f64;
 
                     // 在LED宽度方向的采样位置
-                    let x_offset = led_start + (col as f64 + 0.5) * (led_end - led_start) / samples_per_axis as f64;
+                    let x_offset = led_start
+                        + (col as f64 + 0.5) * (led_end - led_start) / samples_per_axis as f64;
 
                     led_points.push((x_offset as usize, y_offset as usize));
                 }
@@ -228,47 +243,6 @@ impl Screenshot {
         colors
     }
 
-    pub fn get_one_edge_colors_by_cg_image(
-        sample_points_of_leds: &Vec<LedSamplePoints>,
-        bitmap: core_foundation::data::CFData,
-        bytes_per_row: usize,
-    ) -> Vec<LedColor> {
-        let mut colors = vec![];
-        for led_points in sample_points_of_leds {
-            let mut r = 0.0;
-            let mut g = 0.0;
-            let mut b = 0.0;
-            let len = led_points.len() as f64;
-            for (x, y) in led_points {
-                // log::debug!("CG Sampling pixel at x: {}, y: {}, bytes_per_row: {}", x, y, bytes_per_row);
-                let position = y * bytes_per_row + x * 4;
-
-                // Add bounds checking to prevent index out of bounds
-                if position + 2 < bitmap.len() as usize {
-                    b += bitmap[position] as f64;
-                    g += bitmap[position + 1] as f64;
-                    r += bitmap[position + 2] as f64;
-                } else {
-                    // Skip invalid positions or use default values
-                    log::warn!("Invalid pixel position in CG image: x={}, y={}, position={}, bitmap_len={}", x, y, position, bitmap.len());
-                }
-                // log::info!("position: {}, total: {}", position, bitmap.len());
-            }
-            let color = LedColor::new((r / len) as u8, (g / len) as u8, (b / len) as u8);
-            colors.push(color);
-        }
-        colors
-    }
-
-    pub async fn get_colors_by_sample_points(
-        &self,
-        points: &Vec<LedSamplePoints>,
-    ) -> Vec<LedColor> {
-        let bytes = self.bytes.read().await;
-
-        Self::get_one_edge_colors(points, &bytes, self.bytes_per_row)
-    }
-
     /// 使用新的采样函数获取LED灯带颜色数据
     /// 这个方法使用改进的颜色采样算法，解决了之前的颜色错误问题
     pub async fn get_colors_by_led_configs(
@@ -297,12 +271,6 @@ pub struct ScreenSamplePoints {
     pub right: Vec<LedSamplePoints>,
 }
 
-pub struct DisplayColorsOfLedStrips {
-    pub top: Vec<u8>,
-    pub bottom: Vec<u8>,
-    pub left: Vec<u8>,
-    pub right: Vec<u8>,
-}
 #[derive(Debug, Clone, Serialize)]
 pub struct ScreenshotPayload {
     pub display_id: u32,
@@ -314,7 +282,6 @@ pub struct ScreenshotPayload {
 mod tests {
     use super::*;
     use crate::ambient_light::Border;
-    use crate::ScreenshotManager;
 
     // Helper function to create a mock LedStripConfig
     fn mock_led_strip_config(border: Border, len: usize) -> LedStripConfig {
@@ -358,7 +325,10 @@ mod tests {
         assert!(!top_points.is_empty());
         assert_eq!(top_points.len(), 100);
         // Print first few points for debugging
-        println!("Top border first LED points: {:?}", &top_points[0][0..5.min(top_points[0].len())]);
+        println!(
+            "Top border first LED points: {:?}",
+            &top_points[0][0..5.min(top_points[0].len())]
+        );
 
         let bottom_config = mock_led_strip_config(Border::Bottom, 100);
         let bottom_points = screenshot.get_sample_points(&bottom_config);
@@ -366,13 +336,19 @@ mod tests {
         assert_eq!(bottom_points.len(), 100);
         // Verify that bottom points are transformed correctly
         assert!(bottom_points[0][0].1 > 900);
-        println!("Bottom border first LED points: {:?}", &bottom_points[0][0..5.min(bottom_points[0].len())]);
+        println!(
+            "Bottom border first LED points: {:?}",
+            &bottom_points[0][0..5.min(bottom_points[0].len())]
+        );
 
         let left_config = mock_led_strip_config(Border::Left, 50);
         let left_points = screenshot.get_sample_points(&left_config);
         assert!(!left_points.is_empty());
         assert_eq!(left_points.len(), 50);
-        println!("Left border first LED points: {:?}", &left_points[0][0..5.min(left_points[0].len())]);
+        println!(
+            "Left border first LED points: {:?}",
+            &left_points[0][0..5.min(left_points[0].len())]
+        );
 
         let right_config = mock_led_strip_config(Border::Right, 50);
         let right_points = screenshot.get_sample_points(&right_config);
@@ -380,7 +356,10 @@ mod tests {
         assert_eq!(right_points.len(), 50);
         // Verify that right points are transformed correctly
         assert!(right_points[0][0].0 > 1800);
-        println!("Right border first LED points: {:?}", &right_points[0][0..5.min(right_points[0].len())]);
+        println!(
+            "Right border first LED points: {:?}",
+            &right_points[0][0..5.min(right_points[0].len())]
+        );
     }
 
     #[test]
@@ -432,25 +411,25 @@ mod tests {
                 let position = y * bytes_per_row + x * 4;
                 if x < width / 2 && y < height / 2 {
                     // Top-left: Red
-                    bitmap[position] = 0;     // B
+                    bitmap[position] = 0; // B
                     bitmap[position + 1] = 0; // G
                     bitmap[position + 2] = 255; // R
                     bitmap[position + 3] = 255; // A
                 } else if x >= width / 2 && y < height / 2 {
                     // Top-right: Green
-                    bitmap[position] = 0;     // B
+                    bitmap[position] = 0; // B
                     bitmap[position + 1] = 255; // G
                     bitmap[position + 2] = 0; // R
                     bitmap[position + 3] = 255; // A
                 } else if x < width / 2 && y >= height / 2 {
                     // Bottom-left: Blue
-                    bitmap[position] = 255;   // B
+                    bitmap[position] = 255; // B
                     bitmap[position + 1] = 0; // G
                     bitmap[position + 2] = 0; // R
                     bitmap[position + 3] = 255; // A
                 } else {
                     // Bottom-right: White
-                    bitmap[position] = 255;   // B
+                    bitmap[position] = 255; // B
                     bitmap[position + 1] = 255; // G
                     bitmap[position + 2] = 255; // R
                     bitmap[position + 3] = 255; // A
@@ -465,8 +444,8 @@ mod tests {
         println!("Top-left color (should be red): {:?}", colors[0]);
         let rgb = colors[0].get_rgb();
         assert_eq!(rgb[0], 255); // R
-        assert_eq!(rgb[1], 0);   // G
-        assert_eq!(rgb[2], 0);   // B
+        assert_eq!(rgb[1], 0); // G
+        assert_eq!(rgb[2], 0); // B
 
         // Test sampling from top-right (should be green)
         let sample_points = vec![vec![(60, 10), (65, 15), (70, 20)]];
@@ -474,9 +453,9 @@ mod tests {
         assert_eq!(colors.len(), 1);
         println!("Top-right color (should be green): {:?}", colors[0]);
         let rgb = colors[0].get_rgb();
-        assert_eq!(rgb[0], 0);   // R
+        assert_eq!(rgb[0], 0); // R
         assert_eq!(rgb[1], 255); // G
-        assert_eq!(rgb[2], 0);   // B
+        assert_eq!(rgb[2], 0); // B
     }
 
     #[test]
@@ -528,7 +507,15 @@ mod tests {
             reversed: false,
         };
 
-        let screenshot = Screenshot::new(1, height, width, (width * 4) as usize, Arc::new(vec![]), 1.0, 1.0);
+        let screenshot = Screenshot::new(
+            1,
+            height,
+            width,
+            (width * 4) as usize,
+            Arc::new(vec![]),
+            1.0,
+            1.0,
+        );
         let points = screenshot.get_sample_points(&config);
 
         println!("Screen dimensions: {}x{}", width, height);
@@ -547,13 +534,28 @@ mod tests {
             let min_x = led_points.iter().map(|p| p.0).min().unwrap_or(0);
             let max_x = led_points.iter().map(|p| p.0).max().unwrap_or(0);
 
-            println!("  Y range: {} - {} (should be near {})", min_y, max_y, height - 1);
+            println!(
+                "  Y range: {} - {} (should be near {})",
+                min_y,
+                max_y,
+                height - 1
+            );
             println!("  X range: {} - {}", min_x, max_x);
 
             // Validate bottom border coordinates
             let height_usize = height as usize;
-            assert!(min_y >= height_usize - height_usize/20, "Bottom border Y coordinates too high: min_y={}, expected >= {}", min_y, height_usize - height_usize/20);
-            assert!(max_y < height_usize, "Bottom border Y coordinates out of bounds: max_y={}, height={}", max_y, height);
+            assert!(
+                min_y >= height_usize - height_usize / 20,
+                "Bottom border Y coordinates too high: min_y={}, expected >= {}",
+                min_y,
+                height_usize - height_usize / 20
+            );
+            assert!(
+                max_y < height_usize,
+                "Bottom border Y coordinates out of bounds: max_y={}, height={}",
+                max_y,
+                height
+            );
         }
     }
 
@@ -576,7 +578,10 @@ mod tests {
         println!("  single_axis_points: {}", single_axis_points);
 
         let points = Screenshot::get_one_edge_sample_points(
-            edge_thickness, edge_length, leds, single_axis_points
+            edge_thickness,
+            edge_length,
+            leds,
+            single_axis_points,
         );
 
         println!("Generated {} LED groups", points.len());
@@ -588,11 +593,15 @@ mod tests {
             }
 
             // Apply Bottom border transformation: (x, height - 1 - y)
-            let transformed_points: Vec<_> = led_points.iter()
+            let transformed_points: Vec<_> = led_points
+                .iter()
                 .map(|(x, y)| (*x, height - 1 - *y))
                 .collect();
 
-            println!("LED {} transformed points (after Bottom border transformation):", i);
+            println!(
+                "LED {} transformed points (after Bottom border transformation):",
+                i
+            );
             for (j, point) in transformed_points.iter().enumerate() {
                 println!("  Point {}: ({}, {})", j, point.0, point.1);
             }
@@ -609,18 +618,22 @@ mod tests {
         let mut bitmap = vec![0u8; height * bytes_per_row];
 
         // Fill bottom area with green color (like your test wallpaper)
-        let bottom_start_y = height - height/20; // 1026
+        let bottom_start_y = height - height / 20; // 1026
         for y in bottom_start_y..height {
             for x in 0..width {
                 let position = y * bytes_per_row + x * 4;
-                bitmap[position] = 0;     // B
+                bitmap[position] = 0; // B
                 bitmap[position + 1] = 255; // G (Green)
-                bitmap[position + 2] = 0;   // R
+                bitmap[position + 2] = 0; // R
                 bitmap[position + 3] = 255; // A
             }
         }
 
-        println!("Created mock bitmap with green bottom area from Y={} to Y={}", bottom_start_y, height-1);
+        println!(
+            "Created mock bitmap with green bottom area from Y={} to Y={}",
+            bottom_start_y,
+            height - 1
+        );
 
         // Test Bottom border sampling
         let config = LedStripConfig {
@@ -633,7 +646,15 @@ mod tests {
         };
 
         let bitmap_arc = Arc::new(bitmap.clone());
-        let screenshot = Screenshot::new(1, height as u32, width as u32, bytes_per_row, bitmap_arc, 1.0, 1.0);
+        let screenshot = Screenshot::new(
+            1,
+            height as u32,
+            width as u32,
+            bytes_per_row,
+            bitmap_arc,
+            1.0,
+            1.0,
+        );
         let sample_points = screenshot.get_sample_points(&config);
 
         println!("Generated {} LED sample point groups", sample_points.len());
@@ -644,10 +665,17 @@ mod tests {
         println!("Sampled {} LED colors", colors.len());
         for (i, color) in colors.iter().enumerate() {
             let rgb = color.get_rgb();
-            println!("LED {} color: R={}, G={}, B={} (should be green: R=0, G=255, B=0)", i, rgb[0], rgb[1], rgb[2]);
+            println!(
+                "LED {} color: R={}, G={}, B={} (should be green: R=0, G=255, B=0)",
+                i, rgb[0], rgb[1], rgb[2]
+            );
 
             // Verify that we're getting green color
-            assert_eq!(rgb[1], 255, "LED {} should be green (G=255), but got G={}", i, rgb[1]);
+            assert_eq!(
+                rgb[1], 255,
+                "LED {} should be green (G=255), but got G={}",
+                i, rgb[1]
+            );
             assert_eq!(rgb[0], 0, "LED {} should have R=0, but got R={}", i, rgb[0]);
             assert_eq!(rgb[2], 0, "LED {} should have B=0, but got B={}", i, rgb[2]);
         }
@@ -664,7 +692,7 @@ mod tests {
         println!("⚠️  这个测试需要真实的屏幕截图数据，在CI环境中会跳过");
 
         // 创建一个简单的配置来测试Bottom边框
-        let config = LedStripConfig {
+        let _config = LedStripConfig {
             index: 0,
             border: crate::ambient_light::Border::Bottom,
             display_id: 0,
@@ -705,13 +733,7 @@ pub fn sample_edge_colors_from_image(
 
     // 为每个LED灯带配置生成颜色数据
     for config in led_configs {
-        let colors = sample_colors_for_led_strip(
-            image_data,
-            width,
-            height,
-            bytes_per_row,
-            config,
-        );
+        let colors = sample_colors_for_led_strip(image_data, width, height, bytes_per_row, config);
         result.push(colors);
     }
 
@@ -751,7 +773,9 @@ mod color_sampling_tests {
     use std::path::Path;
 
     /// 从PNG文件加载图像数据并转换为BGRA格式
-    fn load_test_image_as_bgra(path: &str) -> Result<(Vec<u8>, u32, u32, usize), Box<dyn std::error::Error>> {
+    fn load_test_image_as_bgra(
+        path: &str,
+    ) -> Result<(Vec<u8>, u32, u32, usize), Box<dyn std::error::Error>> {
         // 使用image crate加载PNG文件
         let img = image::open(path)?;
         let rgba_img = img.to_rgba8();
@@ -811,7 +835,13 @@ mod color_sampling_tests {
     }
 
     /// 验证颜色是否接近期望值（允许一定误差）
-    fn assert_color_close_to(actual: &LedColor, expected_r: u8, expected_g: u8, expected_b: u8, tolerance: u8) {
+    fn assert_color_close_to(
+        actual: &LedColor,
+        expected_r: u8,
+        expected_g: u8,
+        expected_b: u8,
+        tolerance: u8,
+    ) {
         let [r, g, b] = actual.get_rgb();
         let diff_r = (r as i16 - expected_r as i16).unsigned_abs() as u8;
         let diff_g = (g as i16 - expected_g as i16).unsigned_abs() as u8;
@@ -820,7 +850,13 @@ mod color_sampling_tests {
         assert!(
             diff_r <= tolerance && diff_g <= tolerance && diff_b <= tolerance,
             "Color mismatch: expected RGB({}, {}, {}), got RGB({}, {}, {}), tolerance: {}",
-            expected_r, expected_g, expected_b, r, g, b, tolerance
+            expected_r,
+            expected_g,
+            expected_b,
+            r,
+            g,
+            b,
+            tolerance
         );
     }
 
@@ -831,26 +867,27 @@ mod color_sampling_tests {
 
         // 检查测试图片是否存在
         if !Path::new(test_image_path).exists() {
-            panic!("测试图片不存在: {}. 请确保已将测试图片移动到正确位置。", test_image_path);
+            panic!(
+                "测试图片不存在: {}. 请确保已将测试图片移动到正确位置。",
+                test_image_path
+            );
         }
 
         // 加载测试图片
-        let (image_data, width, height, bytes_per_row) = load_test_image_as_bgra(test_image_path)
-            .expect("无法加载测试图片");
+        let (image_data, width, height, bytes_per_row) =
+            load_test_image_as_bgra(test_image_path).expect("无法加载测试图片");
 
-        println!("📸 加载测试图片: {}x{}, 每行{}字节", width, height, bytes_per_row);
+        println!(
+            "📸 加载测试图片: {}x{}, 每行{}字节",
+            width, height, bytes_per_row
+        );
 
         // 创建LED灯带配置
         let led_configs = create_test_led_configs();
 
         // 执行颜色采样
-        let sampled_colors = sample_edge_colors_from_image(
-            &image_data,
-            width,
-            height,
-            bytes_per_row,
-            &led_configs,
-        );
+        let sampled_colors =
+            sample_edge_colors_from_image(&image_data, width, height, bytes_per_row, &led_configs);
 
         // 验证结果
         assert_eq!(sampled_colors.len(), 4, "应该有4个LED灯带的颜色数据");
@@ -873,11 +910,20 @@ mod color_sampling_tests {
 
                 // 如果采样到灰色（中心渐变），说明采样点超出了边缘区域，这是可接受的
                 if r == g && g == b {
-                    println!("    注意：LED {} 采样到中心渐变区域 RGB({}, {}, {})", i, r, g, b);
+                    println!(
+                        "    注意：LED {} 采样到中心渐变区域 RGB({}, {}, {})",
+                        i, r, g, b
+                    );
                 } else {
                     // 如果不是灰色，则红色分量应该占主导
                     assert!(r >= 150, "边缘LED红色分量不足: R={}", r);
-                    assert!(r >= g && r >= b, "边缘LED红色分量不是主导色: RGB({}, {}, {})", r, g, b);
+                    assert!(
+                        r >= g && r >= b,
+                        "边缘LED红色分量不是主导色: RGB({}, {}, {})",
+                        r,
+                        g,
+                        b
+                    );
                 }
             }
         }
@@ -900,11 +946,20 @@ mod color_sampling_tests {
 
                 // 如果采样到灰色（中心渐变），说明采样点超出了边缘区域，这是可接受的
                 if r == g && g == b {
-                    println!("    注意：LED {} 采样到中心渐变区域 RGB({}, {}, {})", i, r, g, b);
+                    println!(
+                        "    注意：LED {} 采样到中心渐变区域 RGB({}, {}, {})",
+                        i, r, g, b
+                    );
                 } else {
                     // 如果不是灰色，则绿色分量应该占主导
                     assert!(g >= 150, "边缘LED绿色分量不足: G={}", g);
-                    assert!(g >= r && g >= b, "边缘LED绿色分量不是主导色: RGB({}, {}, {})", r, g, b);
+                    assert!(
+                        g >= r && g >= b,
+                        "边缘LED绿色分量不是主导色: RGB({}, {}, {})",
+                        r,
+                        g,
+                        b
+                    );
                 }
             }
         }
@@ -927,11 +982,20 @@ mod color_sampling_tests {
 
                 // 如果采样到灰色（中心渐变），说明采样点超出了边缘区域，这是可接受的
                 if r == g && g == b {
-                    println!("    注意：LED {} 采样到中心渐变区域 RGB({}, {}, {})", i, r, g, b);
+                    println!(
+                        "    注意：LED {} 采样到中心渐变区域 RGB({}, {}, {})",
+                        i, r, g, b
+                    );
                 } else {
                     // 如果不是灰色，则蓝色分量应该占主导
                     assert!(b >= 150, "边缘LED蓝色分量不足: B={}", b);
-                    assert!(b >= r && b >= g, "边缘LED蓝色分量不是主导色: RGB({}, {}, {})", r, g, b);
+                    assert!(
+                        b >= r && b >= g,
+                        "边缘LED蓝色分量不是主导色: RGB({}, {}, {})",
+                        r,
+                        g,
+                        b
+                    );
                 }
             }
         }
@@ -954,10 +1018,18 @@ mod color_sampling_tests {
 
                 // 如果采样到灰色（中心渐变），说明采样点超出了边缘区域，这是可接受的
                 if r == g && g == b {
-                    println!("    注意：LED {} 采样到中心渐变区域 RGB({}, {}, {})", i, r, g, b);
+                    println!(
+                        "    注意：LED {} 采样到中心渐变区域 RGB({}, {}, {})",
+                        i, r, g, b
+                    );
                 } else {
                     // 如果不是灰色，则应该是黄色（红绿分量高，蓝色分量低）
-                    assert!(r >= 150 && g >= 150, "边缘LED黄色分量不足: R={}, G={}", r, g);
+                    assert!(
+                        r >= 150 && g >= 150,
+                        "边缘LED黄色分量不足: R={}, G={}",
+                        r,
+                        g
+                    );
                     assert!(b <= 150, "边缘LED蓝色分量过高: B={}", b);
                 }
             }
@@ -975,8 +1047,8 @@ mod color_sampling_tests {
             return;
         }
 
-        let (image_data, width, height, bytes_per_row) = load_test_image_as_bgra(test_image_path)
-            .expect("无法加载测试图片");
+        let (image_data, width, height, bytes_per_row) =
+            load_test_image_as_bgra(test_image_path).expect("无法加载测试图片");
 
         // 只测试顶部边缘（红色）
         let top_config = vec![LedStripConfig {
@@ -988,13 +1060,8 @@ mod color_sampling_tests {
             reversed: false,
         }];
 
-        let sampled_colors = sample_edge_colors_from_image(
-            &image_data,
-            width,
-            height,
-            bytes_per_row,
-            &top_config,
-        );
+        let sampled_colors =
+            sample_edge_colors_from_image(&image_data, width, height, bytes_per_row, &top_config);
 
         assert_eq!(sampled_colors.len(), 1);
         assert_eq!(sampled_colors[0].len(), 5);
@@ -1011,11 +1078,20 @@ mod color_sampling_tests {
             } else {
                 // 边缘LED需要检查是否采样到了有效的边缘颜色
                 if r == g && g == b {
-                    println!("    注意：LED {} 采样到中心渐变区域 RGB({}, {}, {})", i, r, g, b);
+                    println!(
+                        "    注意：LED {} 采样到中心渐变区域 RGB({}, {}, {})",
+                        i, r, g, b
+                    );
                 } else {
                     // 如果不是灰色，则红色分量应该占主导
                     assert!(r >= 150, "边缘LED红色分量不足: R={}", r);
-                    assert!(r >= g && r >= b, "边缘LED红色分量不是主导色: RGB({}, {}, {})", r, g, b);
+                    assert!(
+                        r >= g && r >= b,
+                        "边缘LED红色分量不是主导色: RGB({}, {}, {})",
+                        r,
+                        g,
+                        b
+                    );
                 }
             }
         }
@@ -1032,20 +1108,15 @@ mod color_sampling_tests {
             return;
         }
 
-        let (image_data, width, height, bytes_per_row) = load_test_image_as_bgra(test_image_path)
-            .expect("无法加载测试图片");
+        let (image_data, width, height, bytes_per_row) =
+            load_test_image_as_bgra(test_image_path).expect("无法加载测试图片");
 
         // 创建LED灯带配置
         let led_configs = create_test_led_configs();
 
         // 测试新的采样函数
-        let colors_by_strips = sample_edge_colors_from_image(
-            &image_data,
-            width,
-            height,
-            bytes_per_row,
-            &led_configs,
-        );
+        let colors_by_strips =
+            sample_edge_colors_from_image(&image_data, width, height, bytes_per_row, &led_configs);
 
         // 验证返回的数据结构
         assert_eq!(colors_by_strips.len(), 4, "应该有4个LED灯带的颜色数据");
@@ -1070,8 +1141,8 @@ mod color_sampling_tests {
             return;
         }
 
-        let (image_data, width, height, bytes_per_row) = load_test_image_as_bgra(test_image_path)
-            .expect("无法加载测试图片");
+        let (image_data, width, height, bytes_per_row) =
+            load_test_image_as_bgra(test_image_path).expect("无法加载测试图片");
 
         // 创建多显示器LED灯带配置
         let multi_display_configs = vec![
@@ -1146,8 +1217,16 @@ mod color_sampling_tests {
         assert_eq!(display_1_strips.len(), 2, "显示器1应该有2个LED灯带");
         assert_eq!(display_2_strips.len(), 2, "显示器2应该有2个LED灯带");
 
-        assert_eq!(display_1_colors.len(), 2, "显示器1应该有2个LED灯带的颜色数据");
-        assert_eq!(display_2_colors.len(), 2, "显示器2应该有2个LED灯带的颜色数据");
+        assert_eq!(
+            display_1_colors.len(),
+            2,
+            "显示器1应该有2个LED灯带的颜色数据"
+        );
+        assert_eq!(
+            display_2_colors.len(),
+            2,
+            "显示器2应该有2个LED灯带的颜色数据"
+        );
 
         // 验证每个灯带的LED数量
         for colors in &display_1_colors {
@@ -1158,7 +1237,15 @@ mod color_sampling_tests {
         }
 
         println!("✅ 多显示器颜色采样测试通过！");
-        println!("   显示器1: {} 个灯带, {} 个LED", display_1_colors.len(), display_1_colors.iter().map(|c| c.len()).sum::<usize>());
-        println!("   显示器2: {} 个灯带, {} 个LED", display_2_colors.len(), display_2_colors.iter().map(|c| c.len()).sum::<usize>());
+        println!(
+            "   显示器1: {} 个灯带, {} 个LED",
+            display_1_colors.len(),
+            display_1_colors.iter().map(|c| c.len()).sum::<usize>()
+        );
+        println!(
+            "   显示器2: {} 个灯带, {} 个LED",
+            display_2_colors.len(),
+            display_2_colors.iter().map(|c| c.len()).sum::<usize>()
+        );
     }
 }

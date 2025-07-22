@@ -380,24 +380,6 @@ impl LedDataSender {
         Ok(())
     }
 
-    /// 发送屏幕氛围光数据（单个数据包，保持向后兼容）
-    pub async fn send_ambient_light_data(&self, offset: u16, data: Vec<u8>) -> anyhow::Result<()> {
-        let packet = LedDataPacket::new(offset, data, "AmbientLight".to_string());
-        self.send_packet(packet, DataSendMode::AmbientLight).await
-    }
-
-    /// 发送单灯条配置数据
-    pub async fn send_strip_config_data(&self, offset: u16, data: Vec<u8>) -> anyhow::Result<()> {
-        let packet = LedDataPacket::new(offset, data, "StripConfig".to_string());
-        self.send_packet(packet, DataSendMode::StripConfig).await
-    }
-
-    /// 发送测试效果数据
-    pub async fn send_test_effect_data(&self, offset: u16, data: Vec<u8>) -> anyhow::Result<()> {
-        let packet = LedDataPacket::new(offset, data, "TestEffect".to_string());
-        self.send_packet(packet, DataSendMode::TestEffect).await
-    }
-
     /// 强制发送数据包（忽略模式检查，用于特殊情况如关闭LED）
     pub async fn force_send_packet(&self, packet: LedDataPacket) -> anyhow::Result<()> {
         let udp_rpc = UdpRpc::global().await;

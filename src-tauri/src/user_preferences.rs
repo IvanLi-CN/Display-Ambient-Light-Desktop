@@ -184,13 +184,6 @@ impl UserPreferencesManager {
         self.update_preferences(preferences).await
     }
 
-    /// Update window maximized state
-    pub async fn update_window_maximized(&self, maximized: bool) -> anyhow::Result<()> {
-        let mut preferences = self.get_preferences().await;
-        preferences.window.maximized = maximized;
-        self.update_preferences(preferences).await
-    }
-
     /// Update view scale
     pub async fn update_view_scale(&self, scale: f64) -> anyhow::Result<()> {
         let mut preferences = self.get_preferences().await;

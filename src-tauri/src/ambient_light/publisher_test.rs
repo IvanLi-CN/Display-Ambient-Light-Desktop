@@ -1,9 +1,8 @@
 //! 测试 LedColorsPublisher 的 generate_and_publish_config_colors 函数
-//! 
+//!
 //! 这个测试验证单屏配置模式下的数据生成和发布逻辑是否正确。
 
 use super::*;
-use crate::led_data_sender::LedDataSender;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -24,7 +23,12 @@ mod tests {
             }
         }
 
-        async fn send_complete_led_data(&self, offset: u16, buffer: Vec<u8>, source: &str) -> anyhow::Result<()> {
+        async fn send_complete_led_data(
+            &self,
+            offset: u16,
+            buffer: Vec<u8>,
+            source: &str,
+        ) -> anyhow::Result<()> {
             let mut data = self.sent_data.write().await;
             data.push((offset, buffer, source.to_string()));
             Ok(())
@@ -76,10 +80,10 @@ mod tests {
     /// 创建测试用的边框颜色
     fn create_test_border_colors() -> BorderColors {
         BorderColors {
-            top: [[0, 255, 255], [0, 0, 255]],       // 青色 + 蓝色
-            bottom: [[255, 0, 0], [255, 128, 0]],    // 红色 + 橙色
-            left: [[128, 0, 255], [255, 0, 128]],    // 紫色 + 玫红色
-            right: [[255, 255, 0], [128, 255, 0]],   // 黄色 + 黄绿色
+            top: [[0, 255, 255], [0, 0, 255]],     // 青色 + 蓝色
+            bottom: [[255, 0, 0], [255, 128, 0]],  // 红色 + 橙色
+            left: [[128, 0, 255], [255, 0, 128]],  // 紫色 + 玫红色
+            right: [[255, 255, 0], [128, 255, 0]], // 黄色 + 黄绿色
         }
     }
 
@@ -87,12 +91,12 @@ mod tests {
     async fn test_generate_edge_colors_from_constants() {
         let publisher = LedColorsPublisher::global().await;
         let border_colors = create_test_border_colors();
-        
+
         let edge_colors = publisher.generate_edge_colors_from_constants(&border_colors);
-        
+
         // 验证生成的边框颜色
         assert_eq!(edge_colors.len(), 4);
-        
+
         let top_colors = edge_colors.get(&Border::Top).unwrap();
         let top_rgb_1 = top_colors[0].get_rgb();
         let top_rgb_2 = top_colors[1].get_rgb();
@@ -123,66 +127,70 @@ mod tests {
         let publisher = LedColorsPublisher::global().await;
         let config_group = create_test_config_group();
         let border_colors = create_test_border_colors();
-        
+
         let edge_colors = publisher.generate_edge_colors_from_constants(&border_colors);
-        let buffer = publisher.map_edge_colors_to_led_buffer(&config_group, &edge_colors).unwrap();
-        
+        let buffer = publisher
+            .map_edge_colors_to_led_buffer(&config_group, &edge_colors)
+            .unwrap();
+
         // 验证缓冲区大小
         // 序列号0: Bottom边, 4个LED, WS2812B (3字节/LED) = 12字节
-        // 序列号1: Right边, 3个LED, SK6812 (4字节/LED) = 12字节  
+        // 序列号1: Right边, 3个LED, SK6812 (4字节/LED) = 12字节
         // 序列号2: Top边, 2个LED, WS2812B (3字节/LED) = 6字节
         // 总计: 12 + 12 + 6 = 30字节
         assert_eq!(buffer.len(), 30);
-        
+
         // 验证序列号0 (Bottom边, 双色分段: 红色+橙色, WS2812B格式: GRB)
         let bottom_start = 0;
         for i in 0..4 {
             let offset = bottom_start + i * 3;
             if i < 2 {
                 // 前半部分应该是红色 [255, 0, 0] -> GRB: [0, 255, 0]
-                assert_eq!(buffer[offset], 0, "LED {} G channel should be 0", i);     // G
+                assert_eq!(buffer[offset], 0, "LED {} G channel should be 0", i); // G
                 assert_eq!(buffer[offset + 1], 255, "LED {} R channel should be 255", i); // R
-                assert_eq!(buffer[offset + 2], 0, "LED {} B channel should be 0", i);   // B
+                assert_eq!(buffer[offset + 2], 0, "LED {} B channel should be 0", i);
+            // B
             } else {
                 // 后半部分应该是橙色 [255, 128, 0] -> GRB: [128, 255, 0]
-                assert_eq!(buffer[offset], 128, "LED {} G channel should be 128", i);     // G
+                assert_eq!(buffer[offset], 128, "LED {} G channel should be 128", i); // G
                 assert_eq!(buffer[offset + 1], 255, "LED {} R channel should be 255", i); // R
-                assert_eq!(buffer[offset + 2], 0, "LED {} B channel should be 0", i);   // B
+                assert_eq!(buffer[offset + 2], 0, "LED {} B channel should be 0", i);
+                // B
             }
         }
-        
+
         // 验证序列号1 (Right边, 双色分段: 黄色+黄绿色, SK6812格式: GRBW)
         let right_start = 12;
         for i in 0..3 {
             let offset = right_start + i * 4;
             if i < 1 {
                 // 前半部分（第1个LED）应该是黄色 [255, 255, 0] -> GRBW: [255, 255, 0, 0]
-                assert_eq!(buffer[offset], 255);     // G
+                assert_eq!(buffer[offset], 255); // G
                 assert_eq!(buffer[offset + 1], 255); // R
-                assert_eq!(buffer[offset + 2], 0);   // B
-                assert_eq!(buffer[offset + 3], 0);   // W
+                assert_eq!(buffer[offset + 2], 0); // B
+                assert_eq!(buffer[offset + 3], 0); // W
             } else {
                 // 后半部分（第2-3个LED）应该是黄绿色 [128, 255, 0] -> GRBW: [255, 128, 0, 0]
-                assert_eq!(buffer[offset], 255);     // G
+                assert_eq!(buffer[offset], 255); // G
                 assert_eq!(buffer[offset + 1], 128); // R
-                assert_eq!(buffer[offset + 2], 0);   // B
-                assert_eq!(buffer[offset + 3], 0);   // W
+                assert_eq!(buffer[offset + 2], 0); // B
+                assert_eq!(buffer[offset + 3], 0); // W
             }
         }
-        
+
         // 验证序列号2 (Top边, 双色分段: 青色+蓝色, WS2812B格式: GRB)
         let top_start = 24;
         for i in 0..2 {
             let offset = top_start + i * 3;
             if i < 1 {
                 // 前半部分（第1个LED）应该是青色 [0, 255, 255] -> GRB: [255, 0, 255]
-                assert_eq!(buffer[offset], 255);     // G
-                assert_eq!(buffer[offset + 1], 0);   // R
+                assert_eq!(buffer[offset], 255); // G
+                assert_eq!(buffer[offset + 1], 0); // R
                 assert_eq!(buffer[offset + 2], 255); // B
             } else {
                 // 后半部分（第2个LED）应该是蓝色 [0, 0, 255] -> GRB: [0, 0, 255]
-                assert_eq!(buffer[offset], 0);       // G
-                assert_eq!(buffer[offset + 1], 0);   // R
+                assert_eq!(buffer[offset], 0); // G
+                assert_eq!(buffer[offset + 1], 0); // R
                 assert_eq!(buffer[offset + 2], 255); // B
             }
         }
@@ -192,54 +200,87 @@ mod tests {
     async fn test_generate_and_publish_config_colors_with_mock() {
         // 创建 mock sender
         let mock_sender = MockLedDataSender::new();
-        
+
         // 创建测试数据
         let publisher = LedColorsPublisher::global().await;
         let config_group = create_test_config_group();
         let border_colors = create_test_border_colors();
-        
+
         // 手动调用内部方法来测试数据生成
         let edge_colors = publisher.generate_edge_colors_from_constants(&border_colors);
-        let complete_buffer = publisher.map_edge_colors_to_led_buffer(&config_group, &edge_colors).unwrap();
-        
+        let complete_buffer = publisher
+            .map_edge_colors_to_led_buffer(&config_group, &edge_colors)
+            .unwrap();
+
         // 模拟发送数据
-        mock_sender.send_complete_led_data(0, complete_buffer.clone(), "SingleDisplayConfig").await.unwrap();
-        
+        mock_sender
+            .send_complete_led_data(0, complete_buffer.clone(), "SingleDisplayConfig")
+            .await
+            .unwrap();
+
         // 验证发送的数据
         let sent_data = mock_sender.get_sent_data().await;
         assert_eq!(sent_data.len(), 1);
-        
+
         let (offset, buffer, source) = &sent_data[0];
         assert_eq!(*offset, 0);
         assert_eq!(*source, "SingleDisplayConfig");
         assert_eq!(buffer.len(), 30); // 总字节数
-        
+
         // 验证具体的LED数据内容
-        // Bottom边 (红色): 4个LED × 3字节 = 12字节
+        // Bottom边 (双色分段: 红色+橙色): 4个LED × 3字节 = 12字节
+        // half_count = 4/2 = 2, 所以LED0和LED1用红色，LED2和LED3用橙色
         for i in 0..4 {
             let led_offset = i * 3;
-            assert_eq!(buffer[led_offset], 0);     // G
-            assert_eq!(buffer[led_offset + 1], 255); // R
-            assert_eq!(buffer[led_offset + 2], 0);   // B
+            if i < 2 {
+                // LED0,LED1: 红色 [255, 0, 0] -> GRB: [0, 255, 0]
+                assert_eq!(buffer[led_offset], 0); // G
+                assert_eq!(buffer[led_offset + 1], 255); // R
+                assert_eq!(buffer[led_offset + 2], 0); // B
+            } else {
+                // LED2,LED3: 橙色 [255, 128, 0] -> GRB: [128, 255, 0]
+                assert_eq!(buffer[led_offset], 128); // G
+                assert_eq!(buffer[led_offset + 1], 255); // R
+                assert_eq!(buffer[led_offset + 2], 0); // B
+            }
         }
-        
-        // Right边 (黄色): 3个LED × 4字节 = 12字节
+
+        // Right边 (双色分段: 黄色+黄绿色): 3个LED × 4字节 = 12字节
+        // half_count = 3/2 = 1, 所以LED0用黄色，LED1和LED2用黄绿色
         for i in 0..3 {
             let led_offset = 12 + i * 4;
-            assert_eq!(buffer[led_offset], 255);     // G
-            assert_eq!(buffer[led_offset + 1], 255); // R
-            assert_eq!(buffer[led_offset + 2], 0);   // B
-            assert_eq!(buffer[led_offset + 3], 0);   // W
+            if i < 1 {
+                // LED0: 黄色 [255, 255, 0] -> GRBW: [255, 255, 0, 0]
+                assert_eq!(buffer[led_offset], 255); // G
+                assert_eq!(buffer[led_offset + 1], 255); // R
+                assert_eq!(buffer[led_offset + 2], 0); // B
+                assert_eq!(buffer[led_offset + 3], 0); // W
+            } else {
+                // LED1,LED2: 黄绿色 [128, 255, 0] -> GRBW: [255, 128, 0, 0]
+                assert_eq!(buffer[led_offset], 255); // G
+                assert_eq!(buffer[led_offset + 1], 128); // R
+                assert_eq!(buffer[led_offset + 2], 0); // B
+                assert_eq!(buffer[led_offset + 3], 0); // W
+            }
         }
-        
-        // Top边 (青色): 2个LED × 3字节 = 6字节
+
+        // Top边 (双色分段: 青色+蓝色): 2个LED × 3字节 = 6字节
+        // half_count = 2/2 = 1, 所以LED0用青色，LED1用蓝色
         for i in 0..2 {
             let led_offset = 24 + i * 3;
-            assert_eq!(buffer[led_offset], 255);     // G
-            assert_eq!(buffer[led_offset + 1], 0);   // R
-            assert_eq!(buffer[led_offset + 2], 255); // B
+            if i < 1 {
+                // LED0: 青色 [0, 255, 255] -> GRB: [255, 0, 255]
+                assert_eq!(buffer[led_offset], 255); // G
+                assert_eq!(buffer[led_offset + 1], 0); // R
+                assert_eq!(buffer[led_offset + 2], 255); // B
+            } else {
+                // LED1: 蓝色 [0, 0, 255] -> GRB: [0, 0, 255]
+                assert_eq!(buffer[led_offset], 0); // G
+                assert_eq!(buffer[led_offset + 1], 0); // R
+                assert_eq!(buffer[led_offset + 2], 255); // B
+            }
         }
-        
+
         println!("✅ 测试通过: generate_and_publish_config_colors 生成了正确的LED数据");
         println!("   - 总字节数: {}", buffer.len());
         println!("   - Bottom边(红色): 4个LED × 3字节 = 12字节");
@@ -252,41 +293,43 @@ mod tests {
         let publisher = LedColorsPublisher::global().await;
         let config_group = create_test_config_group();
         let border_colors = create_test_border_colors();
-        
+
         let edge_colors = publisher.generate_edge_colors_from_constants(&border_colors);
-        let buffer = publisher.map_edge_colors_to_led_buffer(&config_group, &edge_colors).unwrap();
-        
+        let buffer = publisher
+            .map_edge_colors_to_led_buffer(&config_group, &edge_colors)
+            .unwrap();
+
         // 验证LED数据的顺序是否按序列号排序
         // 序列号0: index=0, Bottom边
-        // 序列号1: index=1, Right边  
+        // 序列号1: index=1, Right边
         // 序列号2: index=2, Top边
-        
+
         println!("🔍 LED数据顺序验证:");
         println!("序列号0 (Bottom, 红色, WS2812B): 字节0-11");
         println!("序列号1 (Right, 黄色, SK6812): 字节12-23");
         println!("序列号2 (Top, 青色, WS2812B): 字节24-29");
-        
+
         // 验证数据连续性 - 没有间隙
         assert_eq!(buffer.len(), 30);
-        
+
         // 验证不同LED类型的字节格式
         // WS2812B: GRB (3字节)
         // SK6812: GRBW (4字节)
-        
+
         let mut byte_index = 0;
-        
+
         // 序列号0: Bottom边, 双色分段: 红色+橙色, WS2812B
         for led in 0..4 {
             if led < 2 {
                 // 前半部分: 红色 [255,0,0] -> GRB: [0,255,0]
-                assert_eq!(buffer[byte_index], 0);     // G
+                assert_eq!(buffer[byte_index], 0); // G
                 assert_eq!(buffer[byte_index + 1], 255); // R
-                assert_eq!(buffer[byte_index + 2], 0);   // B
+                assert_eq!(buffer[byte_index + 2], 0); // B
             } else {
                 // 后半部分: 橙色 [255,128,0] -> GRB: [128,255,0]
-                assert_eq!(buffer[byte_index], 128);   // G
+                assert_eq!(buffer[byte_index], 128); // G
                 assert_eq!(buffer[byte_index + 1], 255); // R
-                assert_eq!(buffer[byte_index + 2], 0);   // B
+                assert_eq!(buffer[byte_index + 2], 0); // B
             }
             byte_index += 3;
         }
@@ -295,38 +338,38 @@ mod tests {
         for led in 0..3 {
             if led < 1 {
                 // 前半部分: 黄色 [255,255,0] -> GRBW: [255,255,0,0]
-                assert_eq!(buffer[byte_index], 255);     // G
+                assert_eq!(buffer[byte_index], 255); // G
                 assert_eq!(buffer[byte_index + 1], 255); // R
-                assert_eq!(buffer[byte_index + 2], 0);   // B
-                assert_eq!(buffer[byte_index + 3], 0);   // W
+                assert_eq!(buffer[byte_index + 2], 0); // B
+                assert_eq!(buffer[byte_index + 3], 0); // W
             } else {
                 // 后半部分: 黄绿色 [128,255,0] -> GRBW: [255,128,0,0]
-                assert_eq!(buffer[byte_index], 255);     // G
+                assert_eq!(buffer[byte_index], 255); // G
                 assert_eq!(buffer[byte_index + 1], 128); // R
-                assert_eq!(buffer[byte_index + 2], 0);   // B
-                assert_eq!(buffer[byte_index + 3], 0);   // W
+                assert_eq!(buffer[byte_index + 2], 0); // B
+                assert_eq!(buffer[byte_index + 3], 0); // W
             }
             byte_index += 4;
         }
-        
+
         // 序列号2: Top边, 双色分段: 青色+蓝色, WS2812B
         for led in 0..2 {
             if led < 1 {
                 // 前半部分: 青色 [0,255,255] -> GRB: [255,0,255]
-                assert_eq!(buffer[byte_index], 255);     // G
-                assert_eq!(buffer[byte_index + 1], 0);   // R
+                assert_eq!(buffer[byte_index], 255); // G
+                assert_eq!(buffer[byte_index + 1], 0); // R
                 assert_eq!(buffer[byte_index + 2], 255); // B
             } else {
                 // 后半部分: 蓝色 [0,0,255] -> GRB: [0,0,255]
-                assert_eq!(buffer[byte_index], 0);       // G
-                assert_eq!(buffer[byte_index + 1], 0);   // R
+                assert_eq!(buffer[byte_index], 0); // G
+                assert_eq!(buffer[byte_index + 1], 0); // R
                 assert_eq!(buffer[byte_index + 2], 255); // B
             }
             byte_index += 3;
         }
-        
+
         assert_eq!(byte_index, 30); // 验证所有字节都被检查了
-        
+
         println!("✅ LED数据顺序和格式验证通过");
     }
 
@@ -385,7 +428,9 @@ mod tests {
         let border_colors = create_test_border_colors();
 
         let edge_colors = publisher.generate_edge_colors_from_constants(&border_colors);
-        let buffer = publisher.map_edge_colors_to_led_buffer(&config_group, &edge_colors).unwrap();
+        let buffer = publisher
+            .map_edge_colors_to_led_buffer(&config_group, &edge_colors)
+            .unwrap();
 
         // 验证缓冲区大小
         // 序列号0: Bottom边, 3个LED, SK6812 (4字节/LED) = 12字节
@@ -405,41 +450,79 @@ mod tests {
 
         let mut byte_index = 0;
 
-        // 验证序列号0 (显示器2, Bottom边, 红色 [255,0,0], SK6812格式: GRBW)
+        // 验证序列号0 (显示器2, Bottom边, 双色分段: 红色+橙色, SK6812格式: GRBW)
+        // half_count = 3/2 = 1, 所以LED0用红色，LED1和LED2用橙色
         for i in 0..3 {
             let offset = byte_index + i * 4;
-            assert_eq!(buffer[offset], 0, "序列号0 LED{} G通道应该是0", i);
-            assert_eq!(buffer[offset + 1], 255, "序列号0 LED{} R通道应该是255", i);
-            assert_eq!(buffer[offset + 2], 0, "序列号0 LED{} B通道应该是0", i);
-            assert_eq!(buffer[offset + 3], 0, "序列号0 LED{} W通道应该是0", i);
+            if i < 1 {
+                // LED0: 红色 [255, 0, 0] -> GRBW: [0, 255, 0, 0]
+                assert_eq!(buffer[offset], 0, "序列号0 LED{} G通道应该是0", i);
+                assert_eq!(buffer[offset + 1], 255, "序列号0 LED{} R通道应该是255", i);
+                assert_eq!(buffer[offset + 2], 0, "序列号0 LED{} B通道应该是0", i);
+                assert_eq!(buffer[offset + 3], 0, "序列号0 LED{} W通道应该是0", i);
+            } else {
+                // LED1,LED2: 橙色 [255, 128, 0] -> GRBW: [128, 255, 0, 0]
+                assert_eq!(buffer[offset], 128, "序列号0 LED{} G通道应该是128", i);
+                assert_eq!(buffer[offset + 1], 255, "序列号0 LED{} R通道应该是255", i);
+                assert_eq!(buffer[offset + 2], 0, "序列号0 LED{} B通道应该是0", i);
+                assert_eq!(buffer[offset + 3], 0, "序列号0 LED{} W通道应该是0", i);
+            }
         }
         byte_index += 12;
 
-        // 验证序列号1 (显示器2, Right边, 黄色 [255,255,0], WS2812B格式: GRB)
+        // 验证序列号1 (显示器2, Right边, 双色分段: 黄色+黄绿色, WS2812B格式: GRB)
+        // half_count = 2/2 = 1, 所以LED0用黄色，LED1用黄绿色
         for i in 0..2 {
             let offset = byte_index + i * 3;
-            assert_eq!(buffer[offset], 255, "序列号1 LED{} G通道应该是255", i);
-            assert_eq!(buffer[offset + 1], 255, "序列号1 LED{} R通道应该是255", i);
-            assert_eq!(buffer[offset + 2], 0, "序列号1 LED{} B通道应该是0", i);
+            if i < 1 {
+                // LED0: 黄色 [255, 255, 0] -> GRB: [255, 255, 0]
+                assert_eq!(buffer[offset], 255, "序列号1 LED{} G通道应该是255", i);
+                assert_eq!(buffer[offset + 1], 255, "序列号1 LED{} R通道应该是255", i);
+                assert_eq!(buffer[offset + 2], 0, "序列号1 LED{} B通道应该是0", i);
+            } else {
+                // LED1: 黄绿色 [128, 255, 0] -> GRB: [255, 128, 0]
+                assert_eq!(buffer[offset], 255, "序列号1 LED{} G通道应该是255", i);
+                assert_eq!(buffer[offset + 1], 128, "序列号1 LED{} R通道应该是128", i);
+                assert_eq!(buffer[offset + 2], 0, "序列号1 LED{} B通道应该是0", i);
+            }
         }
         byte_index += 6;
 
-        // 验证序列号2 (显示器2, Top边, 青色 [0,255,255], WS2812B格式: GRB)
+        // 验证序列号2 (显示器2, Top边, 双色分段: 青色+蓝色, WS2812B格式: GRB)
+        // half_count = 3/2 = 1, 所以LED0用青色，LED1和LED2用蓝色
         for i in 0..3 {
             let offset = byte_index + i * 3;
-            assert_eq!(buffer[offset], 255, "序列号2 LED{} G通道应该是255", i);
-            assert_eq!(buffer[offset + 1], 0, "序列号2 LED{} R通道应该是0", i);
-            assert_eq!(buffer[offset + 2], 255, "序列号2 LED{} B通道应该是255", i);
+            if i < 1 {
+                // LED0: 青色 [0, 255, 255] -> GRB: [255, 0, 255]
+                assert_eq!(buffer[offset], 255, "序列号2 LED{} G通道应该是255", i);
+                assert_eq!(buffer[offset + 1], 0, "序列号2 LED{} R通道应该是0", i);
+                assert_eq!(buffer[offset + 2], 255, "序列号2 LED{} B通道应该是255", i);
+            } else {
+                // LED1,LED2: 蓝色 [0, 0, 255] -> GRB: [0, 0, 255]
+                assert_eq!(buffer[offset], 0, "序列号2 LED{} G通道应该是0", i);
+                assert_eq!(buffer[offset + 1], 0, "序列号2 LED{} R通道应该是0", i);
+                assert_eq!(buffer[offset + 2], 255, "序列号2 LED{} B通道应该是255", i);
+            }
         }
         byte_index += 9;
 
-        // 验证序列号3 (显示器1, Top边, 青色 [0,255,255], SK6812格式: GRBW)
+        // 验证序列号3 (显示器1, Top边, 双色分段: 青色+蓝色, SK6812格式: GRBW)
+        // half_count = 4/2 = 2, 所以LED0和LED1用青色，LED2和LED3用蓝色
         for i in 0..4 {
             let offset = byte_index + i * 4;
-            assert_eq!(buffer[offset], 255, "序列号3 LED{} G通道应该是255", i);
-            assert_eq!(buffer[offset + 1], 0, "序列号3 LED{} R通道应该是0", i);
-            assert_eq!(buffer[offset + 2], 255, "序列号3 LED{} B通道应该是255", i);
-            assert_eq!(buffer[offset + 3], 0, "序列号3 LED{} W通道应该是0", i);
+            if i < 2 {
+                // LED0,LED1: 青色 [0, 255, 255] -> GRBW: [255, 0, 255, 0]
+                assert_eq!(buffer[offset], 255, "序列号3 LED{} G通道应该是255", i);
+                assert_eq!(buffer[offset + 1], 0, "序列号3 LED{} R通道应该是0", i);
+                assert_eq!(buffer[offset + 2], 255, "序列号3 LED{} B通道应该是255", i);
+                assert_eq!(buffer[offset + 3], 0, "序列号3 LED{} W通道应该是0", i);
+            } else {
+                // LED2,LED3: 蓝色 [0, 0, 255] -> GRBW: [0, 0, 255, 0]
+                assert_eq!(buffer[offset], 0, "序列号3 LED{} G通道应该是0", i);
+                assert_eq!(buffer[offset + 1], 0, "序列号3 LED{} R通道应该是0", i);
+                assert_eq!(buffer[offset + 2], 255, "序列号3 LED{} B通道应该是255", i);
+                assert_eq!(buffer[offset + 3], 0, "序列号3 LED{} W通道应该是0", i);
+            }
         }
         byte_index += 16;
 
@@ -459,7 +542,9 @@ mod tests {
         let border_colors = create_test_border_colors();
 
         // 模拟单屏配置模式：只处理显示器1的灯带
-        let display_1_strips: Vec<_> = full_config.strips.iter()
+        let display_1_strips: Vec<_> = full_config
+            .strips
+            .iter()
             .filter(|s| s.display_id == 1)
             .cloned()
             .collect();
@@ -471,19 +556,31 @@ mod tests {
         };
 
         let edge_colors = publisher.generate_edge_colors_from_constants(&border_colors);
-        let buffer = publisher.map_edge_colors_to_led_buffer(&single_display_config, &edge_colors).unwrap();
+        let buffer = publisher
+            .map_edge_colors_to_led_buffer(&single_display_config, &edge_colors)
+            .unwrap();
 
         // 验证只有显示器1的数据
         // 序列号3: Top边, 4个LED, SK6812 (4字节/LED) = 16字节
         assert_eq!(buffer.len(), 16);
 
-        // 验证序列号3 (显示器1, Top边, 青色 [0,255,255], SK6812格式: GRBW)
+        // 验证序列号3 (显示器1, Top边, 双色分段: 青色+蓝色, SK6812格式: GRBW)
+        // half_count = 4/2 = 2, 所以LED0和LED1用青色，LED2和LED3用蓝色
         for i in 0..4 {
             let offset = i * 4;
-            assert_eq!(buffer[offset], 255, "显示器1 LED{} G通道应该是255", i);
-            assert_eq!(buffer[offset + 1], 0, "显示器1 LED{} R通道应该是0", i);
-            assert_eq!(buffer[offset + 2], 255, "显示器1 LED{} B通道应该是255", i);
-            assert_eq!(buffer[offset + 3], 0, "显示器1 LED{} W通道应该是0", i);
+            if i < 2 {
+                // LED0,LED1: 青色 [0, 255, 255] -> GRBW: [255, 0, 255, 0]
+                assert_eq!(buffer[offset], 255, "显示器1 LED{} G通道应该是255", i);
+                assert_eq!(buffer[offset + 1], 0, "显示器1 LED{} R通道应该是0", i);
+                assert_eq!(buffer[offset + 2], 255, "显示器1 LED{} B通道应该是255", i);
+                assert_eq!(buffer[offset + 3], 0, "显示器1 LED{} W通道应该是0", i);
+            } else {
+                // LED2,LED3: 蓝色 [0, 0, 255] -> GRBW: [0, 0, 255, 0]
+                assert_eq!(buffer[offset], 0, "显示器1 LED{} G通道应该是0", i);
+                assert_eq!(buffer[offset + 1], 0, "显示器1 LED{} R通道应该是0", i);
+                assert_eq!(buffer[offset + 2], 255, "显示器1 LED{} B通道应该是255", i);
+                assert_eq!(buffer[offset + 3], 0, "显示器1 LED{} W通道应该是0", i);
+            }
         }
 
         println!("✅ 单屏配置模式验证通过");
@@ -504,7 +601,9 @@ mod tests {
         let border_colors = create_test_border_colors();
 
         let edge_colors = publisher.generate_edge_colors_from_constants(&border_colors);
-        let buffer = publisher.map_edge_colors_to_led_buffer(&config_group, &edge_colors).unwrap();
+        let buffer = publisher
+            .map_edge_colors_to_led_buffer(&config_group, &edge_colors)
+            .unwrap();
 
         // 验证数据连续性
         let mut expected_byte_index = 0;
@@ -523,7 +622,8 @@ mod tests {
             };
             let strip_bytes = strip.len * bytes_per_led;
 
-            println!("序列号{} (显示器{}, {}边): 字节{}-{} ({} LEDs × {} bytes = {} bytes)",
+            println!(
+                "序列号{} (显示器{}, {}边): 字节{}-{} ({} LEDs × {} bytes = {} bytes)",
                 strip.index,
                 strip.display_id,
                 match strip.border {

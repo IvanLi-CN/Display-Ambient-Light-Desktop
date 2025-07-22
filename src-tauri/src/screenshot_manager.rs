@@ -4,82 +4,13 @@ use std::{collections::HashMap, sync::Arc};
 use core_graphics::display::{
     kCGNullWindowID, kCGWindowImageDefault, kCGWindowListOptionOnScreenOnly, CGDisplay,
 };
-use core_graphics::geometry::{CGPoint, CGRect, CGSize};
 use paris::warn;
-// Unused imports removed - these are for future screen capture functionality
 use tauri::async_runtime::RwLock;
 use tokio::sync::{broadcast, watch, OnceCell};
 use tokio::task::yield_now;
 use tokio::time::sleep;
 
-use crate::screenshot::LedSamplePoints;
-use crate::{ambient_light::SamplePointMapper, led_color::LedColor, screenshot::Screenshot};
-
-pub fn get_display_colors(
-    display_id: u32,
-    sample_points: &Vec<Vec<LedSamplePoints>>,
-    bound_scale_factor: f32,
-) -> anyhow::Result<Vec<LedColor>> {
-    let cg_display = CGDisplay::new(display_id);
-
-    let mut colors = vec![];
-    for points in sample_points {
-        if points.len() == 0 {
-            continue;
-        }
-        let start_x = points[0][0].0;
-        let start_y = points[0][0].1;
-        let end_x = points.last().unwrap().last().unwrap().0;
-        let end_y = points.last().unwrap().last().unwrap().1;
-
-        let (start_x, end_x) = (usize::min(start_x, end_x), usize::max(start_x, end_x));
-        let (start_y, end_y) = (usize::min(start_y, end_y), usize::max(start_y, end_y));
-
-        let origin = CGPoint {
-            x: start_x as f64 * bound_scale_factor as f64 + cg_display.bounds().origin.x,
-            y: start_y as f64 * bound_scale_factor as f64 + cg_display.bounds().origin.y,
-        };
-        let size = CGSize {
-            width: (end_x - start_x + 1) as f64,
-            height: (end_y - start_y + 1) as f64,
-        };
-
-        // log::info!(
-        //     "origin: {:?}, size: {:?}, start_x: {}, start_y: {}, bounds: {:?}",
-        //     origin,
-        //     size,
-        //     start_x,
-        //     start_y,
-        //     cg_display.bounds().size
-        // );
-
-        let cg_image = CGDisplay::screenshot(
-            CGRect::new(&origin, &size),
-            kCGWindowListOptionOnScreenOnly,
-            kCGNullWindowID,
-            kCGWindowImageDefault,
-        )
-        .ok_or_else(|| anyhow::anyhow!("Display#{}: take screenshot failed", display_id))?;
-
-        let bitmap = cg_image.data();
-
-        let points = points
-            .iter()
-            .map(|points| {
-                points
-                    .iter()
-                    .map(|(x, y)| (*x - start_x, *y - start_y))
-                    .collect::<Vec<_>>()
-            })
-            .collect::<Vec<_>>();
-
-        let mut part_colors =
-            Screenshot::get_one_edge_colors_by_cg_image(&points, bitmap, cg_image.bytes_per_row());
-        colors.append(&mut part_colors);
-    }
-
-    Ok(colors)
-}
+use crate::{ambient_light::SamplePointMapper, screenshot::Screenshot};
 
 pub struct ScreenshotManager {
     pub channels: Arc<RwLock<HashMap<u32, Arc<RwLock<watch::Sender<Screenshot>>>>>>,
@@ -284,10 +215,6 @@ impl ScreenshotManager {
         // 不再使用mappers，直接返回原始颜色数据
         // mappers配置已过时，现在直接基于strips配置处理数据
         colors.clone()
-    }
-
-    pub async fn clone_merged_screenshot_rx(&self) -> broadcast::Receiver<Screenshot> {
-        self.merged_screenshot_tx.read().await.subscribe()
     }
 
     pub async fn subscribe_by_display_id(

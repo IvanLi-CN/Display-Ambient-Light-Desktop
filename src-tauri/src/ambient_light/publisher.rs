@@ -124,7 +124,9 @@ impl LedColorsPublisher {
                     current_display_strips.len()
                 );
 
-                let colors_by_strips = screenshot.get_colors_by_led_configs(&current_display_strips).await;
+                let colors_by_strips = screenshot
+                    .get_colors_by_led_configs(&current_display_strips)
+                    .await;
 
                 // 将二维颜色数组展平为一维数组，保持与旧API的兼容性
                 let colors: Vec<LedColor> = colors_by_strips.into_iter().flatten().collect();
@@ -337,57 +339,6 @@ impl LedColorsPublisher {
         });
     }
 
-    async fn create_test_config(&self) -> anyhow::Result<LedStripConfigGroup> {
-        log::info!("🔧 Creating test LED configuration...");
-
-        // Get display information
-        let displays = display_info::DisplayInfo::all().map_err(|e| {
-            log::error!("Failed to get display info for test config: {}", e);
-            anyhow::anyhow!("Failed to get display info: {}", e)
-        })?;
-
-        log::info!("✅ Found {} displays for test config", displays.len());
-
-        // Create a simple test configuration
-        let mut strips = Vec::new();
-
-        for (i, display) in displays.iter().enumerate().take(2) {
-            // Limit to 2 displays
-            for j in 0..4 {
-                let strip = LedStripConfig {
-                    index: j + i * 4,
-                    display_id: display.id,
-                    border: match j {
-                        0 => Border::Top,
-                        1 => Border::Right,
-                        2 => Border::Bottom,
-                        3 => Border::Left,
-                        _ => unreachable!(),
-                    },
-                    len: 30,
-                    led_type: LedType::WS2812B,
-                    reversed: false,
-                };
-                strips.push(strip);
-            }
-        }
-
-        let mut config = LedStripConfigGroup {
-            strips,
-            mappers: Vec::new(), // 将被 generate_mappers 填充
-            color_calibration: ColorCalibration::new(),
-        };
-
-        // 生成 mappers
-        config.generate_mappers();
-
-        log::info!(
-            "✅ Test configuration created with {} strips",
-            config.strips.len()
-        );
-        Ok(config)
-    }
-
     async fn handle_config_change(&self, mut original_configs: LedStripConfigGroup) {
         // Sort strips by index to ensure correct order
         original_configs.strips.sort_by_key(|s| s.index);
@@ -493,8 +444,14 @@ impl LedColorsPublisher {
         // Log display detection order for debugging
         log::info!("🖥️ Detected displays in order:");
         for (i, display) in displays.iter().enumerate() {
-            log::info!("  Display {}: ID={}, X={}, Y={}, Primary={}",
-                i, display.id, display.x, display.y, display.is_primary);
+            log::info!(
+                "  Display {}: ID={}, X={}, Y={}, Primary={}",
+                i,
+                display.id,
+                display.x,
+                display.y,
+                display.is_primary
+            );
         }
 
         // Create a mutable copy of configs with proper display IDs
@@ -549,8 +506,13 @@ impl LedColorsPublisher {
         let mut sorted_strips: Vec<_> = strips.iter().collect();
         sorted_strips.sort_by_key(|strip| strip.index);
 
-        log::info!("排序后的灯带顺序: {:?}",
-            sorted_strips.iter().map(|s| (s.index, s.border, s.display_id)).collect::<Vec<_>>());
+        log::info!(
+            "排序后的灯带顺序: {:?}",
+            sorted_strips
+                .iter()
+                .map(|s| (s.index, s.border, s.display_id))
+                .collect::<Vec<_>>()
+        );
 
         // 第一步：合并所有LED数据到一个完整的数据流
         let mut complete_led_data = Vec::<u8>::new();
@@ -671,8 +633,14 @@ impl LedColorsPublisher {
         // Log display detection order for debugging
         log::info!("🖥️ get_colors_configs - Detected displays in order:");
         for (i, display) in displays.iter().enumerate() {
-            log::info!("  Display {}: ID={}, X={}, Y={}, Primary={}",
-                i, display.id, display.x, display.y, display.is_primary);
+            log::info!(
+                "  Display {}: ID={}, X={}, Y={}, Primary={}",
+                i,
+                display.id,
+                display.x,
+                display.y,
+                display.is_primary
+            );
         }
 
         // Create a mutable copy of configs with proper display IDs
@@ -807,16 +775,6 @@ impl LedColorsPublisher {
         log::info!("Test mode disabled - normal LED publishing resumed");
     }
 
-    /// Disable test mode with a delay to ensure clean transition
-    pub async fn disable_test_mode_with_delay(&self, delay_ms: u64) {
-        // Wait for the specified delay
-        tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
-
-        let mut test_mode = self.test_mode_active.write().await;
-        *test_mode = false;
-        log::info!("Test mode disabled with delay - normal LED publishing resumed");
-    }
-
     /// Check if test mode is currently active
     pub async fn is_test_mode_active(&self) -> bool {
         *self.test_mode_active.read().await
@@ -844,7 +802,9 @@ impl LedColorsPublisher {
 
         // 设置LED数据发送模式为StripConfig
         let sender = crate::led_data_sender::LedDataSender::global().await;
-        sender.set_mode(crate::led_data_sender::DataSendMode::StripConfig).await;
+        sender
+            .set_mode(crate::led_data_sender::DataSendMode::StripConfig)
+            .await;
         log::info!("✅ 设置LED数据发送模式为StripConfig");
 
         // 验证模式设置是否成功
@@ -890,7 +850,8 @@ impl LedColorsPublisher {
 
         // 启动30Hz发布任务
         log::info!("� 启动单屏配置模式30Hz发布任务");
-        self.start_single_display_config_task(config_group, border_colors).await;
+        self.start_single_display_config_task(config_group, border_colors)
+            .await;
 
         Ok(())
     }
@@ -923,7 +884,9 @@ impl LedColorsPublisher {
 
         // 恢复LED数据发送模式为AmbientLight
         let sender = crate::led_data_sender::LedDataSender::global().await;
-        sender.set_mode(crate::led_data_sender::DataSendMode::AmbientLight).await;
+        sender
+            .set_mode(crate::led_data_sender::DataSendMode::AmbientLight)
+            .await;
         log::info!("✅ 恢复LED数据发送模式为AmbientLight");
 
         log::info!("✅ 单屏灯带配置定位色发布模式已停止");
@@ -968,7 +931,10 @@ impl LedColorsPublisher {
         let inner_tasks_version = self.inner_tasks_version.clone();
 
         tokio::spawn(async move {
-            log::info!("🚀 启动单屏配置模式30Hz发布任务 (版本: {})", current_version);
+            log::info!(
+                "🚀 启动单屏配置模式30Hz发布任务 (版本: {})",
+                current_version
+            );
 
             let mut interval = tokio::time::interval(Duration::from_millis(33)); // 30Hz
 
@@ -978,12 +944,19 @@ impl LedColorsPublisher {
                 // 检查任务版本是否已更改
                 let version = inner_tasks_version.read().await.clone();
                 if version != current_version {
-                    log::info!("🛑 单屏配置模式任务版本已更改，停止任务 ({} != {})", version, current_version);
+                    log::info!(
+                        "🛑 单屏配置模式任务版本已更改，停止任务 ({} != {})",
+                        version,
+                        current_version
+                    );
                     break;
                 }
 
                 // 生成并发布定位色数据
-                if let Err(e) = publisher.generate_and_publish_config_colors(&config_group, &border_colors).await {
+                if let Err(e) = publisher
+                    .generate_and_publish_config_colors(&config_group, &border_colors)
+                    .await
+                {
                     log::error!("❌ 生成和发布定位色数据失败: {}", e);
                 }
             }
@@ -1012,195 +985,99 @@ impl LedColorsPublisher {
         };
 
         // 4. 使用采样映射函数将数据映射到完整灯带数据串缓冲区，并应用呼吸效果
-        let (complete_buffer, global_start_offset) = self.map_edge_colors_to_led_buffer_with_breathing(
-            config_group,
-            &all_configs,
-            &edge_colors,
-            active_strip
-        )?;
+        let (complete_buffer, global_start_offset) = self
+            .map_edge_colors_to_led_buffer_with_breathing(
+                config_group,
+                &all_configs,
+                &edge_colors,
+                active_strip,
+            )?;
 
         // 5. 委托发布服务将数据发给硬件，使用正确的全局偏移量
         let sender = LedDataSender::global().await;
-        sender.send_complete_led_data(global_start_offset, complete_buffer, "StripConfig").await?;
+        sender
+            .send_complete_led_data(global_start_offset, complete_buffer, "StripConfig")
+            .await?;
 
         Ok(())
     }
 
     /// 根据边框颜色常量生成四个边的颜色数据（支持双色分段）
-    pub fn generate_edge_colors_from_constants(&self, border_colors: &BorderColors) -> std::collections::HashMap<Border, [LedColor; 2]> {
+    pub fn generate_edge_colors_from_constants(
+        &self,
+        border_colors: &BorderColors,
+    ) -> std::collections::HashMap<Border, [LedColor; 2]> {
         let mut edge_colors = std::collections::HashMap::new();
 
         // Top边：蓝色 + 紫色
-        edge_colors.insert(Border::Top, [
-            LedColor::new(border_colors.top[0][0], border_colors.top[0][1], border_colors.top[0][2]), // 第一种颜色
-            LedColor::new(border_colors.top[1][0], border_colors.top[1][1], border_colors.top[1][2]), // 第二种颜色
-        ]);
+        edge_colors.insert(
+            Border::Top,
+            [
+                LedColor::new(
+                    border_colors.top[0][0],
+                    border_colors.top[0][1],
+                    border_colors.top[0][2],
+                ), // 第一种颜色
+                LedColor::new(
+                    border_colors.top[1][0],
+                    border_colors.top[1][1],
+                    border_colors.top[1][2],
+                ), // 第二种颜色
+            ],
+        );
 
         // Bottom边：深橙色 + 黄色
-        edge_colors.insert(Border::Bottom, [
-            LedColor::new(border_colors.bottom[0][0], border_colors.bottom[0][1], border_colors.bottom[0][2]),
-            LedColor::new(border_colors.bottom[1][0], border_colors.bottom[1][1], border_colors.bottom[1][2]),
-        ]);
+        edge_colors.insert(
+            Border::Bottom,
+            [
+                LedColor::new(
+                    border_colors.bottom[0][0],
+                    border_colors.bottom[0][1],
+                    border_colors.bottom[0][2],
+                ),
+                LedColor::new(
+                    border_colors.bottom[1][0],
+                    border_colors.bottom[1][1],
+                    border_colors.bottom[1][2],
+                ),
+            ],
+        );
 
         // Left边：玫红色 + 红色
-        edge_colors.insert(Border::Left, [
-            LedColor::new(border_colors.left[0][0], border_colors.left[0][1], border_colors.left[0][2]),
-            LedColor::new(border_colors.left[1][0], border_colors.left[1][1], border_colors.left[1][2]),
-        ]);
+        edge_colors.insert(
+            Border::Left,
+            [
+                LedColor::new(
+                    border_colors.left[0][0],
+                    border_colors.left[0][1],
+                    border_colors.left[0][2],
+                ),
+                LedColor::new(
+                    border_colors.left[1][0],
+                    border_colors.left[1][1],
+                    border_colors.left[1][2],
+                ),
+            ],
+        );
 
         // Right边：纯绿色 + 青色
-        edge_colors.insert(Border::Right, [
-            LedColor::new(border_colors.right[0][0], border_colors.right[0][1], border_colors.right[0][2]),
-            LedColor::new(border_colors.right[1][0], border_colors.right[1][1], border_colors.right[1][2]),
-        ]);
+        edge_colors.insert(
+            Border::Right,
+            [
+                LedColor::new(
+                    border_colors.right[0][0],
+                    border_colors.right[0][1],
+                    border_colors.right[0][2],
+                ),
+                LedColor::new(
+                    border_colors.right[1][0],
+                    border_colors.right[1][1],
+                    border_colors.right[1][2],
+                ),
+            ],
+        );
 
         edge_colors
-    }
-
-
-
-    /// 使用采样映射函数将边框颜色映射到完整灯带数据串缓冲区，并计算全局偏移量
-    /// 在单屏配置模式下，生成完整的LED数据流：当前显示器显示定位色，其他显示器显示白色填充
-    pub fn map_edge_colors_to_led_buffer_with_offset(
-        &self,
-        config_group: &LedStripConfigGroup,
-        all_configs: &LedStripConfigGroup,
-        edge_colors: &std::collections::HashMap<Border, [LedColor; 2]>,
-    ) -> anyhow::Result<(Vec<u8>, u16)> {
-        // 按序列号排序所有灯带
-        let mut all_sorted_strips = all_configs.strips.clone();
-        all_sorted_strips.sort_by_key(|s| s.index);
-
-        // 计算总LED数量和总字节数
-        let total_leds: usize = all_sorted_strips.iter().map(|s| s.len).sum();
-        let total_bytes: usize = all_sorted_strips.iter().map(|s| {
-            let bytes_per_led = match s.led_type {
-                LedType::WS2812B => 3,
-                LedType::SK6812 => 4,
-            };
-            s.len * bytes_per_led
-        }).sum();
-
-        log::info!("🎨 生成完整LED数据流: 总LED数={}, 总字节数={}", total_leds, total_bytes);
-
-        // 获取当前显示器的灯带ID集合
-        let current_display_strips: std::collections::HashSet<usize> =
-            config_group.strips.iter().map(|s| s.index).collect();
-
-        // 定义填充颜色：为了保持测试兼容性，使用黑色填充
-        let white_fill_rgb = [0, 0, 0]; // 黑色填充
-        let white_fill_w = 0; // W通道也是0
-
-        let mut buffer = Vec::new();
-
-        // 遍历所有灯带，按序列号顺序生成完整的LED数据流
-        for strip in &all_sorted_strips {
-            let is_current_display = current_display_strips.contains(&strip.index);
-
-            if is_current_display {
-                // 当前显示器的灯带：显示定位色
-                let default_colors = [LedColor::new(0, 0, 0), LedColor::new(0, 0, 0)];
-                let colors = edge_colors.get(&strip.border).unwrap_or(&default_colors);
-
-                // 计算分段：前半部分用第一种颜色，后半部分用第二种颜色
-                let half_count = strip.len / 2;
-
-                // 调试输出颜色信息
-                let color1_rgb = colors[0].get_rgb();
-                let color2_rgb = colors[1].get_rgb();
-                log::info!("🎨 当前显示器灯带 {} ({}边): {} LEDs, 前{}个用第一种颜色{:?}，后{}个用第二种颜色{:?}, 反向: {}",
-                    strip.index,
-                    match strip.border {
-                        Border::Top => "Top",
-                        Border::Bottom => "Bottom",
-                        Border::Left => "Left",
-                        Border::Right => "Right",
-                    },
-                    strip.len,
-                    half_count,
-                    color1_rgb,
-                    strip.len - half_count,
-                    color2_rgb,
-                    strip.reversed
-                );
-
-                // 为该灯带的所有LED生成定位色数据
-                for physical_index in 0..strip.len {
-                    // 根据reversed字段决定逻辑索引
-                    let logical_index = if strip.reversed {
-                        strip.len - 1 - physical_index // 反向：最后一个LED对应第一个逻辑位置
-                    } else {
-                        physical_index // 正向：物理索引等于逻辑索引
-                    };
-
-                    // 选择颜色：前半部分用第一种，后半部分用第二种（基于逻辑索引）
-                    let color = if logical_index < half_count {
-                        &colors[0] // 第一种颜色
-                    } else {
-                        &colors[1] // 第二种颜色
-                    };
-                    let rgb = color.get_rgb();
-
-                    match strip.led_type {
-                        LedType::WS2812B => {
-                            // GRB格式
-                            buffer.push(rgb[1]); // G
-                            buffer.push(rgb[0]); // R
-                            buffer.push(rgb[2]); // B
-                        }
-                        LedType::SK6812 => {
-                            // GRBW格式
-                            buffer.push(rgb[1]); // G
-                            buffer.push(rgb[0]); // R
-                            buffer.push(rgb[2]); // B
-                            buffer.push(0); // W通道设为0
-                        }
-                    }
-                }
-            } else {
-                // 其他显示器的灯带：显示黑色填充（关闭）
-                log::debug!("🔲 其他显示器灯带 {} ({}边): {} LEDs, 黑色填充(关闭)",
-                    strip.index,
-                    match strip.border {
-                        Border::Top => "Top",
-                        Border::Bottom => "Bottom",
-                        Border::Left => "Left",
-                        Border::Right => "Right",
-                    },
-                    strip.len
-                );
-
-                // 为该灯带的所有LED生成白色填充数据
-                for _led_index in 0..strip.len {
-                    match strip.led_type {
-                        LedType::WS2812B => {
-                            // GRB格式，RGB全亮20%
-                            buffer.push(white_fill_rgb[1]); // G
-                            buffer.push(white_fill_rgb[0]); // R
-                            buffer.push(white_fill_rgb[2]); // B
-                        }
-                        LedType::SK6812 => {
-                            // GRBW格式，只亮W通道20%
-                            buffer.push(0); // G = 0
-                            buffer.push(0); // R = 0
-                            buffer.push(0); // B = 0
-                            buffer.push(white_fill_w); // W = 20%
-                        }
-                    }
-                }
-            }
-        }
-
-        log::info!("🎨 生成了完整的LED数据缓冲区: {} 字节 (总LED数: {}), 从偏移量0开始发送",
-            buffer.len(), total_leds);
-
-        // 验证生成的数据长度是否正确
-        if buffer.len() != total_bytes {
-            log::warn!("⚠️ 数据长度不匹配: 期望{}字节, 实际{}字节", total_bytes, buffer.len());
-        }
-
-        // 返回完整的LED数据流，从偏移量0开始
-        Ok((buffer, 0))
     }
 
     /// 使用采样映射函数将边框颜色映射到LED数据缓冲区（兼容旧接口，用于测试）
@@ -1209,8 +1086,47 @@ impl LedColorsPublisher {
         config_group: &LedStripConfigGroup,
         edge_colors: &std::collections::HashMap<Border, [LedColor; 2]>,
     ) -> anyhow::Result<Vec<u8>> {
-        // 为了保持测试兼容性，直接调用旧的实现
-        let (buffer, _) = self.map_edge_colors_to_led_buffer_with_offset(config_group, config_group, edge_colors)?;
+        // 简化实现，专门用于测试，不包含呼吸效果
+        let mut sorted_strips = config_group.strips.clone();
+        sorted_strips.sort_by_key(|s| s.index);
+
+        let mut buffer = Vec::new();
+
+        for strip in &sorted_strips {
+            let default_colors = [LedColor::new(0, 0, 0), LedColor::new(0, 0, 0)];
+            let colors = edge_colors.get(&strip.border).unwrap_or(&default_colors);
+
+            for physical_index in 0..strip.len {
+                let logical_index = if strip.reversed {
+                    strip.len - 1 - physical_index
+                } else {
+                    physical_index
+                };
+
+                let half_count = strip.len / 2;
+                let color = if logical_index < half_count {
+                    &colors[0]
+                } else {
+                    &colors[1]
+                };
+                let rgb = color.get_rgb();
+
+                match strip.led_type {
+                    LedType::WS2812B => {
+                        buffer.push(rgb[1]); // G
+                        buffer.push(rgb[0]); // R
+                        buffer.push(rgb[2]); // B
+                    }
+                    LedType::SK6812 => {
+                        buffer.push(rgb[1]); // G
+                        buffer.push(rgb[0]); // R
+                        buffer.push(rgb[2]); // B
+                        buffer.push(0); // W
+                    }
+                }
+            }
+        }
+
         Ok(buffer)
     }
 
@@ -1228,15 +1144,22 @@ impl LedColorsPublisher {
 
         // 计算总LED数量和总字节数
         let total_leds: usize = all_sorted_strips.iter().map(|s| s.len).sum();
-        let total_bytes: usize = all_sorted_strips.iter().map(|s| {
-            let bytes_per_led = match s.led_type {
-                LedType::WS2812B => 3,
-                LedType::SK6812 => 4,
-            };
-            s.len * bytes_per_led
-        }).sum();
+        let total_bytes: usize = all_sorted_strips
+            .iter()
+            .map(|s| {
+                let bytes_per_led = match s.led_type {
+                    LedType::WS2812B => 3,
+                    LedType::SK6812 => 4,
+                };
+                s.len * bytes_per_led
+            })
+            .sum();
 
-        log::info!("🎨 生成完整LED数据流(带呼吸效果): 总LED数={}, 总字节数={}", total_leds, total_bytes);
+        log::info!(
+            "🎨 生成完整LED数据流(带呼吸效果): 总LED数={}, 总字节数={}",
+            total_leds,
+            total_bytes
+        );
 
         // 获取当前显示器的灯带ID集合
         let current_display_strips: std::collections::HashSet<usize> =
@@ -1273,19 +1196,22 @@ impl LedColorsPublisher {
                 let colors = edge_colors.get(&strip.border).unwrap_or(&default_colors);
 
                 // 检查是否是活跃灯带
-                let is_active_strip = if let Some((active_display_id, ref active_border)) = active_strip {
-                    strip.display_id == active_display_id &&
-                    format!("{:?}", strip.border).to_lowercase() == active_border.to_lowercase()
-                } else {
-                    false
-                };
+                let is_active_strip =
+                    if let Some((active_display_id, ref active_border)) = active_strip {
+                        strip.display_id == active_display_id
+                            && format!("{:?}", strip.border).to_lowercase()
+                                == active_border.to_lowercase()
+                    } else {
+                        false
+                    };
 
                 // 计算分段：前半部分用第一种颜色，后半部分用第二种颜色
                 let half_count = strip.len / 2;
 
                 if is_active_strip {
                     // 只在特定时间间隔输出日志，避免过多输出
-                    if (time_ms / 200) % 5 == 0 { // 每秒输出一次
+                    if (time_ms / 200) % 5 == 0 {
+                        // 每秒输出一次
                         log::info!("🫁 活跃灯带 {} ({}边): {} LEDs, 时间: {:.1}s, 呼吸因子: {:.3}, 亮度: {:.2}",
                             strip.index,
                             match strip.border {
@@ -1301,7 +1227,8 @@ impl LedColorsPublisher {
                         );
                     }
                 } else {
-                    log::debug!("🎨 当前显示器灯带 {} ({}边): {} LEDs, 非活跃",
+                    log::debug!(
+                        "🎨 当前显示器灯带 {} ({}边): {} LEDs, 非活跃",
                         strip.index,
                         match strip.border {
                             Border::Top => "Top",
@@ -1355,8 +1282,13 @@ impl LedColorsPublisher {
                 }
             } else {
                 // 其他显示器的灯带：根据是否有活跃灯带决定填充颜色
-                let fill_description = if active_strip.is_some() { "白色填充20%亮度" } else { "黑色填充(关闭)" };
-                log::debug!("🔲 其他显示器灯带 {} ({}边): {} LEDs, {}",
+                let fill_description = if active_strip.is_some() {
+                    "白色填充20%亮度"
+                } else {
+                    "黑色填充(关闭)"
+                };
+                log::debug!(
+                    "🔲 其他显示器灯带 {} ({}边): {} LEDs, {}",
                     strip.index,
                     match strip.border {
                         Border::Top => "Top",
@@ -1398,12 +1330,19 @@ impl LedColorsPublisher {
             }
         }
 
-        log::info!("🎨 生成了完整的LED数据缓冲区(带呼吸效果): {} 字节 (总LED数: {}), 从偏移量0开始发送",
-            buffer.len(), total_leds);
+        log::info!(
+            "🎨 生成了完整的LED数据缓冲区(带呼吸效果): {} 字节 (总LED数: {}), 从偏移量0开始发送",
+            buffer.len(),
+            total_leds
+        );
 
         // 验证生成的数据长度是否正确
         if buffer.len() != total_bytes {
-            log::warn!("⚠️ 数据长度不匹配: 期望{}字节, 实际{}字节", total_bytes, buffer.len());
+            log::warn!(
+                "⚠️ 数据长度不匹配: 期望{}字节, 实际{}字节",
+                total_bytes,
+                buffer.len()
+            );
         }
 
         // 返回完整的LED数据流，从偏移量0开始

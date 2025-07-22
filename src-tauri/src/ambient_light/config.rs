@@ -152,7 +152,13 @@ impl LedStripConfigGroup {
 
         log::debug!("生成了 {} 个 mappers", self.mappers.len());
         for (i, mapper) in self.mappers.iter().enumerate() {
-            log::debug!("Mapper {}: start={}, end={}, pos={}", i, mapper.start, mapper.end, mapper.pos);
+            log::debug!(
+                "Mapper {}: start={}, end={}, pos={}",
+                i,
+                mapper.start,
+                mapper.end,
+                mapper.pos
+            );
         }
     }
 }
@@ -325,7 +331,7 @@ mod tests {
 
         // 第二个灯带是反向的，所以 start > end
         assert_eq!(config.mappers[1].start, 120); // end position
-        assert_eq!(config.mappers[1].end, 60);    // start position
+        assert_eq!(config.mappers[1].end, 60); // start position
         assert_eq!(config.mappers[1].pos, 60);
 
         assert_eq!(config.color_calibration.g, 0.9);
@@ -406,15 +412,15 @@ mod tests {
         assert_eq!(total_leds, 110);
 
         // 验证动态生成的 mappers
-        assert_eq!(config.mappers[0].start, 0);   // index 0
+        assert_eq!(config.mappers[0].start, 0); // index 0
         assert_eq!(config.mappers[0].end, 30);
-        assert_eq!(config.mappers[1].start, 30);  // index 1
+        assert_eq!(config.mappers[1].start, 30); // index 1
         assert_eq!(config.mappers[1].end, 60);
-        assert_eq!(config.mappers[2].start, 60);  // index 2
+        assert_eq!(config.mappers[2].start, 60); // index 2
         assert_eq!(config.mappers[2].end, 85);
         // index 3 是反向的
         assert_eq!(config.mappers[3].start, 110); // end position
-        assert_eq!(config.mappers[3].end, 85);    // start position
+        assert_eq!(config.mappers[3].end, 85); // start position
     }
 
     #[test]
@@ -456,10 +462,10 @@ mod tests {
         ];
 
         // 验证每个灯带的 start_pos 计算
-        assert_eq!(strips[0].calculate_start_pos(&strips), 0);   // index 0: 0
-        assert_eq!(strips[1].calculate_start_pos(&strips), 38);  // index 1: 38
-        assert_eq!(strips[2].calculate_start_pos(&strips), 60);  // index 2: 60
-        assert_eq!(strips[3].calculate_start_pos(&strips), 98);  // index 3: 98
+        assert_eq!(strips[0].calculate_start_pos(&strips), 0); // index 0: 0
+        assert_eq!(strips[1].calculate_start_pos(&strips), 38); // index 1: 38
+        assert_eq!(strips[2].calculate_start_pos(&strips), 60); // index 2: 60
+        assert_eq!(strips[3].calculate_start_pos(&strips), 98); // index 3: 98
 
         // 验证总LED数量
         let total_leds: usize = strips.iter().map(|s| s.len).sum();

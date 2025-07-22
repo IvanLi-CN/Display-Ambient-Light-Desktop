@@ -285,18 +285,23 @@ async fn test_single_display_config_mode() -> Result<(), String> {
 
     log::info!("📋 读取到用户配置: {} 个灯带", config_group.strips.len());
     for strip in &config_group.strips {
-        log::info!("  - 灯带{}: {:?}边, {}个LED, 类型{:?}",
-            strip.index, strip.border, strip.len, strip.led_type);
+        log::info!(
+            "  - 灯带{}: {:?}边, {}个LED, 类型{:?}",
+            strip.index,
+            strip.border,
+            strip.len,
+            strip.led_type
+        );
     }
 
     let test_strips = config_group.strips;
 
     // 定义边框颜色 - 使用ColorPreview组件中的正确颜色（HSV色环45度间隔）
     let border_colors = ambient_light::BorderColors {
-        top: [[0, 255, 255], [0, 0, 255]],       // 青色 (180°) + 蓝色 (225°)
-        bottom: [[255, 0, 0], [255, 128, 0]],    // 红色 (0°) + 橙色 (45°)
-        left: [[128, 0, 255], [255, 0, 128]],    // 紫色 (270°) + 玫红色 (315°)
-        right: [[255, 255, 0], [128, 255, 0]],   // 黄色 (90°) + 黄绿色 (135°)
+        top: [[0, 255, 255], [0, 0, 255]],     // 青色 (180°) + 蓝色 (225°)
+        bottom: [[255, 0, 0], [255, 128, 0]],  // 红色 (0°) + 橙色 (45°)
+        left: [[128, 0, 255], [255, 0, 128]],  // 紫色 (270°) + 玫红色 (315°)
+        right: [[255, 255, 0], [128, 255, 0]], // 黄色 (90°) + 黄绿色 (135°)
     };
 
     log::info!("🔧 启动测试单屏配置模式");
@@ -1392,7 +1397,10 @@ async fn main() {
     if display_id.is_none() {
         if let Ok(env_display) = std::env::var("TAURI_DEV_DISPLAY") {
             display_id = Some(env_display.clone());
-            info!("Environment variable detected: TAURI_DEV_DISPLAY={}", env_display);
+            info!(
+                "Environment variable detected: TAURI_DEV_DISPLAY={}",
+                env_display
+            );
         }
     }
 

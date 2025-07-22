@@ -224,7 +224,8 @@ impl ConfigManager {
         for strip in config.strips.iter_mut() {
             if strip.display_id == display_id && strip.border == border {
                 strip.reversed = !strip.reversed;
-                log::info!("🔄 切换灯带反向状态: 显示器{} {}边 -> reversed={}",
+                log::info!(
+                    "🔄 切换灯带反向状态: 显示器{} {}边 -> reversed={}",
                     display_id,
                     match border {
                         Border::Top => "Top",
