@@ -353,9 +353,9 @@ mod tests {
                 display_id: 1, // Use a fixed display ID
                 border: match j {
                     0 => Border::Top,
-                    1 => Border::Bottom,
-                    2 => Border::Left,
-                    _ => Border::Right,
+                    1 => Border::Right,
+                    2 => Border::Bottom,
+                    _ => Border::Left,
                 },
                 len: 30,
                 led_type: LedType::WS2812B,

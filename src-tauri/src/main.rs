@@ -158,6 +158,23 @@ async fn get_one_edge_colors(
 }
 
 #[tauri::command]
+async fn get_colors_by_led_configs(
+    display_id: u32,
+    led_configs: Vec<ambient_light::LedStripConfig>,
+) -> Result<Vec<Vec<led_color::LedColor>>, String> {
+    let screenshot_manager = ScreenshotManager::global().await;
+    let channels = screenshot_manager.channels.read().await;
+    if let Some(rx) = channels.get(&display_id) {
+        let rx = rx.read().await;
+        let screenshot = rx.borrow().clone();
+        let colors = screenshot.get_colors_by_led_configs(&led_configs).await;
+        Ok(colors)
+    } else {
+        Err(format!("display not found: {display_id}"))
+    }
+}
+
+#[tauri::command]
 async fn patch_led_strip_len(display_id: u32, border: Border, delta_len: i8) -> Result<(), String> {
     info!(
         "patch_led_strip_len: {} {:?} {}",
@@ -1471,6 +1488,7 @@ async fn main() {
             write_led_strip_configs,
             get_led_strips_sample_points,
             get_one_edge_colors,
+            get_colors_by_led_configs,
             patch_led_strip_len,
             patch_led_strip_type,
             send_colors,

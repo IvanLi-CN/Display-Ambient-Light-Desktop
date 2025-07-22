@@ -64,9 +64,23 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
     }
 
     // 基于 strip 的索引计算颜色偏移
-    // 在新系统中，我们需要根据 strip 的索引来计算偏移
-    const stripIndex = ledStripStore.strips.findIndex(s => s === strip);
-    const offset = stripIndex * strip.len * 3;
+    // 正确的偏移计算：累加当前灯带之前所有灯带的实际长度
+    const calculateStripOffset = (targetStrip: any, allStrips: any[]) => {
+      // 按序列号排序所有灯带（与后端逻辑保持一致）
+      const sortedStrips = [...allStrips].sort((a, b) => a.index - b.index);
+
+      let offset = 0;
+      for (const strip of sortedStrips) {
+        if (strip.index < targetStrip.index) {
+          offset += strip.len;
+        } else {
+          break;
+        }
+      }
+      return offset * 3; // 每个LED占用3个字节（RGB）
+    };
+
+    const offset = calculateStripOffset(strip, ledStripStore.strips);
 
     const colors = new Array(localProps.config.len).fill(null).map((_, i) => {
       const index = offset + i * 3;

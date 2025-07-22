@@ -68,7 +68,7 @@ impl LedColorsPublisher {
     async fn start_one_display_colors_fetcher(
         &self,
         display_id: u32,
-        sample_points: Vec<LedSamplePoints>,
+        _sample_points: Vec<LedSamplePoints>, // 不再使用旧的采样点，改用LED配置
         _bound_scale_factor: f32,
         mappers: Vec<SamplePointMapper>,
         display_colors_tx: broadcast::Sender<(u32, Vec<u8>)>,
@@ -109,10 +109,28 @@ impl LedColorsPublisher {
                     screenshot.width,
                     screenshot.height
                 );
-                let colors = screenshot.get_colors_by_sample_points(&sample_points).await;
+
+                // 使用新的采样函数替换旧的采样逻辑
+                // 只处理属于当前显示器的LED灯带配置
+                let current_display_strips: Vec<LedStripConfig> = strips
+                    .iter()
+                    .filter(|strip| strip.display_id == display_id)
+                    .cloned()
+                    .collect();
 
                 log::info!(
-                    "🖼️ Got screenshot for display #{}, extracted {} colors",
+                    "Display #{}: Processing {} LED strips for this display",
+                    display_id,
+                    current_display_strips.len()
+                );
+
+                let colors_by_strips = screenshot.get_colors_by_led_configs(&current_display_strips).await;
+
+                // 将二维颜色数组展平为一维数组，保持与旧API的兼容性
+                let colors: Vec<LedColor> = colors_by_strips.into_iter().flatten().collect();
+
+                log::info!(
+                    "🖼️ Got screenshot for display #{}, extracted {} colors using new sampling algorithm",
                     display_id,
                     colors.len()
                 );
@@ -341,9 +359,9 @@ impl LedColorsPublisher {
                     display_id: display.id,
                     border: match j {
                         0 => Border::Top,
-                        1 => Border::Bottom,
-                        2 => Border::Left,
-                        3 => Border::Right,
+                        1 => Border::Right,
+                        2 => Border::Bottom,
+                        3 => Border::Left,
                         _ => unreachable!(),
                     },
                     len: 30,
@@ -472,6 +490,13 @@ impl LedColorsPublisher {
         let displays = display_info::DisplayInfo::all()
             .map_err(|e| anyhow::anyhow!("Failed to get displays: {}", e))?;
 
+        // Log display detection order for debugging
+        log::info!("🖥️ Detected displays in order:");
+        for (i, display) in displays.iter().enumerate() {
+            log::info!("  Display {}: ID={}, X={}, Y={}, Primary={}",
+                i, display.id, display.x, display.y, display.is_primary);
+        }
+
         // Create a mutable copy of configs with proper display IDs
         let mut updated_configs = configs.clone();
         for strip in updated_configs.strips.iter_mut() {
@@ -479,12 +504,24 @@ impl LedColorsPublisher {
                 // Assign display ID based on strip index
                 let display_index = strip.index / 4;
                 if display_index < displays.len() {
-                    strip.display_id = displays[display_index].id;
-                    log::info!(
-                        "Assigned display ID {} to strip {}",
-                        strip.display_id,
-                        strip.index
-                    );
+                    // TEMPORARY FIX: Reverse display order to match UI layout
+                    // This fixes the issue where display detection order doesn't match UI order
+                    let corrected_display_index = if displays.len() == 2 {
+                        1 - display_index // Swap 0->1, 1->0 for 2 displays
+                    } else {
+                        display_index // Keep original for other cases
+                    };
+
+                    if corrected_display_index < displays.len() {
+                        strip.display_id = displays[corrected_display_index].id;
+                        log::info!(
+                            "Assigned display ID {} to strip {} (original_index={}, corrected_index={})",
+                            strip.display_id,
+                            strip.index,
+                            display_index,
+                            corrected_display_index
+                        );
+                    }
                 }
             }
         }
@@ -631,6 +668,13 @@ impl LedColorsPublisher {
             anyhow::anyhow!("Failed to get display info: {}", e)
         })?;
 
+        // Log display detection order for debugging
+        log::info!("🖥️ get_colors_configs - Detected displays in order:");
+        for (i, display) in displays.iter().enumerate() {
+            log::info!("  Display {}: ID={}, X={}, Y={}, Primary={}",
+                i, display.id, display.x, display.y, display.is_primary);
+        }
+
         // Create a mutable copy of configs with proper display IDs
         let mut updated_configs = configs.clone();
         for strip in updated_configs.strips.iter_mut() {
@@ -638,12 +682,24 @@ impl LedColorsPublisher {
                 // Assign display ID based on strip index
                 let display_index = strip.index / 4;
                 if display_index < displays.len() {
-                    strip.display_id = displays[display_index].id;
-                    log::info!(
-                        "Assigned display ID {} to strip {}",
-                        strip.display_id,
-                        strip.index
-                    );
+                    // TEMPORARY FIX: Reverse display order to match UI layout
+                    // This fixes the issue where display detection order doesn't match UI order
+                    let corrected_display_index = if displays.len() == 2 {
+                        1 - display_index // Swap 0->1, 1->0 for 2 displays
+                    } else {
+                        display_index // Keep original for other cases
+                    };
+
+                    if corrected_display_index < displays.len() {
+                        strip.display_id = displays[corrected_display_index].id;
+                        log::info!(
+                            "get_colors_configs - Assigned display ID {} to strip {} (original_index={}, corrected_index={})",
+                            strip.display_id,
+                            strip.index,
+                            display_index,
+                            corrected_display_index
+                        );
+                    }
                 }
             }
         }
@@ -672,6 +728,9 @@ impl LedColorsPublisher {
                     updated_configs.strips.len(),
                 ));
             }
+
+            // 按序列号排序，确保与send_colors_by_display中的顺序一致
+            led_strip_configs.sort_by_key(|strip| strip.index);
 
             // Create a dummy screenshot object to calculate sample points
             let dummy_screenshot = Screenshot::new(

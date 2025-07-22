@@ -231,9 +231,9 @@ impl LedStripConfigGroup {
                     display_id: 0, // Will be assigned later
                     border: match j {
                         0 => Border::Top,
-                        1 => Border::Bottom,
-                        2 => Border::Left,
-                        3 => Border::Right,
+                        1 => Border::Right,
+                        2 => Border::Bottom,
+                        3 => Border::Left,
                         _ => unreachable!(),
                     },
                     len: 30,
