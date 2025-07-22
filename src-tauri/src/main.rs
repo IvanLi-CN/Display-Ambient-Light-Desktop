@@ -5,6 +5,7 @@ mod ambient_light;
 mod ambient_light_state;
 mod auto_start;
 mod display;
+mod http_server;
 mod language_manager;
 mod led_color;
 mod led_data_sender;
@@ -1414,6 +1415,23 @@ async fn main() {
             );
         }
     }
+
+    // 启动HTTP服务器
+    let http_config = http_server::ServerConfig {
+        host: "127.0.0.1".to_string(),
+        port: 3030,
+        enable_cors: true,
+    };
+
+    // 在后台启动HTTP服务器
+    let _http_server_handle = {
+        let config = http_config.clone();
+        tokio::spawn(async move {
+            if let Err(e) = http_server::start_server(config).await {
+                error!("HTTP服务器启动失败: {}", e);
+            }
+        })
+    };
 
     // Initialize display info (removed debug output)
 
