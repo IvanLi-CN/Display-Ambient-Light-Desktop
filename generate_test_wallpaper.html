@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LED Test Wallpaper Generator</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #f0f0f0;
+        }
+        .controls {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        #canvas {
+            border: 2px solid #333;
+            display: block;
+            margin: 0 auto;
+        }
+        .info {
+            text-align: center;
+            margin-top: 10px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <h1>LED颜色映射测试壁纸生成器</h1>
+        <p>这个壁纸专门设计用于测试LED环境光系统的颜色映射准确性</p>
+        <button onclick="generateTestWallpaper()">生成测试壁纸</button>
+        <button onclick="downloadWallpaper()">下载壁纸</button>
+    </div>
+    
+    <canvas id="canvas" width="1920" height="1080"></canvas>
+    
+    <div class="info">
+        <p><strong>测试说明：</strong></p>
+        <p>• 顶部边缘：鲜红色 - 用于测试Top LED灯带</p>
+        <p>• 底部边缘：鲜绿色 - 用于测试Bottom LED灯带</p>
+        <p>• 左侧边缘：鲜蓝色 - 用于测试Left LED灯带</p>
+        <p>• 右侧边缘：鲜黄色 - 用于测试Right LED灯带</p>
+        <p>• 中心区域：渐变过渡，便于观察边缘采样效果</p>
+    </div>
+
+    <script>
+        function generateTestWallpaper() {
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            // 清除画布
+            ctx.clearRect(0, 0, width, height);
+            
+            // 定义边缘宽度（约5%的屏幕尺寸）
+            const edgeWidth = Math.floor(width * 0.05); // 左右边缘宽度
+            const edgeHeight = Math.floor(height * 0.05); // 上下边缘高度
+            
+            // 创建渐变背景（中心区域）
+            const gradient = ctx.createRadialGradient(
+                width/2, height/2, 0,
+                width/2, height/2, Math.min(width, height)/2
+            );
+            gradient.addColorStop(0, '#ffffff');
+            gradient.addColorStop(0.5, '#cccccc');
+            gradient.addColorStop(1, '#888888');
+            
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, width, height);
+            
+            // 顶部边缘 - 鲜红色
+            ctx.fillStyle = '#FF0000';
+            ctx.fillRect(0, 0, width, edgeHeight);
+            
+            // 底部边缘 - 鲜绿色
+            ctx.fillStyle = '#00FF00';
+            ctx.fillRect(0, height - edgeHeight, width, edgeHeight);
+            
+            // 左侧边缘 - 鲜蓝色
+            ctx.fillStyle = '#0000FF';
+            ctx.fillRect(0, 0, edgeWidth, height);
+            
+            // 右侧边缘 - 鲜黄色
+            ctx.fillStyle = '#FFFF00';
+            ctx.fillRect(width - edgeWidth, 0, edgeWidth, height);
+            
+            // 在四个角落添加特殊标记，便于识别方向
+            const cornerSize = 50;
+            
+            // 左上角 - 紫色
+            ctx.fillStyle = '#FF00FF';
+            ctx.fillRect(0, 0, cornerSize, cornerSize);
+            
+            // 右上角 - 青色
+            ctx.fillStyle = '#00FFFF';
+            ctx.fillRect(width - cornerSize, 0, cornerSize, cornerSize);
+            
+            // 左下角 - 橙色
+            ctx.fillStyle = '#FF8000';
+            ctx.fillRect(0, height - cornerSize, cornerSize, cornerSize);
+            
+            // 右下角 - 粉色
+            ctx.fillStyle = '#FF80FF';
+            ctx.fillRect(width - cornerSize, height - cornerSize, cornerSize, cornerSize);
+            
+            // 添加中心标识文字
+            ctx.fillStyle = '#000000';
+            ctx.font = 'bold 48px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('LED测试壁纸', width/2, height/2 - 50);
+            
+            ctx.font = '24px Arial';
+            ctx.fillText('顶部=红色, 底部=绿色, 左侧=蓝色, 右侧=黄色', width/2, height/2);
+            
+            ctx.font = '20px Arial';
+            ctx.fillText('边缘采样区域约为屏幕的5%', width/2, height/2 + 40);
+            
+            // 添加采样区域指示线
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([10, 5]);
+            
+            // 顶部采样区域指示线
+            ctx.beginPath();
+            ctx.moveTo(0, edgeHeight);
+            ctx.lineTo(width, edgeHeight);
+            ctx.stroke();
+            
+            // 底部采样区域指示线
+            ctx.beginPath();
+            ctx.moveTo(0, height - edgeHeight);
+            ctx.lineTo(width, height - edgeHeight);
+            ctx.stroke();
+            
+            // 左侧采样区域指示线
+            ctx.beginPath();
+            ctx.moveTo(edgeWidth, 0);
+            ctx.lineTo(edgeWidth, height);
+            ctx.stroke();
+            
+            // 右侧采样区域指示线
+            ctx.beginPath();
+            ctx.moveTo(width - edgeWidth, 0);
+            ctx.lineTo(width - edgeWidth, height);
+            ctx.stroke();
+            
+            ctx.setLineDash([]);
+        }
+        
+        function downloadWallpaper() {
+            const canvas = document.getElementById('canvas');
+            const link = document.createElement('a');
+            link.download = 'led-test-wallpaper-1920x1080.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+        
+        // 页面加载时自动生成壁纸
+        window.onload = function() {
+            generateTestWallpaper();
+        };
+    </script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { adaptiveApi } from './api-adapter';
 import { VirtualLedStrip } from '../components/led-strip-configuration/virtual-display';
 import { LedType } from '../models/led-strip-config';
 
@@ -237,10 +237,10 @@ export class LedColorService {
       const bytesPerLed = strip.ledType === LedType.SK6812 ? 4 : 3;
       const offset = strip.stripOrder * strip.count * bytesPerLed;
       
-      await invoke('send_test_colors_to_board', {
+      await adaptiveApi.sendTestColorsToBoard({
         boardAddress,
         offset,
-        buffer: Array.from(colorBytes),
+        buffer: Array.from(colorBytes)
       });
     } catch (error) {
       console.error('Failed to send colors to hardware:', error);

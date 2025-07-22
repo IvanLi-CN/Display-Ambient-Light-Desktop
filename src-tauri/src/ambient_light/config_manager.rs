@@ -97,6 +97,9 @@ impl ConfigManager {
 
         log::debug!("config updated: {:?}", configs);
 
+        // 通过WebSocket广播配置变化
+        crate::websocket_events::publish_config_changed(configs).await;
+
         Ok(())
     }
 

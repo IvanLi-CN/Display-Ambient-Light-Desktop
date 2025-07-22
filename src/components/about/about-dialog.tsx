@@ -1,6 +1,6 @@
 import { createSignal, Show, createEffect } from 'solid-js';
 import { useLanguage } from '../../i18n/index';
-import { invoke } from '@tauri-apps/api/core';
+import { adaptiveApi } from '../../services/api-adapter';
 
 interface AboutDialogProps {
   isOpen: boolean;
@@ -11,14 +11,13 @@ export const AboutDialog = (props: AboutDialogProps) => {
   const { t } = useLanguage();
   const [appVersion, setAppVersion] = createSignal('2.0.0-alpha');
 
-  // Get app version from package.json or Tauri config
+  // Get app version from API
   const getAppVersion = async () => {
     try {
-      // Try to get version from Tauri
-      const version = await invoke<string>('get_app_version_string');
+      const version = await adaptiveApi.getAppVersion();
       setAppVersion(version);
     } catch (error) {
-      console.warn('Failed to get app version from Tauri, using default');
+      console.warn('Failed to get app version, using default');
       // Keep default version
     }
   };
@@ -33,7 +32,7 @@ export const AboutDialog = (props: AboutDialogProps) => {
   // Handle external link clicks
   const openExternalLink = async (url: string) => {
     try {
-      await invoke('open_external_url', { url });
+      await adaptiveApi.openExternalUrl(url);
     } catch (error) {
       console.error('Failed to open external URL:', error);
       // Fallback to window.open

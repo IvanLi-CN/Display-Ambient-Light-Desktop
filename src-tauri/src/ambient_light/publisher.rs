@@ -289,12 +289,19 @@ impl LedColorsPublisher {
                     let sorted_colors =
                         ScreenshotManager::get_sorted_colors(&flatten_colors, &mappers);
 
-                    match sorted_colors_tx.send(sorted_colors) {
+                    match sorted_colors_tx.send(sorted_colors.clone()) {
                         Ok(_) => {}
                         Err(err) => {
                             warn!("Failed to send sorted colors: {}", err);
                         }
                     };
+
+                    // 通过WebSocket广播颜色变化
+                    crate::websocket_events::publish_led_colors_changed(flatten_colors).await;
+                    crate::websocket_events::WebSocketEventPublisher::global()
+                        .await
+                        .publish_led_sorted_colors_changed(sorted_colors)
+                        .await;
 
                     _start = tokio::time::Instant::now();
                 }

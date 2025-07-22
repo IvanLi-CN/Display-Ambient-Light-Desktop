@@ -1,6 +1,6 @@
 import { render } from 'solid-js/web';
 import { createSignal, createEffect, onMount } from 'solid-js';
-import { invoke } from '@tauri-apps/api/core';
+import { adaptiveApi } from './services/api-adapter';
 import { LanguageProvider, useLanguage } from './i18n/index';
 import { themeStore } from './stores/theme.store';
 
@@ -11,19 +11,20 @@ const AboutWindow = () => {
   // Get app version on mount
   onMount(async () => {
     try {
-      const version = await invoke<string>('get_app_version_string');
+      const version = await adaptiveApi.getAppVersion();
       setAppVersion(version);
     } catch (error) {
-      console.warn('Failed to get app version from Tauri, using default');
+      console.warn('Failed to get app version, using default');
     }
   });
 
   // Handle external link clicks
   const openExternalLink = async (url: string) => {
     try {
-      await invoke('open_external_url', { url });
+      // 尝试使用API适配器打开链接
+      await adaptiveApi.emitEvent('open_external_url', { url });
     } catch (error) {
-      console.error('Failed to open external URL:', error);
+      console.error('Failed to open external URL via API:', error);
       // Fallback to window.open
       window.open(url, '_blank');
     }

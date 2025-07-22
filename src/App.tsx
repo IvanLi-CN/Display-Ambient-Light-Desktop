@@ -6,8 +6,7 @@ import { LedStripTest } from './components/led-strip-test/led-strip-test';
 import { LedDataSenderTest } from './components/led-data-sender-test/led-data-sender-test';
 import { Settings } from './components/settings/settings';
 import { createEffect, createSignal, onMount } from 'solid-js';
-import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
+import { adaptiveApi } from './services/api-adapter';
 import { setLedStripStore } from './stores/led-strip.store';
 import { LedStripConfigContainer } from './models/led-strip-config';
 import { InfoIndex } from './components/info/info-index';
@@ -27,9 +26,9 @@ function App() {
 
   // Get app version on mount
   createEffect(() => {
-    invoke<AppVersion>('get_app_version').then((version) => {
+    adaptiveApi.getAppVersion().then((version: any) => {
       setAppVersion(version);
-    }).catch((error) => {
+    }).catch((error: any) => {
       console.error('Failed to get app version:', error);
     });
   });
@@ -44,8 +43,10 @@ function App() {
   // Listen for navigation events from backend
   onMount(async () => {
     try {
-      const unlisten = await listen<string>('navigate', (event) => {
-        const targetPath = event.payload;
+      // 初始化API适配器
+      await adaptiveApi.initialize();
+
+      const unlisten = await adaptiveApi.onEvent<string>('navigate', (targetPath) => {
         console.log('🎯 Received navigation event from backend:', targetPath);
         console.log('🎯 Current location before navigation:', window.location.href);
 
@@ -55,11 +56,10 @@ function App() {
         console.log('🎯 Navigation called, new location:', window.location.href);
 
         // Report successful navigation
-        invoke('report_current_page', {
-          pageInfo: `Navigation event processed: ${targetPath}`
-        }).catch((error) => {
-          console.error('Failed to report navigation event:', error);
-        });
+        adaptiveApi.reportCurrentPage(`Navigation event processed: ${targetPath}`)
+          .catch((error) => {
+            console.error('Failed to report navigation event:', error);
+          });
       });
 
       console.log('✅ Navigation event listener registered');
@@ -94,7 +94,7 @@ function App() {
     };
 
     const currentPageName = getPageName(currentPath);
-    invoke('report_current_page', { pageInfo: `Current page: ${currentPageName} (path: ${currentPath})` }).catch((error) => {
+    adaptiveApi.reportCurrentPage(`Current page: ${currentPageName} (path: ${currentPath})`).catch((error) => {
       console.error('Failed to report current page:', error);
     });
 
@@ -104,7 +104,7 @@ function App() {
     if (isLeavingTestPage) {
       // The LED test component will handle stopping the test effect via onCleanup
       // We just need to ensure test mode is disabled to resume normal LED publishing
-      invoke('disable_test_mode').catch((error) => {
+      adaptiveApi.disableTestMode().catch((error) => {
         console.error('Failed to disable test mode:', error);
       });
     }
@@ -114,12 +114,12 @@ function App() {
   });
 
   createEffect(() => {
-    invoke<LedStripConfigContainer>('read_config').then((config) => {
+    adaptiveApi.getConfig().then((config: LedStripConfigContainer) => {
       setLedStripStore({
         strips: config.strips,
         colorCalibration: config.color_calibration,
       });
-    }).catch((error) => {
+    }).catch((error: any) => {
       console.error('Failed to read config:', error);
     });
   });

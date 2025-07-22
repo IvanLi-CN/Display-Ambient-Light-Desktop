@@ -28,8 +28,8 @@ impl Default for ServerConfig {
 /// 应用状态，包含所有共享资源
 #[derive(Clone)]
 pub struct AppState {
-    // 这里将包含对现有管理器的引用
-    // 例如: ambient_light_manager, display_manager 等
+    /// WebSocket连接管理器
+    pub websocket_manager: websocket::WebSocketManager,
 }
 
 /// 标准API响应格式
@@ -79,17 +79,43 @@ impl ApiError {
 #[openapi(
     paths(
         api::health::health_check,
+        api::general::greet,
+        api::general::ping,
         api::info::get_app_version,
+        api::info::get_system_info,
+        api::led::send_colors,
+        api::led::send_test_colors_to_board,
+        api::led::get_data_send_mode,
+        api::led::set_data_send_mode,
+        api::config::get_led_strip_configs,
+        api::config::update_led_strip_configs,
+        api::config::update_led_strip_length,
+        api::config::get_user_preferences,
+        api::config::update_theme,
+        api::display::get_displays,
+        api::display::list_display_info,
+        api::display::get_display_colors,
+        api::device::get_boards,
+        api::device::get_auto_start_status,
+        api::device::set_auto_start_status,
+        api::device::get_ambient_light_state,
     ),
     components(
-        schemas(ApiResponse<String>, ApiError)
+        schemas(
+            ApiResponse<String>,
+            ApiError,
+            api::general::GreetRequest,
+            api::general::GreetResponse
+        )
     ),
     tags(
         (name = "health", description = "健康检查相关API"),
+        (name = "general", description = "通用API"),
         (name = "info", description = "应用信息相关API"),
         (name = "config", description = "配置管理相关API"),
         (name = "led", description = "LED控制相关API"),
         (name = "display", description = "显示器相关API"),
+        (name = "device", description = "设备管理相关API"),
     ),
     info(
         title = "Ambient Light Control API",
@@ -105,7 +131,11 @@ pub struct ApiDoc;
 
 /// 创建HTTP服务器
 pub async fn create_server(config: ServerConfig) -> Result<Router, anyhow::Error> {
-    let app_state = AppState {};
+    // 获取全局WebSocket事件发布器的WebSocket管理器
+    let websocket_publisher = crate::websocket_events::WebSocketEventPublisher::global().await;
+    let app_state = AppState {
+        websocket_manager: websocket_publisher.get_websocket_manager().clone(),
+    };
 
     // 配置CORS
     let cors = if config.enable_cors {
@@ -138,6 +168,8 @@ pub async fn create_server(config: ServerConfig) -> Result<Router, anyhow::Error
 /// 创建API v1路由
 fn create_api_routes() -> Router<AppState> {
     Router::new()
+        // 通用API
+        .merge(api::general::create_routes())
         // 应用信息
         .nest("/info", api::info::create_routes())
         // 配置管理

@@ -1,5 +1,6 @@
 import { createSignal, onMount } from 'solid-js';
-import { invoke } from '@tauri-apps/api/core';
+import { adaptiveApi } from '../../services/api-adapter';
+import { LedApiService } from '../../services/led-api.service';
 import { DataSendMode } from '../../models/led-data-sender';
 
 export const LedDataSenderTest = () => {
@@ -10,7 +11,7 @@ export const LedDataSenderTest = () => {
   // 获取当前模式
   const getCurrentMode = async () => {
     try {
-      const mode = await invoke<DataSendMode>('get_led_data_send_mode');
+      const mode = await LedApiService.getDataSendMode();
       setCurrentMode(mode);
     } catch (error) {
       console.error('Failed to get current mode:', error);
@@ -21,7 +22,7 @@ export const LedDataSenderTest = () => {
   const setMode = async (mode: DataSendMode) => {
     try {
       setIsLoading(true);
-      await invoke('set_led_data_send_mode', { mode });
+      await LedApiService.setDataSendMode(mode);
       setCurrentMode(mode);
       console.log(`Mode set to: ${mode}`);
     } catch (error) {
@@ -35,7 +36,7 @@ export const LedDataSenderTest = () => {
   const runTest = async () => {
     try {
       setIsLoading(true);
-      const result = await invoke<string>('test_led_data_sender');
+      const result = await LedApiService.testLedDataSender();
       setTestResult(result);
     } catch (error) {
       console.error('Failed to run test:', error);

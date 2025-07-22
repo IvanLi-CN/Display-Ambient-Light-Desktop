@@ -16,6 +16,7 @@ mod screenshot;
 mod screenshot_manager;
 mod user_preferences;
 mod volume;
+mod websocket_events;
 
 use ambient_light::{Border, ColorCalibration, LedStripConfig, LedStripConfigGroup, LedType};
 use display::{DisplayManager, DisplayState};

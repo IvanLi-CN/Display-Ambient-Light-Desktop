@@ -68,12 +68,12 @@ pub async fn websocket_handler(ws: WebSocketUpgrade, State(state): State<AppStat
 }
 
 /// 处理WebSocket连接
-async fn handle_socket(socket: WebSocket, _state: AppState) {
+async fn handle_socket(socket: WebSocket, state: AppState) {
     let (mut sender, mut receiver) = socket.split();
 
-    // TODO: 从AppState获取WebSocketManager
-    // let ws_manager = state.websocket_manager.clone();
-    // let mut ws_receiver = ws_manager.subscribe();
+    // 从AppState获取WebSocketManager
+    let ws_manager = state.websocket_manager.clone();
+    let mut ws_receiver = ws_manager.subscribe();
 
     // 发送连接确认消息
     if sender
@@ -94,16 +94,7 @@ async fn handle_socket(socket: WebSocket, _state: AppState) {
                     if let Ok(ws_msg) = serde_json::from_str::<WsMessage>(&text) {
                         match ws_msg {
                             WsMessage::Ping => {
-                                // 响应心跳
-                                if sender
-                                    .send(Message::Text(
-                                        serde_json::to_string(&WsMessage::Pong).unwrap(),
-                                    ))
-                                    .await
-                                    .is_err()
-                                {
-                                    break;
-                                }
+                                log::debug!("收到WebSocket心跳");
                             }
                             _ => {
                                 // 处理其他客户端消息
@@ -114,6 +105,7 @@ async fn handle_socket(socket: WebSocket, _state: AppState) {
                 }
                 Message::Binary(_) => {
                     // 处理二进制消息
+                    log::debug!("收到WebSocket二进制消息");
                 }
                 Message::Close(_) => {
                     log::info!("WebSocket连接关闭");
@@ -126,13 +118,21 @@ async fn handle_socket(socket: WebSocket, _state: AppState) {
 
     // 广播消息给客户端的任务
     let mut send_task = tokio::spawn(async move {
-        // TODO: 实现从ws_receiver接收广播消息并发送给客户端
-        // while let Ok(msg) = ws_receiver.recv().await {
-        //     let text = serde_json::to_string(&msg).unwrap();
-        //     if sender.send(Message::Text(text)).await.is_err() {
-        //         break;
-        //     }
-        // }
+        // 实现从ws_receiver接收广播消息并发送给客户端
+        while let Ok(msg) = ws_receiver.recv().await {
+            let text = match serde_json::to_string(&msg) {
+                Ok(text) => text,
+                Err(e) => {
+                    log::error!("序列化WebSocket消息失败: {}", e);
+                    continue;
+                }
+            };
+
+            if sender.send(Message::Text(text)).await.is_err() {
+                log::debug!("WebSocket发送消息失败，连接可能已断开");
+                break;
+            }
+        }
     });
 
     // 等待任一任务完成

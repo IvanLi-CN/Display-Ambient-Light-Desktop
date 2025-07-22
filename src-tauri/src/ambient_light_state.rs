@@ -124,6 +124,11 @@ impl AmbientLightStateManager {
             "Ambient light state changed to: {}",
             if enabled { "enabled" } else { "disabled" }
         );
+
+        // 通过WebSocket广播状态变化
+        let current_state = self.get_state().await;
+        crate::websocket_events::publish_ambient_light_state_changed(&current_state).await;
+
         Ok(())
     }
 

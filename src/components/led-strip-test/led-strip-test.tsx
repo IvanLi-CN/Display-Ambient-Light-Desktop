@@ -1,6 +1,7 @@
 import { createSignal, createEffect, For, Show, onCleanup } from 'solid-js';
-import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
+import { adaptiveApi } from '../../services/api-adapter';
+import { LedApiService } from '../../services/led-api.service';
+import { DeviceApiService } from '../../services/display-api.service';
 import { useLanguage } from '../../i18n/index';
 
 interface BoardInfo {
@@ -132,7 +133,7 @@ export const LedStripTest = () => {
   // Load available boards and listen for changes
   createEffect(() => {
     // Initial load
-    invoke<BoardInfo[]>('get_boards').then((boardList) => {
+    adaptiveApi.getBoards().then((boardList) => {
       setBoards(boardList);
       if (boardList.length > 0 && !selectedBoard()) {
         setSelectedBoard(boardList[0]);
@@ -142,8 +143,7 @@ export const LedStripTest = () => {
     });
 
     // Listen for board changes
-    const unlisten = listen<BoardInfo[]>('boards_changed', (event) => {
-      const boardList = event.payload;
+    const unlisten = adaptiveApi.onEvent<BoardInfo[]>('boards_changed', (boardList) => {
       setBoards(boardList);
 
       // If currently selected board is no longer available, select the first available one
@@ -178,7 +178,7 @@ export const LedStripTest = () => {
   onCleanup(() => {
     if (isRunning() && selectedBoard()) {
       // Stop the test effect in backend
-      invoke('stop_led_test_effect', {
+      adaptiveApi.stopLedTestEffect({
         boardAddress: `${selectedBoard()!.address}:${selectedBoard()!.port}`,
         ledCount: ledCount(),
         ledType: ledType()
@@ -242,7 +242,7 @@ export const LedStripTest = () => {
       };
 
       // Start the test effect in Rust backend
-      await invoke('start_led_test_effect', {
+      await adaptiveApi.startLedTestEffect({
         boardAddress: `${selectedBoard()!.address}:${selectedBoard()!.port}`,
         effectConfig: effectConfig,
         updateIntervalMs: animationSpeed()
@@ -264,7 +264,7 @@ export const LedStripTest = () => {
 
     try {
       // Stop the test effect in Rust backend
-      await invoke('stop_led_test_effect', {
+      await adaptiveApi.stopLedTestEffect({
         boardAddress: `${selectedBoard()!.address}:${selectedBoard()!.port}`,
         ledCount: ledCount(),
         ledType: ledType()
@@ -292,7 +292,7 @@ export const LedStripTest = () => {
       console.log('🚀 开始LED配置数据测试...');
 
       // 1. 启用测试模式
-      await invoke('enable_test_mode');
+      await adaptiveApi.enableTestMode();
       console.log('✅ 测试模式已启用');
 
       // 2. 生成模拟LED配置数据
@@ -307,7 +307,7 @@ export const LedStripTest = () => {
       try {
         console.log(`📤 发送到 ${boardAddress}...`);
 
-        await invoke('send_test_colors_to_board', {
+        await adaptiveApi.sendTestColorsToBoard({
           boardAddress: boardAddress,
           offset: 0,
           buffer: testData

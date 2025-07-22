@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { adaptiveApi } from './api-adapter';
 
 /**
  * Navigation service for handling page navigation via Tauri commands
@@ -11,7 +11,7 @@ export class NavigationService {
    */
   static async navigateToPage(page: string): Promise<void> {
     try {
-      await invoke('navigate_to_page', { page });
+      await adaptiveApi.navigateToPage(page);
       console.log(`Successfully navigated to page: ${page}`);
     } catch (error) {
       console.error(`Failed to navigate to page '${page}':`, error);
@@ -66,7 +66,7 @@ export class NavigationService {
    */
   static async navigateToDisplayConfig(displayId: string): Promise<void> {
     try {
-      await invoke('navigate_to_display_config', { displayId });
+      await adaptiveApi.navigateToDisplayConfig(displayId);
       console.log(`Successfully navigated to display config: ${displayId}`);
     } catch (error) {
       console.error(`Failed to navigate to display config '${displayId}':`, error);

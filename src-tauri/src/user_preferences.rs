@@ -146,7 +146,13 @@ impl UserPreferencesManager {
 
         // Update in-memory state
         let mut current_prefs = self.preferences.write().await;
-        *current_prefs = preferences;
+        *current_prefs = preferences.clone();
+
+        // 通过WebSocket广播用户偏好设置变化
+        crate::websocket_events::WebSocketEventPublisher::global()
+            .await
+            .publish_user_preferences_changed(&preferences)
+            .await;
 
         Ok(())
     }
