@@ -156,6 +156,14 @@ export class LedApiService {
  */
 export class ConfigApiService {
   /**
+   * 获取配置信息
+   * 替代: invoke('read_config')
+   */
+  static async getConfig(): Promise<any> {
+    return api.get('/api/v1/config/led-strips');
+  }
+
+  /**
    * 读取LED灯带配置
    * 替代: invoke('read_led_strip_configs')
    */
@@ -353,11 +361,4 @@ export class ConfigApiService {
     });
   }
 
-  /**
-   * 获取配置信息
-   * 替代: invoke('read_config')
-   */
-  static async getConfig(): Promise<any> {
-    return api.get('/api/v1/config');
-  }
 }
