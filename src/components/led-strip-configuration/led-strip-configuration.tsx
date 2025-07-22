@@ -1,11 +1,11 @@
 import { createEffect, onCleanup } from 'solid-js';
-import { invoke } from '@tauri-apps/api/core';
+import { adaptiveApi } from '../../services/api-adapter';
+import { WebSocketListener } from '../websocket-listener';
 import { DisplayView } from './display-view';
 import { DisplayListContainer } from './display-list-container';
 import { displayStore, setDisplayStore } from '../../stores/display.store';
 import { LedStripConfigContainer } from '../../models/led-strip-config';
 import { setLedStripStore } from '../../stores/led-strip.store';
-import { listen } from '@tauri-apps/api/event';
 import { LedStripPartsSorter } from './led-strip-parts-sorter';
 import { LedCountControlPanel } from './led-count-control-panel';
 import { createStore } from 'solid-js/store';
@@ -21,7 +21,7 @@ export const LedStripConfiguration = () => {
 
   console.log('🔧 LedStripConfiguration component loaded');
   createEffect(() => {
-    invoke<string>('list_display_info').then((displays) => {
+    adaptiveApi.listDisplayInfo().then((displays) => {
       const parsedDisplays = JSON.parse(displays);
       setDisplayStore({
         displays: parsedDisplays,
@@ -30,58 +30,38 @@ export const LedStripConfiguration = () => {
       console.error('Failed to load displays:', error);
     });
 
-    invoke<LedStripConfigContainer>('read_led_strip_configs').then((configs) => {
+    adaptiveApi.getConfig().then((configs) => {
       setLedStripStore(configs);
     }).catch((error) => {
       console.error('Failed to load LED strip configs:', error);
     });
   });
 
-  // listen to config_changed event
-  createEffect(() => {
-    const unlisten = listen('config_changed', (event) => {
-      const { strips } = event.payload as LedStripConfigContainer;
+  // WebSocket event handlers
+  const webSocketHandlers = {
+    config_changed: (data: any) => {
+      const { strips } = data as LedStripConfigContainer;
       setLedStripStore({
         strips,
       });
-    });
-
-    onCleanup(() => {
-      unlisten.then((unlisten) => unlisten());
-    });
-  });
-
-  // listen to led_colors_changed event
-  createEffect(() => {
-    const unlisten = listen<Uint8ClampedArray>('led_colors_changed', (event) => {
+    },
+    led_colors_changed: (data: any) => {
       if (!window.document.hidden) {
-        const colors = event.payload;
+        const colors = data as Uint8ClampedArray;
         setLedStripStore({
           colors,
         });
       }
-    });
-
-    onCleanup(() => {
-      unlisten.then((unlisten) => unlisten());
-    });
-  });
-
-  // listen to led_sorted_colors_changed event
-  createEffect(() => {
-    const unlisten = listen<Uint8ClampedArray>('led_sorted_colors_changed', (event) => {
+    },
+    led_sorted_colors_changed: (data: any) => {
       if (!window.document.hidden) {
-        const sortedColors = event.payload;
+        const sortedColors = data as Uint8ClampedArray;
         setLedStripStore({
           sortedColors,
         });
       }
-    });
-
-    onCleanup(() => {
-      unlisten.then((unlisten) => unlisten());
-    });
-  });
+    },
+  };
 
   const [ledStripConfiguration, setLedStripConfiguration] = createStore<
     LedStripConfigurationContextType[0]
@@ -108,6 +88,7 @@ export const LedStripConfiguration = () => {
 
   return (
     <div class="space-y-4">
+      <WebSocketListener handlers={webSocketHandlers} />
       <div class="flex items-center justify-between">
         <h1 class="text-xl font-bold text-base-content">{t('ledConfig.title')}</h1>
         <div class="stats shadow">

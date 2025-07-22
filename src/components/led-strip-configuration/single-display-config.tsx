@@ -2,7 +2,7 @@ import { Component, createSignal, createMemo, For, Show, onMount, createEffect, 
 import { useParams, useNavigate } from '@solidjs/router';
 import { useLanguage } from '../../i18n/index';
 import { LedColorService } from '../../services/led-color-service';
-import { invoke } from '@tauri-apps/api/core';
+import { adaptiveApi } from '../../services/api-adapter';
 
 // LED灯带配置类型
 interface LedStripConfig {
@@ -456,10 +456,12 @@ const LedConfigPanel: Component<{
                 updateStrip({ reverse: newReverseState });
                 try {
                   console.log(`Calling reverse_led_strip_part for display ${props.strip.displayId} and border ${props.strip.border}`);
-                  await invoke('reverse_led_strip_part', {
-                    displayId: props.strip.displayId,
-                    border: props.strip.border,
-                  });
+                  await adaptiveApi.reverseLedStripPart(
+                    props.strip.displayId,
+                    props.strip.border,
+                    0, // startIndex - 需要根据实际情况设置
+                    props.strip.count - 1 // endIndex
+                  );
                   console.log('Successfully called reverse_led_strip_part');
                 } catch (error) {
                   console.error('Failed to call reverse_led_strip_part:', error);
@@ -562,10 +564,9 @@ const LedConfigPanel: Component<{
 export function SingleDisplayConfig() {
   console.log('🎯 SingleDisplayConfig component is rendering');
 
-  // 立即通过Tauri报告组件渲染状态
-  invoke('report_current_page', {
-    pageInfo: '🎯 SingleDisplayConfig 组件开始渲染'
-  }).catch(e => console.error('Failed to report component render:', e));
+  // 立即通过API报告组件渲染状态
+  adaptiveApi.reportCurrentPage('🎯 SingleDisplayConfig 组件开始渲染')
+    .catch((e: any) => console.error('Failed to report component render:', e));
 
   const params = useParams();
   const navigate = useNavigate();
@@ -603,7 +604,7 @@ export function SingleDisplayConfig() {
       console.log('要保存的灯带:', stripsToSave);
 
       // 1. 读取完整的现有配置
-      const fullConfig = await invoke('read_led_strip_configs') as any;
+      const fullConfig = await adaptiveApi.readLedStripConfigs() as any;
       console.log('读取到的完整配置:', fullConfig);
 
       // 2. 移除当前显示器的旧配置
@@ -632,7 +633,7 @@ export function SingleDisplayConfig() {
       console.log('合并后的最终配置:', finalStrips);
 
       // 5. 保存完整的配置
-      await invoke('write_led_strip_configs', { configs: finalStrips });
+      await adaptiveApi.writeLedStripConfigs({ configs: finalStrips });
 
       console.log('✅ 成功保存完整LED灯带配置到后端');
     } catch (error) {
@@ -645,7 +646,7 @@ export function SingleDisplayConfig() {
   const startTestMode = async () => {
     try {
       console.log('Starting LED test mode...');
-      await invoke('enable_test_mode');
+      await adaptiveApi.enableTestMode();
       console.log('LED test mode enabled');
     } catch (error) {
       console.error('Failed to start test mode:', error);
@@ -656,7 +657,7 @@ export function SingleDisplayConfig() {
   const stopTestMode = async () => {
     try {
       console.log('Stopping LED test mode...');
-      await invoke('disable_test_mode');
+      await adaptiveApi.disableTestMode();
       console.log('LED test mode disabled, ambient light resumed');
     } catch (error) {
       console.error('Failed to stop test mode:', error);
@@ -677,7 +678,7 @@ export function SingleDisplayConfig() {
         console.log('显示器ID:', displayId());
 
         // 尝试从后端加载已保存的配置
-        const allConfigs = await invoke('read_led_strip_configs');
+        const allConfigs = await adaptiveApi.readLedStripConfigs();
 
         console.log('从后端加载的完整配置组:', allConfigs);
         console.log('配置组类型:', typeof allConfigs);
@@ -745,11 +746,9 @@ export function SingleDisplayConfig() {
     // 如果没有保存的配置或加载失败，创建测试配置
     console.log('Starting with test LED strip configuration');
 
-    // 通过Tauri命令报告状态，这样会显示在后端日志中
+    // 通过API命令报告状态，这样会显示在后端日志中
     try {
-      await invoke('report_current_page', {
-        pageInfo: '🔧 单屏配置页面：开始创建测试LED灯带配置'
-      });
+      await adaptiveApi.reportCurrentPage('🔧 单屏配置页面：开始创建测试LED灯带配置');
     } catch (e) {
       console.error('Failed to report page info:', e);
     }
@@ -809,11 +808,9 @@ export function SingleDisplayConfig() {
     setLedStrips(testStrips);
     setSelectedStrip(testStrips[0]);
 
-    // 通过Tauri命令报告状态
+    // 通过API命令报告状态
     try {
-      await invoke('report_current_page', {
-        pageInfo: `🔧 单屏配置页面：已设置${testStrips.length}个测试灯带，准备启动单屏配置模式`
-      });
+      await adaptiveApi.reportCurrentPage(`🔧 单屏配置页面：已设置${testStrips.length}个测试灯带，准备启动单屏配置模式`);
     } catch (e) {
       console.error('Failed to report page info:', e);
     }
@@ -823,17 +820,13 @@ export function SingleDisplayConfig() {
     setTimeout(async () => {
       try {
         console.log('⏰ 测试配置 setTimeout 回调执行');
-        await invoke('report_current_page', {
-          pageInfo: '🚀 单屏配置页面：开始启动后端单屏配置模式'
-        });
+        await adaptiveApi.reportCurrentPage('🚀 单屏配置页面：开始启动后端单屏配置模式');
         console.log('📞 准备调用 startSingleDisplayConfigMode（测试配置）');
         await startSingleDisplayConfigMode();
         console.log('✅ startSingleDisplayConfigMode 调用完成（测试配置）');
       } catch (e) {
         console.error('Failed to start single display config mode:', e);
-        await invoke('report_current_page', {
-          pageInfo: `❌ 单屏配置页面：启动失败 - ${e}`
-        });
+        await adaptiveApi.reportCurrentPage(`❌ 单屏配置页面：启动失败 - ${e}`);
       }
     }, 100);
   });
@@ -917,7 +910,7 @@ export function SingleDisplayConfig() {
       // 验证保存：立即读取配置确认保存成功
       console.log('=== 验证保存结果 ===');
       try {
-        const verifyAllConfigs = await invoke('read_led_strip_configs');
+        const verifyAllConfigs = await adaptiveApi.readLedStripConfigs();
         console.log('保存后立即读取的完整配置:', verifyAllConfigs);
 
         // 过滤当前显示器的配置
@@ -1003,28 +996,19 @@ export function SingleDisplayConfig() {
       console.log('灯带配置:', backendStrips);
       console.log('边框颜色:', borderColors);
 
-      // 通过Tauri报告详细信息
-      await invoke('report_current_page', {
-        pageInfo: `🚀 准备启动后端单屏配置模式，灯带数量: ${backendStrips.length}`
-      });
+      // 通过API报告详细信息
+      await adaptiveApi.reportCurrentPage(`🚀 准备启动后端单屏配置模式，灯带数量: ${backendStrips.length}`);
 
       // 报告每个灯带的详细信息
       for (let i = 0; i < backendStrips.length; i++) {
         const strip = backendStrips[i];
-        await invoke('report_current_page', {
-          pageInfo: `灯带${i}: index=${strip.index}, border=${strip.border}, display_id=${strip.display_id}, len=${strip.len}, led_type=${strip.led_type}`
-        });
+        await adaptiveApi.reportCurrentPage(`灯带${i}: index=${strip.index}, border=${strip.border}, display_id=${strip.display_id}, len=${strip.len}, led_type=${strip.led_type}`);
       }
 
-      await invoke('start_single_display_config_publisher', {
-        strips: backendStrips,
-        borderColors: borderColors
-      });
+      await adaptiveApi.startSingleDisplayConfigPublisher(backendStrips, borderColors);
 
       console.log('✅ 后端单屏配置模式已启动');
-      await invoke('report_current_page', {
-        pageInfo: '✅ 后端单屏配置模式启动成功'
-      });
+      await adaptiveApi.reportCurrentPage('✅ 后端单屏配置模式启动成功');
     } catch (error) {
       console.error('❌ 启动后端单屏配置模式失败:', error);
     }
@@ -1034,7 +1018,7 @@ export function SingleDisplayConfig() {
   const stopSingleDisplayConfigMode = async () => {
     try {
       console.log('=== 停止后端单屏配置模式 ===');
-      await invoke('stop_single_display_config_publisher');
+      await adaptiveApi.stopSingleDisplayConfigPublisher();
       console.log('✅ 后端单屏配置模式已停止');
     } catch (error) {
       console.error('❌ 停止后端单屏配置模式失败:', error);
@@ -1092,16 +1076,10 @@ export function SingleDisplayConfig() {
     try {
       if (strip) {
         console.log('设置活跃灯带用于呼吸效果:', strip.id, strip.border);
-        await invoke('set_active_strip_for_breathing', {
-          displayId: strip.displayId,
-          border: strip.border,
-        });
+        await adaptiveApi.setActiveStripForBreathing(strip.displayId, strip.border);
       } else {
         console.log('清除活跃灯带呼吸效果');
-        await invoke('set_active_strip_for_breathing', {
-          displayId: displayId(),
-          border: null,
-        });
+        await adaptiveApi.setActiveStripForBreathing(displayId(), null);
       }
     } catch (error) {
       console.error('设置活跃灯带失败:', error);

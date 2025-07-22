@@ -3,8 +3,7 @@
  * 自动检测运行环境并选择合适的API调用方式
  */
 
-import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
+// Tauri imports removed - using HTTP API only
 import { LedApiService, ConfigApiService } from './led-api.service';
 import { DisplayApiService, DeviceApiService, HealthApiService } from './display-api.service';
 import { InfoApiService } from './info-api.service';
@@ -104,29 +103,8 @@ export class ApiAdapter {
   ): Promise<T> {
     await this.initialize();
 
-    if (this.environmentInfo!.preferredMode === 'http' && this.environmentInfo!.isHttpApiAvailable) {
-      try {
-        return await httpApiCall();
-      } catch (error) {
-        console.warn(`HTTP API调用失败，尝试Tauri fallback:`, error);
-        if (this.environmentInfo!.isTauri) {
-          return await invoke<T>(tauriCommand, tauriArgs);
-        }
-        throw error;
-      }
-    } else if (this.environmentInfo!.isTauri) {
-      try {
-        return await invoke<T>(tauriCommand, tauriArgs);
-      } catch (error) {
-        console.warn(`Tauri调用失败，尝试HTTP API fallback:`, error);
-        if (this.environmentInfo!.isHttpApiAvailable) {
-          return await httpApiCall();
-        }
-        throw error;
-      }
-    } else {
-      throw new Error('没有可用的API调用方式');
-    }
+    // 直接使用 HTTP API
+    return await httpApiCall();
   }
 
   /**
@@ -138,20 +116,10 @@ export class ApiAdapter {
   ): Promise<() => void> {
     await this.initialize();
 
-    if (this.environmentInfo!.preferredMode === 'http' && this.environmentInfo!.isHttpApiAvailable) {
-      // 使用WebSocket事件
-      return api.onEvent(eventName, (message) => {
-        handler(message.data || message);
-      });
-    } else if (this.environmentInfo!.isTauri) {
-      // 使用Tauri事件
-      const unlisten = await listen<T>(eventName, (event) => {
-        handler(event.payload);
-      });
-      return unlisten;
-    } else {
-      throw new Error('没有可用的事件监听方式');
-    }
+    // 只使用WebSocket事件
+    return api.onEvent(eventName, (message: any) => {
+      handler(message.data || message);
+    });
   }
 
   /**
@@ -309,6 +277,160 @@ export class ApiAdapter {
     );
   }
 
+  public async patchLedStripLen(displayId: number, border: string, deltaLen: number): Promise<void> {
+    return this.call(
+      'patch_led_strip_len',
+      () => ConfigApiService.patchLedStripLen(displayId, border as any, deltaLen),
+      { displayId, border, deltaLen }
+    );
+  }
+
+  public async patchLedStripType(displayId: number, border: string, ledType: string): Promise<void> {
+    return this.call(
+      'patch_led_strip_type',
+      () => ConfigApiService.patchLedStripType(displayId, border as any, ledType as any),
+      { displayId, border, ledType }
+    );
+  }
+
+  public async moveStripPart(displayId: number, border: string, fromIndex: number, toIndex: number): Promise<void> {
+    return this.call(
+      'move_strip_part',
+      () => ConfigApiService.moveStripPart(displayId, border as any, fromIndex, toIndex),
+      { displayId, border, fromIndex, toIndex }
+    );
+  }
+
+  public async reverseLedStripPart(displayId: number, border: string, startIndex: number, endIndex: number): Promise<void> {
+    return this.call(
+      'reverse_led_strip_part',
+      () => ConfigApiService.reverseLedStripPart(displayId, border as any, startIndex, endIndex),
+      { displayId, border, startIndex, endIndex }
+    );
+  }
+
+  public async setColorCalibration(displayId: number, border: string, calibration: any): Promise<void> {
+    return this.call(
+      'set_color_calibration',
+      () => ConfigApiService.setColorCalibration(displayId, border as any, calibration),
+      { displayId, border, calibration }
+    );
+  }
+
+  public async startSingleDisplayConfigPublisher(strips: any[], borderColors: any): Promise<void> {
+    return this.call(
+      'start_single_display_config_publisher',
+      () => LedApiService.startSingleDisplayConfigPublisher(strips, borderColors),
+      { strips, borderColors }
+    );
+  }
+
+  public async stopSingleDisplayConfigPublisher(): Promise<void> {
+    return this.call(
+      'stop_single_display_config_publisher',
+      () => LedApiService.stopSingleDisplayConfigPublisher()
+    );
+  }
+
+  public async setActiveStripForBreathing(displayId: number, border: string | null): Promise<void> {
+    return this.call(
+      'set_active_strip_for_breathing',
+      () => LedApiService.setActiveStripForBreathing(displayId, border),
+      { displayId, border }
+    );
+  }
+
+  public async updateUserPreferences(preferences: any): Promise<void> {
+    return this.call(
+      'update_user_preferences',
+      () => ConfigApiService.updateUserPreferences(preferences),
+      { preferences }
+    );
+  }
+
+  public async updateWindowPreferences(windowPrefs: any): Promise<void> {
+    return this.call(
+      'update_window_preferences',
+      () => ConfigApiService.updateWindowPreferences(windowPrefs),
+      { windowPrefs }
+    );
+  }
+
+  public async updateUIPreferences(uiPrefs: any): Promise<void> {
+    return this.call(
+      'update_ui_preferences',
+      () => ConfigApiService.updateUIPreferences(uiPrefs),
+      { uiPrefs }
+    );
+  }
+
+  public async updateViewScale(scale: number): Promise<void> {
+    return this.call(
+      'update_view_scale',
+      () => ConfigApiService.updateViewScale(scale),
+      { scale }
+    );
+  }
+
+  public async updateTheme(theme: string): Promise<void> {
+    return this.call(
+      'update_theme',
+      () => ConfigApiService.updateTheme(theme),
+      { theme }
+    );
+  }
+
+  public async getTheme(): Promise<string> {
+    return this.call(
+      'get_theme',
+      () => ConfigApiService.getTheme()
+    );
+  }
+
+  public async updateNightModeThemeEnabled(enabled: boolean): Promise<void> {
+    return this.call(
+      'update_night_mode_theme_enabled',
+      () => ConfigApiService.updateNightModeThemeEnabled(enabled),
+      { enabled }
+    );
+  }
+
+  public async updateNightModeTheme(theme: string): Promise<void> {
+    return this.call(
+      'update_night_mode_theme',
+      () => ConfigApiService.updateNightModeTheme(theme),
+      { theme }
+    );
+  }
+
+  public async getUserPreferences(): Promise<any> {
+    return this.call(
+      'get_user_preferences',
+      () => ConfigApiService.getUserPreferences()
+    );
+  }
+
+  public async getNightModeThemeEnabled(): Promise<boolean> {
+    return this.call(
+      'get_night_mode_theme_enabled',
+      () => ConfigApiService.getNightModeThemeEnabled()
+    );
+  }
+
+  public async getNightModeTheme(): Promise<string> {
+    return this.call(
+      'get_night_mode_theme',
+      () => ConfigApiService.getNightModeTheme()
+    );
+  }
+
+  public async getCurrentLanguage(): Promise<string> {
+    return this.call(
+      'get_current_language',
+      () => ConfigApiService.getCurrentLanguage()
+    );
+  }
+
   // ===== 问候API（测试用） =====
 
   public async greet(name: string): Promise<string> {
@@ -341,11 +463,38 @@ export const adaptiveApi = {
   disableTestMode: () => apiAdapter.disableTestMode(),
   startLedTestEffect: (params: any) => apiAdapter.startLedTestEffect(params),
   stopLedTestEffect: (params: any) => apiAdapter.stopLedTestEffect(params),
+  startSingleDisplayConfigPublisher: (strips: any[], borderColors: any) =>
+    apiAdapter.startSingleDisplayConfigPublisher(strips, borderColors),
+  stopSingleDisplayConfigPublisher: () => apiAdapter.stopSingleDisplayConfigPublisher(),
+  setActiveStripForBreathing: (displayId: number, border: string | null) =>
+    apiAdapter.setActiveStripForBreathing(displayId, border),
   
   // 配置API
   readLedStripConfigs: () => apiAdapter.readLedStripConfigs(),
   writeLedStripConfigs: (configs: any) => apiAdapter.writeLedStripConfigs(configs),
   getConfig: () => apiAdapter.getConfig(),
+  patchLedStripLen: (displayId: number, border: string, deltaLen: number) =>
+    apiAdapter.patchLedStripLen(displayId, border, deltaLen),
+  patchLedStripType: (displayId: number, border: string, ledType: string) =>
+    apiAdapter.patchLedStripType(displayId, border, ledType),
+  moveStripPart: (displayId: number, border: string, fromIndex: number, toIndex: number) =>
+    apiAdapter.moveStripPart(displayId, border, fromIndex, toIndex),
+  reverseLedStripPart: (displayId: number, border: string, startIndex: number, endIndex: number) =>
+    apiAdapter.reverseLedStripPart(displayId, border, startIndex, endIndex),
+  setColorCalibration: (displayId: number, border: string, calibration: any) =>
+    apiAdapter.setColorCalibration(displayId, border, calibration),
+  updateUserPreferences: (preferences: any) => apiAdapter.updateUserPreferences(preferences),
+  updateWindowPreferences: (windowPrefs: any) => apiAdapter.updateWindowPreferences(windowPrefs),
+  updateUIPreferences: (uiPrefs: any) => apiAdapter.updateUIPreferences(uiPrefs),
+  updateViewScale: (scale: number) => apiAdapter.updateViewScale(scale),
+  updateTheme: (theme: string) => apiAdapter.updateTheme(theme),
+  getTheme: () => apiAdapter.getTheme(),
+  updateNightModeThemeEnabled: (enabled: boolean) => apiAdapter.updateNightModeThemeEnabled(enabled),
+  updateNightModeTheme: (theme: string) => apiAdapter.updateNightModeTheme(theme),
+  getUserPreferences: () => apiAdapter.getUserPreferences(),
+  getNightModeThemeEnabled: () => apiAdapter.getNightModeThemeEnabled(),
+  getNightModeTheme: () => apiAdapter.getNightModeTheme(),
+  getCurrentLanguage: () => apiAdapter.getCurrentLanguage(),
   
   // 显示器API
   listDisplayInfo: () => apiAdapter.listDisplayInfo(),

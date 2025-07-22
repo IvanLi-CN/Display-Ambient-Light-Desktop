@@ -1,8 +1,8 @@
 import { Component, For, createEffect, createSignal } from 'solid-js';
 import { BoardIndex } from './board-index';
-import { listen } from '@tauri-apps/api/event';
+import { WebSocketListener } from '../websocket-listener';
 import debug from 'debug';
-import { invoke } from '@tauri-apps/api/core';
+import { adaptiveApi } from '../../services/api-adapter';
 import { DisplayState, RawDisplayState } from '../../models/display-state.model';
 import { DisplayStateCard } from '../displays/display-state-card';
 import { useLanguage } from '../../i18n/index';
@@ -14,33 +14,33 @@ export const InfoIndex: Component = () => {
   const { t } = useLanguage();
 
   createEffect(() => {
-    const unlisten = listen<RawDisplayState[]>('displays_changed', (ev) => {
-      logger('displays_changed', ev);
-      setDisplayStates(
-        ev.payload.map((it) => ({
-          ...it,
-          last_modified_at: new Date(it.last_modified_at.secs_since_epoch * 1000),
-        })),
-      );
-    });
-
-    invoke<RawDisplayState[]>('get_displays').then((states) => {
+    adaptiveApi.getDisplays().then((states) => {
       logger('get_displays', states);
       setDisplayStates(
-        states.map((it) => ({
+        states.map((it: any) => ({
           ...it,
           last_modified_at: new Date(it.last_modified_at.secs_since_epoch * 1000),
         })),
       );
     });
-
-    return () => {
-      unlisten.then((unlisten) => unlisten());
-    };
   });
+
+  // WebSocket event handlers
+  const webSocketHandlers = {
+    displays_changed: (data: RawDisplayState[]) => {
+      logger('displays_changed', data);
+      setDisplayStates(
+        data.map((it) => ({
+          ...it,
+          last_modified_at: new Date(it.last_modified_at.secs_since_epoch * 1000),
+        })),
+      );
+    },
+  };
 
   return (
     <div class="space-y-8">
+      <WebSocketListener handlers={webSocketHandlers} />
       {/* 硬件设备信息部分 */}
       <BoardIndex />
 

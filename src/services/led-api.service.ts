@@ -69,27 +69,7 @@ export class LedApiService {
     return api.put('/api/v1/led/mode', { mode });
   }
 
-  /**
-   * 启动单屏配置发布器
-   * 替代: invoke('start_single_display_config_publisher', { strips, borderColors })
-   */
-  static async startSingleDisplayConfigPublisher(
-    strips: LedStripConfig[],
-    borderColors: BorderColors
-  ): Promise<void> {
-    return api.post('/api/v1/led/single-display-config', {
-      strips,
-      border_colors: borderColors
-    });
-  }
 
-  /**
-   * 停止单屏配置发布器
-   * 替代: invoke('stop_single_display_config_publisher')
-   */
-  static async stopSingleDisplayConfigPublisher(): Promise<void> {
-    return api.post('/api/v1/led/stop-single-display-config');
-  }
 
   /**
    * 启用测试模式
@@ -117,13 +97,7 @@ export class LedApiService {
 
 
 
-  /**
-   * 设置活跃灯带用于呼吸效果
-   * 替代: invoke('set_active_strip_for_breathing', { stripIndex })
-   */
-  static async setActiveStripForBreathing(stripIndex: number): Promise<void> {
-    return api.post('/api/v1/led/breathing-strip', { strip_index: stripIndex });
-  }
+
 
   /**
    * 测试单屏配置模式
@@ -153,6 +127,27 @@ export class LedApiService {
    */
   static async stopLedTestEffect(params: any): Promise<void> {
     await api.post('/api/v1/led/stop-test-effect', params);
+  }
+
+  /**
+   * 启动单屏配置发布器
+   */
+  static async startSingleDisplayConfigPublisher(strips: any[], borderColors: any): Promise<void> {
+    await api.post('/api/v1/led/start-single-display-config', { strips, border_colors: borderColors });
+  }
+
+  /**
+   * 停止单屏配置发布器
+   */
+  static async stopSingleDisplayConfigPublisher(): Promise<void> {
+    await api.post('/api/v1/led/stop-single-display-config');
+  }
+
+  /**
+   * 设置活跃灯带用于呼吸效果
+   */
+  static async setActiveStripForBreathing(displayId: number, border: string | null): Promise<void> {
+    await api.post('/api/v1/led/set-active-strip-breathing', { display_id: displayId, border });
   }
 }
 
@@ -208,13 +203,7 @@ export class ConfigApiService {
     });
   }
 
-  /**
-   * 获取用户偏好设置
-   * 替代: invoke('read_config')
-   */
-  static async getUserPreferences(): Promise<any> {
-    return api.get('/api/v1/config/user-preferences');
-  }
+
 
   /**
    * 更新主题
@@ -222,6 +211,94 @@ export class ConfigApiService {
    */
   static async updateTheme(theme: string): Promise<void> {
     return api.put('/api/v1/config/theme', { theme });
+  }
+
+  /**
+   * 获取主题
+   * 替代: invoke('get_theme')
+   */
+  static async getTheme(): Promise<string> {
+    return api.get('/api/v1/config/theme');
+  }
+
+  /**
+   * 更新用户偏好设置
+   * 替代: invoke('update_user_preferences', { preferences })
+   */
+  static async updateUserPreferences(preferences: any): Promise<void> {
+    return api.put('/api/v1/config/user-preferences', preferences);
+  }
+
+  /**
+   * 更新窗口偏好设置
+   * 替代: invoke('update_window_preferences', { windowPrefs })
+   */
+  static async updateWindowPreferences(windowPrefs: any): Promise<void> {
+    return api.put('/api/v1/config/window-preferences', windowPrefs);
+  }
+
+  /**
+   * 更新UI偏好设置
+   * 替代: invoke('update_ui_preferences', { uiPrefs })
+   */
+  static async updateUIPreferences(uiPrefs: any): Promise<void> {
+    return api.put('/api/v1/config/ui-preferences', uiPrefs);
+  }
+
+  /**
+   * 更新视图缩放
+   * 替代: invoke('update_view_scale', { scale })
+   */
+  static async updateViewScale(scale: number): Promise<void> {
+    return api.put('/api/v1/config/view-scale', { scale });
+  }
+
+  /**
+   * 更新夜间模式主题启用状态
+   * 替代: invoke('update_night_mode_theme_enabled', { enabled })
+   */
+  static async updateNightModeThemeEnabled(enabled: boolean): Promise<void> {
+    return api.put('/api/v1/config/night-mode-theme-enabled', { enabled });
+  }
+
+  /**
+   * 更新夜间模式主题
+   * 替代: invoke('update_night_mode_theme', { theme })
+   */
+  static async updateNightModeTheme(theme: string): Promise<void> {
+    return api.put('/api/v1/config/night-mode-theme', { theme });
+  }
+
+  /**
+   * 获取用户偏好设置
+   * 替代: invoke('get_user_preferences')
+   */
+  static async getUserPreferences(): Promise<any> {
+    return api.get('/api/v1/config/user-preferences');
+  }
+
+  /**
+   * 获取夜间模式主题启用状态
+   * 替代: invoke('get_night_mode_theme_enabled')
+   */
+  static async getNightModeThemeEnabled(): Promise<boolean> {
+    return api.get('/api/v1/config/night-mode-theme-enabled');
+  }
+
+  /**
+   * 获取夜间模式主题
+   * 替代: invoke('get_night_mode_theme')
+   */
+  static async getNightModeTheme(): Promise<string> {
+    return api.get('/api/v1/config/night-mode-theme');
+  }
+
+  /**
+   * 获取当前语言
+   * 替代: invoke('get_current_language')
+   */
+  static async getCurrentLanguage(): Promise<string> {
+    return api.get('/api/v1/config/current-language');
   }
 
   /**

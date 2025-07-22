@@ -1,8 +1,8 @@
 import { Component, For, createEffect, createSignal } from 'solid-js';
 import { BoardInfo } from '../../models/board-info.model';
-import { listen } from '@tauri-apps/api/event';
+import { WebSocketListener } from '../websocket-listener';
 import debug from 'debug';
-import { invoke } from '@tauri-apps/api/core';
+import { adaptiveApi } from '../../services/api-adapter';
 import { BoardInfoPanel } from './board-info-panel';
 import { useLanguage } from '../../i18n/index';
 
@@ -13,22 +13,22 @@ export const BoardIndex: Component = () => {
   const { t } = useLanguage();
 
   createEffect(() => {
-    const unlisten = listen<BoardInfo[]>('boards_changed', (ev) => {
-      logger('boards_changed', ev);
-      setBoards(ev.payload);
-    });
-
-    invoke<BoardInfo[]>('get_boards').then((boards) => {
+    adaptiveApi.getBoards().then((boards) => {
       logger('get_boards', boards);
       setBoards(boards);
     });
-
-    return () => {
-      unlisten.then((unlisten) => unlisten());
-    };
   });
+
+  // WebSocket event handlers
+  const webSocketHandlers = {
+    boards_changed: (data: BoardInfo[]) => {
+      logger('boards_changed', data);
+      setBoards(data);
+    },
+  };
   return (
     <div class="space-y-6">
+      <WebSocketListener handlers={webSocketHandlers} />
       <div class="flex items-center justify-between">
         <h1 class="text-2xl font-bold text-base-content">{t('info.boardInfo')}</h1>
         <div class="stats shadow">

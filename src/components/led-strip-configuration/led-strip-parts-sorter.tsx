@@ -16,7 +16,7 @@ import {
 } from 'solid-js';
 import { LedStripConfig } from '../../models/led-strip-config';
 import { ledStripStore } from '../../stores/led-strip.store';
-import { invoke } from '@tauri-apps/api/core';
+import { adaptiveApi } from '../../services/api-adapter';
 import { LedStripConfigurationContext } from '../../contexts/led-strip-configuration.context';
 import background from '../../assets/transparent-grid-background.svg?url';
 
@@ -48,11 +48,12 @@ const SorterItem: Component<{ strip: LedStripConfig; stripIndex: number }> = (
     if (targetStart === currentStart) {
       return;
     }
-    invoke('move_strip_part', {
-      displayId: props.strip.display_id,
-      border: props.strip.border,
-      targetStart,
-    }).catch((err) => console.error(err));
+    adaptiveApi.moveStripPart(
+      props.strip.display_id,
+      props.strip.border,
+      currentStart,
+      targetStart
+    ).catch((err) => console.error(err));
   };
 
   // reset translateX on config updated
@@ -153,10 +154,12 @@ const SorterItem: Component<{ strip: LedStripConfig; stripIndex: number }> = (
   });
 
   const reverse = () => {
-    invoke('reverse_led_strip_part', {
-      displayId: props.strip.display_id,
-      border: props.strip.border,
-    }).catch((err) => console.error(err));
+    adaptiveApi.reverseLedStripPart(
+      props.strip.display_id,
+      props.strip.border,
+      0, // startIndex - 整个灯带的开始
+      props.strip.len - 1 // endIndex - 整个灯带的结束
+    ).catch((err) => console.error(err));
   };
 
   const onMouseEnter = () => {

@@ -1,5 +1,5 @@
 import { createSignal } from 'solid-js';
-import { invoke } from '@tauri-apps/api/core';
+import { adaptiveApi } from '../services/api-adapter';
 
 // TypeScript interfaces matching Rust structs
 export interface UserPreferences {
@@ -47,7 +47,7 @@ const [isLoading, setIsLoading] = createSignal(false);
 const loadPreferences = async () => {
   try {
     setIsLoading(true);
-    const preferences = await invoke<UserPreferences>('get_user_preferences');
+    const preferences = await adaptiveApi.getUserPreferences();
     setUserPreferences(preferences);
     console.log('User preferences loaded:', preferences);
   } catch (error) {
@@ -62,7 +62,7 @@ const loadPreferences = async () => {
 // Save preferences to backend
 const savePreferences = async (preferences: UserPreferences) => {
   try {
-    await invoke('update_user_preferences', { preferences });
+    await adaptiveApi.updateUserPreferences(preferences);
     setUserPreferences(preferences);
     console.log('User preferences saved:', preferences);
   } catch (error) {
@@ -74,7 +74,7 @@ const savePreferences = async (preferences: UserPreferences) => {
 // Update specific preference sections
 const updateWindowPreferences = async (windowPrefs: WindowPreferences) => {
   try {
-    await invoke('update_window_preferences', { windowPrefs });
+    await adaptiveApi.updateWindowPreferences(windowPrefs);
     setUserPreferences(prev => ({
       ...prev,
       window: windowPrefs,
@@ -87,7 +87,7 @@ const updateWindowPreferences = async (windowPrefs: WindowPreferences) => {
 
 const updateUIPreferences = async (uiPrefs: UIPreferences) => {
   try {
-    await invoke('update_ui_preferences', { uiPrefs });
+    await adaptiveApi.updateUIPreferences(uiPrefs);
     setUserPreferences(prev => ({
       ...prev,
       ui: uiPrefs,
@@ -103,7 +103,7 @@ const updateUIPreferences = async (uiPrefs: UIPreferences) => {
 // Convenience functions for common updates
 const updateViewScale = async (scale: number) => {
   try {
-    await invoke('update_view_scale', { scale });
+    await adaptiveApi.updateViewScale(scale);
     setUserPreferences(prev => ({
       ...prev,
       ui: {
@@ -119,7 +119,7 @@ const updateViewScale = async (scale: number) => {
 
 const updateTheme = async (theme: string) => {
   try {
-    await invoke('update_theme', { theme });
+    await adaptiveApi.updateTheme(theme);
     setUserPreferences(prev => ({
       ...prev,
       ui: {
@@ -135,7 +135,7 @@ const updateTheme = async (theme: string) => {
 
 const getTheme = async (): Promise<string> => {
   try {
-    return await invoke<string>('get_theme');
+    return await adaptiveApi.getTheme();
   } catch (error) {
     console.error('Failed to get theme:', error);
     return 'dark'; // fallback
@@ -144,7 +144,7 @@ const getTheme = async (): Promise<string> => {
 
 const updateNightModeThemeEnabled = async (enabled: boolean) => {
   try {
-    await invoke('update_night_mode_theme_enabled', { enabled });
+    await adaptiveApi.updateNightModeThemeEnabled(enabled);
     setUserPreferences(prev => ({
       ...prev,
       ui: {
@@ -160,7 +160,7 @@ const updateNightModeThemeEnabled = async (enabled: boolean) => {
 
 const updateNightModeTheme = async (theme: string) => {
   try {
-    await invoke('update_night_mode_theme', { theme });
+    await adaptiveApi.updateNightModeTheme(theme);
     setUserPreferences(prev => ({
       ...prev,
       ui: {
@@ -176,7 +176,7 @@ const updateNightModeTheme = async (theme: string) => {
 
 const getNightModeThemeEnabled = async (): Promise<boolean> => {
   try {
-    return await invoke<boolean>('get_night_mode_theme_enabled');
+    return await adaptiveApi.getNightModeThemeEnabled();
   } catch (error) {
     console.error('Failed to get night mode theme enabled:', error);
     return false; // fallback
@@ -185,7 +185,7 @@ const getNightModeThemeEnabled = async (): Promise<boolean> => {
 
 const getNightModeTheme = async (): Promise<string> => {
   try {
-    return await invoke<string>('get_night_mode_theme');
+    return await adaptiveApi.getNightModeTheme();
   } catch (error) {
     console.error('Failed to get night mode theme:', error);
     return 'dark'; // fallback

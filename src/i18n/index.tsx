@@ -2,7 +2,7 @@ import { createSignal, createContext, useContext, ParentComponent, createEffect 
 import { Language, TranslationDict } from './types';
 import { zhCN } from './locales/zh-CN';
 import { enUS } from './locales/en-US';
-import { invoke } from '@tauri-apps/api/core';
+import { adaptiveApi } from '../services/api-adapter';
 
 // Available translations
 const translations: Record<Language, TranslationDict> = {
@@ -43,7 +43,7 @@ export const LanguageProvider: ParentComponent = (props) => {
   // Load saved language preference from backend on startup
   createEffect(async () => {
     try {
-      const backendLang = await invoke<string>('get_current_language');
+      const backendLang = await adaptiveApi.getCurrentLanguage();
       if (backendLang && (backendLang === 'zh-CN' || backendLang === 'en-US')) {
         setLocale(backendLang as Language);
       }

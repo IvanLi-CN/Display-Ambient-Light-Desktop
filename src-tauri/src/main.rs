@@ -18,14 +18,10 @@ mod user_preferences;
 mod volume;
 mod websocket_events;
 
-use ambient_light::{Border, ColorCalibration, LedStripConfig, LedStripConfigGroup, LedType};
-use display::{DisplayManager, DisplayState};
+use display::DisplayManager;
 use display_info::DisplayInfo;
-use led_data_sender::{DataSendMode, LedDataSender};
-use led_test_effects::{LedTestEffects, TestEffectConfig};
 use paris::{error, info, warn};
-use rpc::{BoardInfo, UdpRpc};
-use screenshot::Screenshot;
+use rpc::UdpRpc;
 use screenshot_manager::ScreenshotManager;
 use tauri::{
     http::{Request, Response},
@@ -33,7 +29,7 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Emitter, Manager, Runtime,
 };
-use user_preferences::{UIPreferences, UserPreferences, UserPreferencesManager, WindowPreferences};
+use user_preferences::UserPreferencesManager;
 
 use serde::{Deserialize, Serialize};
 use serde_json::to_string;
@@ -71,11 +67,7 @@ fn _default_cg_display() -> core_graphics::display::CGDisplay {
 #[derive(Serialize)]
 struct DisplayInfoWrapper<'a>(#[serde(with = "DisplayInfoDef")] &'a DisplayInfo);
 
-// Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {name}! You've been greeted from Rust!")
-}
+// Tauri commands removed - using HTTP API only
 
 #[derive(Serialize)]
 struct AppVersion {
@@ -83,729 +75,7 @@ struct AppVersion {
     is_dev: bool,
 }
 
-#[tauri::command]
-fn get_app_version() -> AppVersion {
-    let version = env!("CARGO_PKG_VERSION").to_string();
-    let is_dev = cfg!(debug_assertions) && std::env::var("HIDE_DEV_MARKER").is_err();
-
-    AppVersion { version, is_dev }
-}
-
-#[tauri::command]
-fn list_display_info() -> Result<String, String> {
-    let displays = display_info::DisplayInfo::all().map_err(|e| {
-        error!("can not list display info: {}", e);
-        e.to_string()
-    })?;
-    let displays: Vec<DisplayInfoWrapper> = displays.iter().map(DisplayInfoWrapper).collect();
-    let json_str = to_string(&displays).map_err(|e| {
-        error!("can not list display info: {}", e);
-        e.to_string()
-    })?;
-    Ok(json_str)
-}
-
-#[tauri::command]
-async fn read_led_strip_configs() -> Result<LedStripConfigGroup, String> {
-    let config_manager = ambient_light::ConfigManager::global().await;
-    let config = config_manager.configs().await;
-    Ok(config)
-}
-
-#[tauri::command]
-async fn write_led_strip_configs(
-    configs: Vec<ambient_light::LedStripConfig>,
-) -> Result<(), String> {
-    let config_manager = ambient_light::ConfigManager::global().await;
-
-    config_manager.set_items(configs).await.map_err(|e| {
-        error!("can not write led strip configs: {}", e);
-        e.to_string()
-    })
-}
-
-#[tauri::command]
-async fn get_led_strips_sample_points(
-    config: LedStripConfig,
-) -> Result<Vec<screenshot::LedSamplePoints>, String> {
-    let screenshot_manager = ScreenshotManager::global().await;
-    let channels = screenshot_manager.channels.read().await;
-    if let Some(rx) = channels.get(&config.display_id) {
-        let rx = rx.read().await;
-        let screenshot = rx.borrow().clone();
-        let sample_points = screenshot.get_sample_points(&config);
-        Ok(sample_points)
-    } else {
-        Err(format!("display not found: {}", config.display_id))
-    }
-}
-
-#[tauri::command]
-async fn get_one_edge_colors(
-    display_id: u32,
-    sample_points: Vec<screenshot::LedSamplePoints>,
-) -> Result<Vec<led_color::LedColor>, String> {
-    let screenshot_manager = ScreenshotManager::global().await;
-    let channels = screenshot_manager.channels.read().await;
-    if let Some(rx) = channels.get(&display_id) {
-        let rx = rx.read().await;
-        let screenshot = rx.borrow().clone();
-        let bytes = screenshot.bytes.read().await.to_owned();
-        let colors =
-            Screenshot::get_one_edge_colors(&sample_points, &bytes, screenshot.bytes_per_row);
-        Ok(colors)
-    } else {
-        Err(format!("display not found: {display_id}"))
-    }
-}
-
-#[tauri::command]
-async fn get_colors_by_led_configs(
-    display_id: u32,
-    led_configs: Vec<ambient_light::LedStripConfig>,
-) -> Result<Vec<Vec<led_color::LedColor>>, String> {
-    let screenshot_manager = ScreenshotManager::global().await;
-    let channels = screenshot_manager.channels.read().await;
-    if let Some(rx) = channels.get(&display_id) {
-        let rx = rx.read().await;
-        let screenshot = rx.borrow().clone();
-        let colors = screenshot.get_colors_by_led_configs(&led_configs).await;
-        Ok(colors)
-    } else {
-        Err(format!("display not found: {display_id}"))
-    }
-}
-
-#[tauri::command]
-async fn patch_led_strip_len(display_id: u32, border: Border, delta_len: i8) -> Result<(), String> {
-    info!(
-        "patch_led_strip_len: {} {:?} {}",
-        display_id, border, delta_len
-    );
-    let config_manager = ambient_light::ConfigManager::global().await;
-    config_manager
-        .patch_led_strip_len(display_id, border, delta_len)
-        .await
-        .map_err(|e| {
-            error!("can not patch led strip len: {}", e);
-            e.to_string()
-        })?;
-
-    info!("patch_led_strip_len: ok");
-    Ok(())
-}
-
-#[tauri::command]
-async fn patch_led_strip_type(
-    display_id: u32,
-    border: Border,
-    led_type: LedType,
-) -> Result<(), String> {
-    let config_manager = ambient_light::ConfigManager::global().await;
-    config_manager
-        .patch_led_strip_type(display_id, border, led_type)
-        .await
-        .map_err(|e| {
-            error!("can not patch led strip type: {}", e);
-            e.to_string()
-        })?;
-
-    Ok(())
-}
-
-#[tauri::command]
-async fn send_colors(offset: u16, buffer: Vec<u8>) -> Result<(), String> {
-    ambient_light::LedColorsPublisher::send_colors(offset, buffer)
-        .await
-        .map_err(|e| {
-            error!("can not send colors: {}", e);
-            e.to_string()
-        })
-}
-
-#[tauri::command]
-async fn start_single_display_config_publisher(
-    strips: Vec<ambient_light::LedStripConfig>,
-    border_colors: ambient_light::BorderColors,
-) -> Result<(), String> {
-    log::info!("🎯 Tauri命令被调用: start_single_display_config_publisher");
-    log::info!("   - 灯带数量: {}", strips.len());
-    log::info!("   - 边框颜色: {:?}", border_colors);
-    let publisher = ambient_light::LedColorsPublisher::global().await;
-    publisher
-        .start_single_display_config_mode(strips, border_colors)
-        .await
-        .map_err(|e| {
-            error!("Failed to start single display config publisher: {}", e);
-            e.to_string()
-        })
-}
-
-#[tauri::command]
-async fn stop_single_display_config_publisher() -> Result<(), String> {
-    log::info!("🛑 Tauri命令被调用: stop_single_display_config_publisher");
-    let publisher = ambient_light::LedColorsPublisher::global().await;
-    publisher
-        .stop_single_display_config_mode()
-        .await
-        .map_err(|e| {
-            error!("Failed to stop single display config publisher: {}", e);
-            e.to_string()
-        })
-}
-
-#[tauri::command]
-async fn set_active_strip_for_breathing(
-    display_id: u32,
-    border: Option<String>,
-) -> Result<(), String> {
-    log::info!("🫁 Tauri命令被调用: set_active_strip_for_breathing");
-    log::info!("   - 显示器ID: {}", display_id);
-    log::info!("   - 边框: {:?}", border);
-
-    let publisher = ambient_light::LedColorsPublisher::global().await;
-    publisher
-        .set_active_strip_for_breathing(display_id, border)
-        .await
-        .map_err(|e| {
-            error!("Failed to set active strip for breathing: {}", e);
-            e.to_string()
-        })
-}
-
-#[tauri::command]
-async fn test_single_display_config_mode() -> Result<(), String> {
-    log::info!("🧪 测试命令被调用: test_single_display_config_mode");
-
-    // 读取用户的实际LED灯带配置
-    let config_manager = ambient_light::ConfigManager::global().await;
-    let config_group = config_manager.configs().await;
-
-    if config_group.strips.is_empty() {
-        return Err("没有找到LED灯带配置，请先配置LED灯带".to_string());
-    }
-
-    log::info!("📋 读取到用户配置: {} 个灯带", config_group.strips.len());
-    for strip in &config_group.strips {
-        log::info!(
-            "  - 灯带{}: {:?}边, {}个LED, 类型{:?}",
-            strip.index,
-            strip.border,
-            strip.len,
-            strip.led_type
-        );
-    }
-
-    let test_strips = config_group.strips;
-
-    // 定义边框颜色 - 使用ColorPreview组件中的正确颜色（HSV色环45度间隔）
-    let border_colors = ambient_light::BorderColors {
-        top: [[0, 255, 255], [0, 0, 255]],     // 青色 (180°) + 蓝色 (225°)
-        bottom: [[255, 0, 0], [255, 128, 0]],  // 红色 (0°) + 橙色 (45°)
-        left: [[128, 0, 255], [255, 0, 128]],  // 紫色 (270°) + 玫红色 (315°)
-        right: [[255, 255, 0], [128, 255, 0]], // 黄色 (90°) + 黄绿色 (135°)
-    };
-
-    log::info!("🔧 启动测试单屏配置模式");
-    log::info!("   - 测试灯带数量: {}", test_strips.len());
-    log::info!("   - 边框颜色: {:?}", border_colors);
-
-    let publisher = ambient_light::LedColorsPublisher::global().await;
-    publisher
-        .start_single_display_config_mode(test_strips, border_colors)
-        .await
-        .map_err(|e| {
-            log::error!("❌ 启动测试单屏配置模式失败: {}", e);
-            e.to_string()
-        })
-}
-
-#[tauri::command]
-async fn send_test_colors_to_board(
-    board_address: String, // Use the board address parameter
-    offset: u16,
-    buffer: Vec<u8>,
-) -> Result<(), String> {
-    // Set data send mode to StripConfig for single strip configuration testing
-    let sender = LedDataSender::global().await;
-    sender.set_mode(DataSendMode::StripConfig).await;
-
-    // Set the target address for strip config mode
-    sender.set_test_target(Some(board_address.clone())).await;
-    info!("Set strip config target address to: {}", board_address);
-
-    // Send the data through unified sender using the new complete data interface
-    info!(
-        "🚀 About to call send_complete_led_data with offset={}, buffer_len={}, source=StripConfig",
-        offset,
-        buffer.len()
-    );
-    sender
-        .send_complete_led_data(offset, buffer.clone(), "StripConfig")
-        .await
-        .map_err(|e| {
-            error!("Failed to send strip config colors: {}", e);
-            e.to_string()
-        })?;
-    info!("✅ send_complete_led_data call completed successfully");
-
-    info!(
-        "Sent strip config colors with offset {} and {} bytes to {}",
-        offset,
-        buffer.len(),
-        board_address
-    );
-    Ok(())
-}
-
-#[tauri::command]
-async fn enable_test_mode() -> Result<(), String> {
-    let publisher = ambient_light::LedColorsPublisher::global().await;
-    publisher.enable_test_mode().await;
-    Ok(())
-}
-
-#[tauri::command]
-async fn disable_test_mode() -> Result<(), String> {
-    info!("🔄 disable_test_mode command called from frontend");
-    let publisher = ambient_light::LedColorsPublisher::global().await;
-    publisher.disable_test_mode().await;
-    info!("✅ disable_test_mode command completed");
-    Ok(())
-}
-
-#[tauri::command]
-async fn is_test_mode_active() -> Result<bool, String> {
-    let publisher = ambient_light::LedColorsPublisher::global().await;
-    Ok(publisher.is_test_mode_active().await)
-}
-
-#[tauri::command]
-async fn start_led_test_effect(
-    board_address: String,
-    effect_config: TestEffectConfig,
-    update_interval_ms: u64,
-) -> Result<(), String> {
-    use tokio::time::{interval, Duration};
-
-    // Enable test mode first
-    let publisher = ambient_light::LedColorsPublisher::global().await;
-    publisher.enable_test_mode().await;
-
-    // Set data send mode to TestEffect and set target address
-    let sender = LedDataSender::global().await;
-    sender.set_mode(DataSendMode::TestEffect).await;
-    sender.set_test_target(Some(board_address.clone())).await;
-
-    let handle_storage = EFFECT_HANDLE
-        .get_or_init(|| async { Arc::new(RwLock::new(None)) })
-        .await;
-
-    let cancel_storage = CANCEL_TOKEN
-        .get_or_init(|| async { Arc::new(RwLock::new(None)) })
-        .await;
-
-    // Stop any existing effect
-    {
-        let mut cancel_guard = cancel_storage.write().await;
-        if let Some(token) = cancel_guard.take() {
-            token.cancel();
-        }
-
-        let mut handle_guard = handle_storage.write().await;
-        if let Some(handle) = handle_guard.take() {
-            let _ = handle.await; // Wait for graceful shutdown
-        }
-    }
-
-    // Start new effect
-    let effect_config = Arc::new(effect_config);
-    let _board_address = Arc::new(board_address);
-    let start_time = std::time::Instant::now();
-
-    // Create new cancellation token
-    let cancel_token = tokio_util::sync::CancellationToken::new();
-    let cancel_token_clone = cancel_token.clone();
-
-    let handle = tokio::spawn(async move {
-        let mut interval = interval(Duration::from_millis(update_interval_ms));
-
-        loop {
-            tokio::select! {
-                _ = interval.tick() => {
-                    let elapsed_ms = start_time.elapsed().as_millis() as u64;
-                    let colors = LedTestEffects::generate_colors(&effect_config, elapsed_ms);
-
-                    // Calculate byte offset for 0x02 packet
-                    let byte_offset = LedTestEffects::calculate_byte_offset(&effect_config);
-
-                    // Send to board with calculated offset using the new complete data interface
-                    let sender = LedDataSender::global().await;
-                    if let Err(e) = sender.send_complete_led_data(byte_offset, colors, "TestEffect").await {
-                        error!("Failed to send test effect colors: {}", e);
-                        // Don't break the loop, just log the error
-                    }
-                }
-                _ = cancel_token_clone.cancelled() => {
-                    info!("LED test effect cancelled gracefully");
-                    break;
-                }
-            }
-        }
-        info!("LED test effect task ended");
-    });
-
-    // Store the handle and cancel token
-    {
-        let mut handle_guard = handle_storage.write().await;
-        *handle_guard = Some(handle);
-
-        let mut cancel_guard = cancel_storage.write().await;
-        *cancel_guard = Some(cancel_token);
-    }
-
-    Ok(())
-}
-
-#[tauri::command]
-async fn stop_led_test_effect(
-    board_address: String,
-    led_count: u32,
-    led_type: led_test_effects::LedType,
-) -> Result<(), String> {
-    // Stop the effect task first
-
-    info!("🛑 Stopping LED test effect - board: {}", board_address);
-
-    // Cancel the task gracefully first
-    if let Some(cancel_storage) = CANCEL_TOKEN.get() {
-        let mut cancel_guard = cancel_storage.write().await;
-        if let Some(token) = cancel_guard.take() {
-            info!("🔄 Cancelling test effect task gracefully");
-            token.cancel();
-        }
-    }
-
-    // Wait for the task to finish
-    if let Some(handle_storage) = EFFECT_HANDLE.get() {
-        let mut handle_guard = handle_storage.write().await;
-        if let Some(handle) = handle_guard.take() {
-            info!("⏳ Waiting for test effect task to finish");
-            match handle.await {
-                Ok(_) => info!("✅ Test effect task finished successfully"),
-                Err(e) => warn!("⚠️ Test effect task finished with error: {}", e),
-            }
-        }
-    }
-
-    // Turn off all LEDs
-    let bytes_per_led = match led_type {
-        led_test_effects::LedType::WS2812B => 3,
-        led_test_effects::LedType::SK6812 => 4,
-    };
-    let buffer = vec![0u8; (led_count * bytes_per_led) as usize];
-
-    // Use force_send_packet to ensure the off command is sent regardless of mode
-    let sender = LedDataSender::global().await;
-    let packet = led_data_sender::LedDataPacket::new(0, buffer, "StopEffect".to_string());
-    if let Err(e) = sender.force_send_packet(packet).await {
-        error!("Failed to send LED off command: {}", e);
-    }
-
-    info!("💡 Sent LED off command");
-
-    // Disable test mode and clear test target to resume normal publishing
-    let publisher = ambient_light::LedColorsPublisher::global().await;
-    publisher.disable_test_mode().await;
-    sender.set_test_target(None).await;
-
-    info!("🔄 Test mode disabled, normal publishing resumed");
-    info!("✅ LED test effect stopped completely");
-
-    Ok(())
-}
-
-#[tauri::command]
-async fn move_strip_part(
-    display_id: u32,
-    border: Border,
-    target_start: usize,
-) -> Result<(), String> {
-    let config_manager = ambient_light::ConfigManager::global().await;
-    config_manager
-        .move_strip_part(display_id, border, target_start)
-        .await
-        .map_err(|e| {
-            error!("can not move strip part: {}", e);
-            e.to_string()
-        })
-}
-
-#[tauri::command]
-async fn reverse_led_strip_part(display_id: u32, border: Border) -> Result<(), String> {
-    let config_manager = ambient_light::ConfigManager::global().await;
-    config_manager
-        .reverse_led_strip_part(display_id, border)
-        .await
-        .map_err(|e| {
-            error!("can not reverse led strip part: {}", e);
-            e.to_string()
-        })
-}
-
-#[tauri::command]
-async fn set_color_calibration(calibration: ColorCalibration) -> Result<(), String> {
-    let config_manager = ambient_light::ConfigManager::global().await;
-    config_manager
-        .set_color_calibration(calibration)
-        .await
-        .map_err(|e| {
-            error!("can not set color calibration: {}", e);
-            e.to_string()
-        })
-}
-
-#[tauri::command]
-async fn read_config() -> ambient_light::LedStripConfigGroup {
-    let config_manager = ambient_light::ConfigManager::global().await;
-    config_manager.configs().await
-}
-
-#[tauri::command]
-async fn get_boards() -> Result<Vec<BoardInfo>, String> {
-    let udp_rpc = UdpRpc::global().await;
-
-    if let Err(e) = udp_rpc {
-        return Err(format!("can not ping: {e}"));
-    }
-
-    let udp_rpc = udp_rpc.as_ref().unwrap();
-
-    let boards = udp_rpc.get_boards().await;
-    let boards = boards.into_iter().collect::<Vec<_>>();
-    Ok(boards)
-}
-
-#[tauri::command]
-async fn get_displays() -> Vec<DisplayState> {
-    let display_manager = DisplayManager::global().await;
-
-    display_manager.get_displays().await
-}
-
-#[tauri::command]
-fn is_auto_start_enabled() -> Result<bool, String> {
-    auto_start::AutoStartManager::is_enabled().map_err(|e| {
-        error!("Failed to check auto start status: {}", e);
-        e.to_string()
-    })
-}
-
-#[tauri::command]
-fn set_auto_start_enabled(enabled: bool) -> Result<(), String> {
-    auto_start::AutoStartManager::set_enabled(enabled).map_err(|e| {
-        error!("Failed to set auto start: {}", e);
-        e.to_string()
-    })
-}
-
-#[tauri::command]
-fn get_auto_start_config() -> Result<auto_start::AutoStartConfig, String> {
-    auto_start::AutoStartManager::get_config().map_err(|e| {
-        error!("Failed to get auto start config: {}", e);
-        e.to_string()
-    })
-}
-
-#[tauri::command]
-async fn is_ambient_light_enabled() -> Result<bool, String> {
-    let state_manager = ambient_light_state::AmbientLightStateManager::global().await;
-    Ok(state_manager.is_enabled().await)
-}
-
-#[tauri::command]
-async fn set_ambient_light_enabled(enabled: bool) -> Result<(), String> {
-    let state_manager = ambient_light_state::AmbientLightStateManager::global().await;
-    state_manager.set_enabled(enabled).await.map_err(|e| {
-        error!("Failed to set ambient light state: {}", e);
-        e.to_string()
-    })
-}
-
-#[tauri::command]
-async fn toggle_ambient_light() -> Result<bool, String> {
-    let state_manager = ambient_light_state::AmbientLightStateManager::global().await;
-    state_manager.toggle().await.map_err(|e| {
-        error!("Failed to toggle ambient light state: {}", e);
-        e.to_string()
-    })
-}
-
-#[tauri::command]
-async fn get_ambient_light_state() -> Result<ambient_light_state::AmbientLightState, String> {
-    let state_manager = ambient_light_state::AmbientLightStateManager::global().await;
-    Ok(state_manager.get_state().await)
-}
-
-#[tauri::command]
-async fn get_led_data_send_mode() -> Result<DataSendMode, String> {
-    let sender = LedDataSender::global().await;
-    Ok(sender.get_mode().await)
-}
-
-#[tauri::command]
-async fn set_led_data_send_mode(mode: DataSendMode) -> Result<(), String> {
-    let sender = LedDataSender::global().await;
-    sender.set_mode(mode).await;
-    info!("LED data send mode set to: {}", mode);
-    Ok(())
-}
-
-#[tauri::command]
-async fn test_led_data_sender() -> Result<String, String> {
-    let sender = LedDataSender::global().await;
-
-    // Test mode switching
-    sender.set_mode(DataSendMode::None).await;
-    let stats1 = sender.get_stats().await;
-
-    sender.set_mode(DataSendMode::AmbientLight).await;
-    let stats2 = sender.get_stats().await;
-
-    sender.set_mode(DataSendMode::TestEffect).await;
-    let stats3 = sender.get_stats().await;
-
-    let result = format!(
-        "LED Data Sender Test Results:\n1. {}\n2. {}\n3. {}",
-        stats1, stats2, stats3
-    );
-
-    info!("{}", result);
-    Ok(result)
-}
-
-#[tauri::command]
-async fn get_current_language() -> Result<String, String> {
-    let language_manager = language_manager::LanguageManager::global().await;
-    Ok(language_manager.get_language().await)
-}
-
-#[tauri::command]
-async fn set_current_language(language: String) -> Result<(), String> {
-    let language_manager = language_manager::LanguageManager::global().await;
-    language_manager.set_language(language).await.map_err(|e| {
-        error!("Failed to set language: {}", e);
-        e.to_string()
-    })
-}
-
-#[tauri::command]
-async fn get_user_preferences() -> Result<UserPreferences, String> {
-    let preferences_manager = UserPreferencesManager::global().await;
-    Ok(preferences_manager.get_preferences().await)
-}
-
-#[tauri::command]
-async fn update_user_preferences(preferences: UserPreferences) -> Result<(), String> {
-    let preferences_manager = UserPreferencesManager::global().await;
-    preferences_manager
-        .update_preferences(preferences)
-        .await
-        .map_err(|e| {
-            error!("Failed to update user preferences: {}", e);
-            e.to_string()
-        })
-}
-
-#[tauri::command]
-async fn update_window_preferences(window_prefs: WindowPreferences) -> Result<(), String> {
-    let preferences_manager = UserPreferencesManager::global().await;
-    preferences_manager
-        .update_window_preferences(window_prefs)
-        .await
-        .map_err(|e| {
-            error!("Failed to update window preferences: {}", e);
-            e.to_string()
-        })
-}
-
-#[tauri::command]
-async fn update_ui_preferences(ui_prefs: UIPreferences) -> Result<(), String> {
-    let preferences_manager = UserPreferencesManager::global().await;
-    preferences_manager
-        .update_ui_preferences(ui_prefs)
-        .await
-        .map_err(|e| {
-            error!("Failed to update UI preferences: {}", e);
-            e.to_string()
-        })
-}
-
 // Removed update_display_preferences - feature not implemented
-
-#[tauri::command]
-async fn update_view_scale(scale: f64) -> Result<(), String> {
-    let preferences_manager = UserPreferencesManager::global().await;
-    preferences_manager
-        .update_view_scale(scale)
-        .await
-        .map_err(|e| {
-            error!("Failed to update view scale: {}", e);
-            e.to_string()
-        })
-}
-
-#[tauri::command]
-async fn update_theme(theme: String) -> Result<(), String> {
-    let preferences_manager = UserPreferencesManager::global().await;
-    preferences_manager.update_theme(theme).await.map_err(|e| {
-        error!("Failed to update theme: {}", e);
-        e.to_string()
-    })
-}
-
-#[tauri::command]
-async fn get_theme() -> Result<String, String> {
-    let preferences_manager = UserPreferencesManager::global().await;
-    let preferences = preferences_manager.get_preferences().await;
-    Ok(preferences.ui.theme)
-}
-
-#[tauri::command]
-async fn update_night_mode_theme_enabled(enabled: bool) -> Result<(), String> {
-    let preferences_manager = UserPreferencesManager::global().await;
-    preferences_manager
-        .update_night_mode_theme_enabled(enabled)
-        .await
-        .map_err(|e| {
-            error!("Failed to update night mode theme enabled: {}", e);
-            e.to_string()
-        })
-}
-
-#[tauri::command]
-async fn update_night_mode_theme(theme: String) -> Result<(), String> {
-    let preferences_manager = UserPreferencesManager::global().await;
-    preferences_manager
-        .update_night_mode_theme(theme)
-        .await
-        .map_err(|e| {
-            error!("Failed to update night mode theme: {}", e);
-            e.to_string()
-        })
-}
-
-#[tauri::command]
-async fn get_night_mode_theme_enabled() -> Result<bool, String> {
-    let preferences_manager = UserPreferencesManager::global().await;
-    Ok(preferences_manager.get_night_mode_theme_enabled().await)
-}
-
-#[tauri::command]
-async fn get_night_mode_theme() -> Result<String, String> {
-    let preferences_manager = UserPreferencesManager::global().await;
-    Ok(preferences_manager.get_night_mode_theme().await)
-}
 
 // Removed update_last_visited_page - feature not implemented
 
@@ -835,149 +105,6 @@ async fn update_tray_menu_internal<R: Runtime>(app_handle: &tauri::AppHandle<R>)
     } else {
         error!("Failed to create new tray menu");
     }
-}
-
-#[tauri::command]
-async fn update_tray_menu(app_handle: tauri::AppHandle) -> Result<(), String> {
-    update_tray_menu_internal(&app_handle).await;
-    Ok(())
-}
-
-#[tauri::command]
-async fn test_tray_visibility(app_handle: tauri::AppHandle) -> Result<String, String> {
-    if let Some(_tray) = app_handle.tray_by_id("main") {
-        Ok("Tray icon exists and is accessible".to_string())
-    } else {
-        Err("Tray icon not found".to_string())
-    }
-}
-
-#[tauri::command]
-async fn get_app_version_string() -> Result<String, String> {
-    Ok(env!("CARGO_PKG_VERSION").to_string())
-}
-
-#[tauri::command]
-async fn open_external_url(url: String, app_handle: tauri::AppHandle) -> Result<(), String> {
-    use tauri_plugin_opener::OpenerExt;
-
-    // Validate URL to prevent security issues
-    if !url.starts_with("http://") && !url.starts_with("https://") {
-        return Err("Invalid URL scheme".to_string());
-    }
-
-    // Use opener plugin to open URL
-    app_handle
-        .opener()
-        .open_url(url, None::<String>)
-        .map_err(|e| format!("Failed to open URL: {}", e))
-}
-
-#[tauri::command]
-async fn navigate_to_page(page: String, app_handle: tauri::AppHandle) -> Result<(), String> {
-    info!("Navigation command received for page: {}", page);
-
-    if let Some(window) = app_handle.get_webview_window("main") {
-        let route = match page.as_str() {
-            "info" => "/info",
-            "led-strips-configuration" | "led-config" => "/led-strips-configuration",
-            "white-balance" => "/white-balance",
-            "led-strip-test" | "led-test" => "/led-strip-test",
-            "led-data-sender-test" | "data-sender-test" => "/led-data-sender-test",
-            "settings" => "/settings",
-            _ => {
-                // Check if it's a display-specific page like "led-config-display-3"
-                if page.starts_with("led-config-display-") {
-                    let display_id = &page["led-config-display-".len()..];
-                    return navigate_to_display_config(display_id.to_string(), app_handle).await;
-                }
-                return Err(format!("Unknown page: {}", page));
-            }
-        };
-
-        let _ = window.show();
-        let _ = window.set_focus();
-
-        // Add a longer delay to ensure the window is ready
-        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-
-        // Use Tauri event system for more reliable navigation
-        let _ = window.emit("navigate", route);
-        info!("Navigation event emitted: {}", route);
-
-        Ok(())
-    } else {
-        Err("Main window not found".to_string())
-    }
-}
-
-#[tauri::command]
-async fn navigate_to_display_config(
-    display_id: String,
-    app_handle: tauri::AppHandle,
-) -> Result<(), String> {
-    info!(
-        "Navigation command received for display config: {}",
-        display_id
-    );
-
-    if let Some(window) = app_handle.get_webview_window("main") {
-        let route = format!("/led-strips-configuration/display/{}", display_id);
-
-        let _ = window.show();
-        let _ = window.set_focus();
-
-        // Add a longer delay to ensure the window is ready
-        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-
-        // Use Tauri event system for more reliable navigation
-        let _ = window.emit("navigate", &route);
-        info!("Display config navigation event emitted: {}", route);
-
-        Ok(())
-    } else {
-        Err("Main window not found".to_string())
-    }
-}
-
-#[tauri::command]
-async fn report_current_page(page_info: String) -> Result<(), String> {
-    info!("🔍 Frontend page report: {}", page_info);
-    Ok(())
-}
-
-#[tauri::command]
-async fn show_about_window<R: tauri::Runtime>(
-    app_handle: tauri::AppHandle<R>,
-) -> Result<(), String> {
-    use tauri::WebviewWindowBuilder;
-
-    // Check if about window already exists
-    if let Some(window) = app_handle.get_webview_window("about") {
-        let _ = window.show();
-        let _ = window.set_focus();
-        return Ok(());
-    }
-
-    // Create new about window
-    let about_window = WebviewWindowBuilder::new(
-        &app_handle,
-        "about",
-        tauri::WebviewUrl::App("about.html".into()),
-    )
-    .title("关于环境光控制")
-    .inner_size(420.0, 450.0)
-    .min_inner_size(400.0, 430.0)
-    .max_inner_size(450.0, 480.0)
-    .resizable(false)
-    .center()
-    .build()
-    .map_err(|e| format!("Failed to create about window: {e}"))?;
-
-    let _ = about_window.show();
-    let _ = about_window.set_focus();
-
-    Ok(())
 }
 
 async fn create_tray_menu<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<Menu<R>> {
@@ -1068,11 +195,11 @@ async fn create_tray_menu<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Resul
 async fn handle_menu_event<R: Runtime>(app: &tauri::AppHandle<R>, event: tauri::menu::MenuEvent) {
     match event.id().as_ref() {
         "toggle_ambient_light" => {
-            if let Ok(new_state) = toggle_ambient_light().await {
+            let state_manager = ambient_light_state::AmbientLightStateManager::global().await;
+            if let Ok(new_state) = state_manager.toggle().await {
                 info!("Ambient light toggled to: {}", new_state);
 
                 // Emit event to notify frontend of state change
-                let state_manager = ambient_light_state::AmbientLightStateManager::global().await;
                 let current_state = state_manager.get_state().await;
                 app.emit("ambient_light_state_changed", current_state)
                     .unwrap();
@@ -1124,9 +251,12 @@ async fn handle_menu_event<R: Runtime>(app: &tauri::AppHandle<R>, event: tauri::
             }
         }
         "show_about" => {
-            if let Err(e) = show_about_window(app.clone()).await {
-                error!("Failed to show about window: {}", e);
-            }
+            // 简单的关于对话框
+            info!(
+                "About: Ambient Light Control v{}",
+                env!("CARGO_PKG_VERSION")
+            );
+            // 可以在这里添加更复杂的关于窗口逻辑
         }
         "show_window" => {
             if let Some(window) = app.get_webview_window("main") {
@@ -1507,66 +637,7 @@ async fn main() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_deep_link::init())
-        .invoke_handler(tauri::generate_handler![
-            greet,
-            get_app_version,
-            list_display_info,
-            read_led_strip_configs,
-            write_led_strip_configs,
-            get_led_strips_sample_points,
-            get_one_edge_colors,
-            get_colors_by_led_configs,
-            patch_led_strip_len,
-            patch_led_strip_type,
-            send_colors,
-            send_test_colors_to_board,
-            start_single_display_config_publisher,
-            stop_single_display_config_publisher,
-            set_active_strip_for_breathing,
-            test_single_display_config_mode,
-            enable_test_mode,
-            disable_test_mode,
-            is_test_mode_active,
-            start_led_test_effect,
-            stop_led_test_effect,
-            move_strip_part,
-            reverse_led_strip_part,
-            set_color_calibration,
-            read_config,
-            get_boards,
-            get_displays,
-            is_auto_start_enabled,
-            set_auto_start_enabled,
-            get_auto_start_config,
-            is_ambient_light_enabled,
-            set_ambient_light_enabled,
-            toggle_ambient_light,
-            get_ambient_light_state,
-            get_led_data_send_mode,
-            set_led_data_send_mode,
-            test_led_data_sender,
-            get_current_language,
-            set_current_language,
-            get_user_preferences,
-            update_user_preferences,
-            update_window_preferences,
-            update_ui_preferences,
-            update_view_scale,
-            update_theme,
-            get_theme,
-            update_night_mode_theme_enabled,
-            update_night_mode_theme,
-            get_night_mode_theme_enabled,
-            get_night_mode_theme,
-            update_tray_menu,
-            test_tray_visibility,
-            get_app_version_string,
-            open_external_url,
-            navigate_to_page,
-            navigate_to_display_config,
-            report_current_page,
-            show_about_window
-        ])
+        // Tauri invoke handlers removed - using HTTP API only
         .register_uri_scheme_protocol("ambient-light", handle_ambient_light_protocol)
         .on_menu_event(|app, event| {
             let app_handle = app.clone();
@@ -1587,8 +658,22 @@ async fn main() {
                             info!("Navigating to page: {}", page);
                             let app_handle_clone = app_handle.clone();
                             tauri::async_runtime::spawn(async move {
-                                if let Err(e) = navigate_to_page(page, app_handle_clone).await {
-                                    error!("Failed to navigate via deep link: {}", e);
+                                // 简单的导航实现
+                                info!("Deep link navigation to page: {}", page);
+                                if let Some(window) = app_handle_clone.get_webview_window("main") {
+                                    let route = match page.as_str() {
+                                        "led-strips-configuration" => "/led-strips-configuration",
+                                        "info" => "/info",
+                                        "settings" => "/settings",
+                                        _ => "/",
+                                    };
+                                    if let Err(e) =
+                                        window.eval(&format!("window.location.hash = '{}'", route))
+                                    {
+                                        error!("Failed to navigate via deep link: {}", e);
+                                    }
+                                } else {
+                                    error!("Main window not found for deep link navigation");
                                 }
                             });
                         }
@@ -1823,26 +908,25 @@ async fn main() {
                     tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
 
                     info!("Starting navigation to page: {}", page);
-                    if let Err(e) = navigate_to_page(page.clone(), app_handle).await {
-                        error!("Failed to navigate to page '{}': {}", page, e);
+                    // 简单的导航实现
+                    if let Some(window) = app_handle.get_webview_window("main") {
+                        let route = match page.as_str() {
+                            "led-strips-configuration" => "/led-strips-configuration",
+                            "info" => "/info",
+                            "settings" => "/settings",
+                            _ => "/",
+                        };
+                        if let Err(e) = window.eval(&format!("window.location.hash = '{}'", route))
+                        {
+                            error!("Failed to navigate to page '{}': {}", page, e);
+                        }
+                    } else {
+                        error!("Main window not found for navigation to page '{}'", page);
                     }
                 });
             }
 
-            // If test mode is requested, run the test
-            if test_single_display_config {
-                let _app_handle = app.handle().clone();
-                tauri::async_runtime::spawn(async move {
-                    info!("🧪 Starting single display config test mode...");
-                    // Wait a bit for the app to fully initialize
-                    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-
-                    match test_single_display_config_mode().await {
-                        Ok(_) => info!("✅ Single display config test completed successfully"),
-                        Err(e) => error!("❌ Single display config test failed: {}", e),
-                    }
-                });
-            }
+            // Test mode removed - functionality moved to HTTP API
 
             Ok(())
         })

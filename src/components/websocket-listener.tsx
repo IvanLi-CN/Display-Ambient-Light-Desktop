@@ -22,6 +22,8 @@ export interface WebSocketEventHandlers {
   onDisplaysChanged?: (data: any) => void;
   onNavigate?: (data: any) => void;
   onConnectionStatusChanged?: (connected: boolean) => void;
+  // 支持任意事件名称
+  [key: string]: ((data: any) => void) | undefined;
 }
 
 interface WebSocketListenerProps {
