@@ -17,7 +17,7 @@ export class InfoApiService {
    * 报告当前页面信息
    */
   static async reportCurrentPage(pageInfo: string): Promise<void> {
-    await api.post('/api/v1/info/current-page', { pageInfo });
+    await api.post('/api/v1/info/current-page', { page_info: pageInfo });
   }
 
   /**
@@ -31,7 +31,7 @@ export class InfoApiService {
    * 导航到显示器配置页面
    */
   static async navigateToDisplayConfig(displayId: string): Promise<void> {
-    await api.post('/api/v1/info/navigate-display-config', { displayId });
+    await api.post('/api/v1/info/navigate-display-config', { display_id: displayId });
   }
 
   /**
