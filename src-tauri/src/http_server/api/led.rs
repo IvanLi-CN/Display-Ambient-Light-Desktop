@@ -361,12 +361,32 @@ pub async fn start_led_test_effect(
         request.board_address
     );
 
-    // TODO: 实现LED测试效果启动逻辑
-    // 这里应该启动一个后台任务来生成和发送LED测试效果数据
+    // 解析效果配置
+    let config: crate::led_test_effects::TestEffectConfig =
+        serde_json::from_value(request.effect_config).map_err(|e| {
+            log::error!("Failed to parse effect config: {}", e);
+            StatusCode::BAD_REQUEST
+        })?;
 
-    Ok(Json(ApiResponse::success(
-        "LED test effect started successfully".to_string(),
-    )))
+    // 获取测试效果管理器并启动效果
+    let manager = crate::led_test_effects::LedTestEffectManager::global().await;
+    match manager
+        .start_test_effect(
+            request.board_address.clone(),
+            config,
+            request.update_interval_ms,
+        )
+        .await
+    {
+        Ok(()) => Ok(Json(ApiResponse::success(format!(
+            "LED test effect started successfully for board: {}",
+            request.board_address
+        )))),
+        Err(e) => {
+            log::error!("Failed to start LED test effect: {}", e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
 }
 
 /// 停止LED测试效果
@@ -388,12 +408,18 @@ pub async fn stop_led_test_effect(
         request.board_address
     );
 
-    // TODO: 实现LED测试效果停止逻辑
-    // 这里应该停止相应的后台任务
-
-    Ok(Json(ApiResponse::success(
-        "LED test effect stopped successfully".to_string(),
-    )))
+    // 获取测试效果管理器并停止效果
+    let manager = crate::led_test_effects::LedTestEffectManager::global().await;
+    match manager.stop_test_effect(&request.board_address).await {
+        Ok(()) => Ok(Json(ApiResponse::success(format!(
+            "LED test effect stopped successfully for board: {}",
+            request.board_address
+        )))),
+        Err(e) => {
+            log::error!("Failed to stop LED test effect: {}", e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
 }
 
 /// 测试单屏配置模式

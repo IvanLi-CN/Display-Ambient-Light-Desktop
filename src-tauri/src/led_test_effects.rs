@@ -1,5 +1,10 @@
+use crate::led_data_sender::LedDataSender;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::f64::consts::PI;
+use std::sync::Arc;
+use tokio::sync::{OnceCell, RwLock};
+use tokio::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TestEffectType {
@@ -22,6 +27,222 @@ pub struct TestEffectConfig {
 pub enum LedType {
     WS2812B,
     SK6812,
+}
+
+/// LED测试效果任务信息
+#[derive(Debug, Clone)]
+pub struct TestEffectTask {
+    pub board_address: String,
+    pub config: TestEffectConfig,
+    pub update_interval_ms: u32,
+    pub start_time: Instant,
+}
+
+/// LED测试效果管理器
+pub struct LedTestEffectManager {
+    /// 活跃的测试效果任务
+    active_tasks: Arc<RwLock<HashMap<String, TestEffectTask>>>,
+}
+
+impl LedTestEffectManager {
+    /// 创建新的测试效果管理器
+    pub fn new() -> Self {
+        Self {
+            active_tasks: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// 获取全局单例实例
+    pub async fn global() -> &'static LedTestEffectManager {
+        static INSTANCE: OnceCell<LedTestEffectManager> = OnceCell::const_new();
+        INSTANCE
+            .get_or_init(|| async { LedTestEffectManager::new() })
+            .await
+    }
+
+    /// 启动LED测试效果
+    pub async fn start_test_effect(
+        &self,
+        board_address: String,
+        config: TestEffectConfig,
+        update_interval_ms: u32,
+    ) -> anyhow::Result<()> {
+        log::info!(
+            "🚀 Starting LED test effect for board: {}, effect: {:?}",
+            board_address,
+            config.effect_type
+        );
+
+        // 如果已有相同设备的任务在运行，先停止它
+        self.stop_test_effect(&board_address).await?;
+
+        // 创建新任务
+        let task = TestEffectTask {
+            board_address: board_address.clone(),
+            config: config.clone(),
+            update_interval_ms,
+            start_time: Instant::now(),
+        };
+
+        // 添加到活跃任务列表
+        {
+            let mut tasks = self.active_tasks.write().await;
+            tasks.insert(board_address.clone(), task);
+        }
+
+        // 启动后台任务
+        let manager = self.clone();
+        let task_board_address = board_address.clone();
+        tokio::spawn(async move {
+            if let Err(e) = manager.run_test_effect_loop(task_board_address).await {
+                log::error!("❌ Test effect loop failed: {}", e);
+            }
+        });
+
+        log::info!("✅ LED test effect started for board: {}", board_address);
+        Ok(())
+    }
+
+    /// 停止LED测试效果
+    pub async fn stop_test_effect(&self, board_address: &str) -> anyhow::Result<()> {
+        log::info!("🛑 Stopping LED test effect for board: {}", board_address);
+
+        let mut tasks = self.active_tasks.write().await;
+        if let Some(_task) = tasks.remove(board_address) {
+            log::info!("✅ LED test effect stopped for board: {}", board_address);
+
+            // 发送全黑数据来清除LED
+            self.send_clear_data(board_address, &_task.config).await?;
+        } else {
+            log::warn!(
+                "⚠️ No active test effect found for board: {}",
+                board_address
+            );
+        }
+
+        Ok(())
+    }
+
+    /// 停止所有测试效果
+    pub async fn stop_all_test_effects(&self) -> anyhow::Result<()> {
+        log::info!("🛑 Stopping all LED test effects");
+
+        let board_addresses: Vec<String> = {
+            let tasks = self.active_tasks.read().await;
+            tasks.keys().cloned().collect()
+        };
+
+        for board_address in board_addresses {
+            self.stop_test_effect(&board_address).await?;
+        }
+
+        log::info!("✅ All LED test effects stopped");
+        Ok(())
+    }
+
+    /// 获取活跃任务列表
+    pub async fn get_active_tasks(&self) -> Vec<String> {
+        let tasks = self.active_tasks.read().await;
+        tasks.keys().cloned().collect()
+    }
+
+    /// 运行测试效果循环
+    async fn run_test_effect_loop(&self, board_address: String) -> anyhow::Result<()> {
+        log::info!("🔄 Starting test effect loop for board: {}", board_address);
+
+        loop {
+            // 检查任务是否还存在
+            let task = {
+                let tasks = self.active_tasks.read().await;
+                tasks.get(&board_address).cloned()
+            };
+
+            let task = match task {
+                Some(task) => task,
+                None => {
+                    log::info!("🏁 Test effect task removed for board: {}", board_address);
+                    break;
+                }
+            };
+
+            // 计算当前时间
+            let elapsed_ms = task.start_time.elapsed().as_millis() as u64;
+
+            // 生成LED颜色数据
+            let colors = LedTestEffects::generate_colors(&task.config, elapsed_ms);
+
+            // 计算字节偏移量
+            let byte_offset = LedTestEffects::calculate_byte_offset(&task.config);
+
+            // 发送数据到硬件
+            if let Err(e) = self
+                .send_test_data(&board_address, byte_offset, colors)
+                .await
+            {
+                log::error!("❌ Failed to send test data to {}: {}", board_address, e);
+                // 继续运行，不因为单次发送失败而停止
+            }
+
+            // 等待下一次更新
+            tokio::time::sleep(Duration::from_millis(task.update_interval_ms as u64)).await;
+        }
+
+        log::info!("✅ Test effect loop ended for board: {}", board_address);
+        Ok(())
+    }
+
+    /// 发送测试数据到硬件
+    async fn send_test_data(
+        &self,
+        board_address: &str,
+        offset: u16,
+        data: Vec<u8>,
+    ) -> anyhow::Result<()> {
+        let sender = LedDataSender::global().await;
+
+        // 设置为测试效果模式
+        sender
+            .set_mode(crate::led_data_sender::DataSendMode::TestEffect)
+            .await;
+
+        // 设置目标设备
+        sender
+            .set_test_target(Some(board_address.to_string()))
+            .await;
+
+        // 发送数据
+        sender
+            .send_complete_led_data(offset, data, "TestEffect")
+            .await?;
+
+        Ok(())
+    }
+
+    /// 发送清除数据（全黑）
+    async fn send_clear_data(
+        &self,
+        board_address: &str,
+        config: &TestEffectConfig,
+    ) -> anyhow::Result<()> {
+        let bytes_per_led = if LedTestEffects::is_rgbw_type(&config.led_type) {
+            4
+        } else {
+            3
+        };
+        let clear_data = vec![0u8; (config.led_count * bytes_per_led) as usize];
+        let byte_offset = LedTestEffects::calculate_byte_offset(config);
+
+        self.send_test_data(board_address, byte_offset, clear_data)
+            .await
+    }
+}
+
+impl Clone for LedTestEffectManager {
+    fn clone(&self) -> Self {
+        Self {
+            active_tasks: self.active_tasks.clone(),
+        }
+    }
 }
 
 pub struct LedTestEffects;
