@@ -575,6 +575,8 @@ async fn main() {
         host: "127.0.0.1".to_string(),
         port: 3030,
         enable_cors: true,
+        serve_static_files: false,
+        static_files_path: None,
     };
 
     // 在后台启动HTTP服务器
@@ -680,9 +682,10 @@ async fn main() {
     // 如果是浏览器模式，启动后端服务（不启动GUI）
     if browser_mode {
         info!("🌐 Running in browser mode - Backend only");
-        info!("📡 HTTP API server: http://127.0.0.1:3030");
+        info!("� HTTP API server: http://127.0.0.1:3030");
         info!("🔌 WebSocket server: ws://127.0.0.1:8765");
-        info!("🌐 Web interface available at: http://127.0.0.1:1420");
+        info!("🌐 Web interface: Start frontend dev server with 'npm run dev'");
+        info!("� Then access http://localhost:1420 in your browser");
         info!("💡 Press Ctrl+C to stop the server");
 
         // 启动WebSocket服务器

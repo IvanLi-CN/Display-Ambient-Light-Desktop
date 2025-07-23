@@ -1,6 +1,7 @@
 use axum::{http::Method, routing::get, Router};
 use serde::Serialize;
 use tower_http::cors::{Any, CorsLayer};
+use tower_http::services::ServeDir;
 use utoipa::{OpenApi, ToSchema};
 use utoipa_swagger_ui::SwaggerUi;
 
@@ -13,6 +14,8 @@ pub struct ServerConfig {
     pub host: String,
     pub port: u16,
     pub enable_cors: bool,
+    pub serve_static_files: bool,
+    pub static_files_path: Option<String>,
 }
 
 impl Default for ServerConfig {
@@ -21,6 +24,8 @@ impl Default for ServerConfig {
             host: "127.0.0.1".to_string(),
             port: 3030,
             enable_cors: true,
+            serve_static_files: false,
+            static_files_path: None,
         }
     }
 }
@@ -170,7 +175,7 @@ pub async fn create_server(config: ServerConfig) -> Result<Router, anyhow::Error
     };
 
     // 创建路由
-    let app = Router::new()
+    let mut app = Router::new()
         // 健康检查
         .route("/health", get(api::health::health_check))
         // API v1 路由
@@ -178,7 +183,17 @@ pub async fn create_server(config: ServerConfig) -> Result<Router, anyhow::Error
         // WebSocket路由
         .route("/ws", get(websocket::websocket_handler))
         // Swagger UI
-        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()));
+
+    // 如果启用静态文件服务，添加静态文件路由
+    if config.serve_static_files {
+        if let Some(static_path) = &config.static_files_path {
+            log::info!("📁 Serving static files from: {}", static_path);
+            app = app.fallback_service(ServeDir::new(static_path));
+        }
+    }
+
+    let app = app
         // 中间件
         .layer(tower_http::trace::TraceLayer::new_for_http())
         .layer(cors)

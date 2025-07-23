@@ -52,8 +52,9 @@ tauri-plugin-opener = "2.4.0"
 # HTTP Server dependencies
 axum = { version = "0.7", features = ["ws", "macros"] }
 tower = { version = "0.4" }
-tower-http = { version = "0.5", features = ["cors", "trace"] }
+tower-http = { version = "0.5", features = ["cors", "trace", "fs"] }
 hyper = { version = "1.0", features = ["full"] }
+hyper-util = { version = "0.1", features = ["full"] }
 
 # API Documentation
 utoipa = { version = "4.0", features = ["axum_extras"] }
