@@ -175,8 +175,8 @@ export class ConfigApiService {
    * 写入LED灯带配置
    * 替代: invoke('write_led_strip_configs', { configs })
    */
-  static async writeLedStripConfigs(configs: any): Promise<void> {
-    return api.post('/api/v1/config/led-strips', configs);
+  static async writeLedStripConfigs(configGroup: any): Promise<void> {
+    return api.post('/api/v1/config/led-strips', configGroup);
   }
 
   /**
@@ -275,6 +275,14 @@ export class ConfigApiService {
    */
   static async updateNightModeTheme(theme: string): Promise<void> {
     return api.put('/api/v1/config/night-mode-theme', { theme });
+  }
+
+  /**
+   * 更新全局颜色校准
+   * 替代: invoke('set_color_calibration', { calibration })
+   */
+  static async updateGlobalColorCalibration(calibration: any): Promise<void> {
+    return api.put('/api/v1/config/global-color-calibration', { calibration });
   }
 
   /**

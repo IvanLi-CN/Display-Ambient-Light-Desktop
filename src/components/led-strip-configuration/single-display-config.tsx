@@ -633,7 +633,16 @@ export function SingleDisplayConfig() {
       console.log('合并后的最终配置:', finalStrips);
 
       // 5. 保存完整的配置
-      await adaptiveApi.writeLedStripConfigs({ configs: finalStrips });
+      const configGroup = {
+        strips: finalStrips,
+        color_calibration: fullConfig.color_calibration || {
+          r: 1.0,
+          g: 1.0,
+          b: 1.0,
+          w: 1.0
+        }
+      };
+      await adaptiveApi.writeLedStripConfigs(configGroup);
 
       console.log('✅ 成功保存完整LED灯带配置到后端');
     } catch (error) {

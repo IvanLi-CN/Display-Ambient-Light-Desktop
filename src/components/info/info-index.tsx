@@ -27,10 +27,13 @@ export const InfoIndex: Component = () => {
 
   // WebSocket event handlers
   const webSocketHandlers = {
-    displays_changed: (data: RawDisplayState[]) => {
+    onDisplaysChanged: (data: any) => {
       logger('displays_changed', data);
+      // WebSocket消息格式: { displays: RawDisplayState[] }
+      const displays = data.displays || data;
+      const displayArray = Array.isArray(displays) ? displays : [];
       setDisplayStates(
-        data.map((it) => ({
+        displayArray.map((it: any) => ({
           ...it,
           last_modified_at: new Date(it.last_modified_at.secs_since_epoch * 1000),
         })),

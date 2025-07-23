@@ -13,8 +13,8 @@ import { LedStripConfigContainer } from './models/led-strip-config';
 import { InfoIndex } from './components/info/info-index';
 import { useLanguage } from './i18n/index';
 import { AppVersion } from './models/app-version.model';
-// Import theme store to ensure it's initialized
-import './stores/theme.store';
+// Import theme store and initialize effects
+import { initializeThemeEffects } from './stores/theme.store';
 // Import user preferences store to ensure it's initialized
 import { userPreferencesStore } from './stores/user-preferences.store';
 
@@ -39,6 +39,11 @@ function App() {
     userPreferencesStore.initializePreferences().catch((error) => {
       console.error('Failed to initialize user preferences:', error);
     });
+  });
+
+  // Initialize theme effects
+  onMount(() => {
+    initializeThemeEffects();
   });
 
   // Listen for navigation events from backend

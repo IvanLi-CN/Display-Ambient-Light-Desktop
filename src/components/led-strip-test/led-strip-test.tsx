@@ -1,4 +1,4 @@
-import { createSignal, createEffect, For, Show, onCleanup } from 'solid-js';
+import { createSignal, createEffect, For, Show, onCleanup, onMount } from 'solid-js';
 import { adaptiveApi } from '../../services/api-adapter';
 import { LedApiService } from '../../services/led-api.service';
 import { DeviceApiService } from '../../services/display-api.service';
@@ -130,48 +130,70 @@ export const LedStripTest = () => {
     setAnimationSpeedInput(animationSpeed().toString());
   });
 
-  // Load available boards and listen for changes
-  createEffect(() => {
-    // Initial load
-    adaptiveApi.getBoards().then((boardList) => {
+  // Load available boards on mount
+  onMount(async () => {
+    try {
+      // Initial load
+      const boardList = await adaptiveApi.getBoards();
       setBoards(boardList);
       if (boardList.length > 0 && !selectedBoard()) {
         setSelectedBoard(boardList[0]);
       }
-    }).catch((error) => {
+    } catch (error) {
       console.error('Failed to load boards:', error);
-    });
+    }
 
     // Listen for board changes
-    const unlisten = adaptiveApi.onEvent<BoardInfo[]>('boards_changed', (boardList) => {
-      setBoards(boardList);
+    try {
+      const unlisten = await adaptiveApi.onEvent<any>('BoardsChanged', (data) => {
+        console.log('🔌 LED Strip Test - BoardsChanged event received:', data);
 
-      // If currently selected board is no longer available, select the first available one
-      const currentBoard = selectedBoard();
-      if (currentBoard) {
-        const stillExists = boardList.find(board =>
-          board.host === currentBoard.host &&
-          board.address === currentBoard.address &&
-          board.port === currentBoard.port
-        );
-
-        if (stillExists) {
-          // Update to the new board object to reflect any status changes
-          setSelectedBoard(stillExists);
+        // Extract boards from WebSocket message structure
+        let boardList: BoardInfo[] = [];
+        if (data && data.boards) {
+          // WebSocket message format: { boards: [...] }
+          boardList = Array.isArray(data.boards) ? data.boards : [];
+          console.log('📋 Extracted boards from WebSocket message:', boardList);
+        } else if (Array.isArray(data)) {
+          // Direct array format
+          boardList = data;
+          console.log('📋 Using direct array format:', boardList);
         } else {
-          // Current board is no longer available, select first available or null
-          setSelectedBoard(boardList.length > 0 ? boardList[0] : null);
+          console.warn('⚠️ Unexpected data format:', data);
         }
-      } else if (boardList.length > 0) {
-        // No board was selected, select the first one
-        setSelectedBoard(boardList[0]);
-      }
-    });
 
-    // Cleanup listener when effect is disposed
-    onCleanup(() => {
-      unlisten.then((unlistenFn) => unlistenFn());
-    });
+        console.log('✅ Setting board list:', boardList);
+        setBoards(boardList);
+
+        // If currently selected board is no longer available, select the first available one
+        const currentBoard = selectedBoard();
+        if (currentBoard) {
+          const stillExists = boardList.find(board =>
+            board.host === currentBoard.host &&
+            board.address === currentBoard.address &&
+            board.port === currentBoard.port
+          );
+
+          if (stillExists) {
+            // Update to the new board object to reflect any status changes
+            setSelectedBoard(stillExists);
+          } else {
+            // Current board is no longer available, select first available or null
+            setSelectedBoard(boardList.length > 0 ? boardList[0] : null);
+          }
+        } else if (boardList.length > 0) {
+          // No board was selected, select the first one
+          setSelectedBoard(boardList[0]);
+        }
+      });
+
+      // Cleanup listener when component is unmounted
+      onCleanup(() => {
+        unlisten();
+      });
+    } catch (error) {
+      console.error('Failed to setup board change listener:', error);
+    }
   });
 
   // Cleanup when component is unmounted

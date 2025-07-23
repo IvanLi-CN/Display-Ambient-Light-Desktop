@@ -1,16 +1,14 @@
-import { listen } from '@tauri-apps/api/event';
 import { Component, createEffect, onCleanup, createSignal } from 'solid-js';
 import { ColorCalibration, LedStripConfigContainer } from '../../models/led-strip-config';
 import { ledStripStore, setLedStripStore } from '../../stores/led-strip.store';
 import { ColorSlider } from './color-slider';
 import { TestColorsBg } from './test-colors-bg';
-import { invoke } from '@tauri-apps/api/core';
 import { VsClose } from 'solid-icons/vs';
 import { BiRegularReset } from 'solid-icons/bi';
 import { BsFullscreen, BsFullscreenExit } from 'solid-icons/bs';
-import { getCurrentWindow } from '@tauri-apps/api/window';
 import transparentBg from '../../assets/transparent-grid-background.svg?url';
 import { useLanguage } from '../../i18n/index';
+import { adaptiveApi } from '../../services/api-adapter';
 
 const Value: Component<{ value: number }> = (props) => {
   return (
@@ -31,16 +29,16 @@ export const WhiteBalance = () => {
   createEffect(() => {
     const autoEnterFullscreen = async () => {
       try {
-        const window = getCurrentWindow();
-        const currentFullscreen = await window.isFullscreen();
-        if (!currentFullscreen) {
-          await window.setFullscreen(true);
+        if (!document.fullscreenElement) {
+          await document.documentElement.requestFullscreen();
           setIsFullscreen(true);
         } else {
           setIsFullscreen(true);
         }
       } catch (error) {
         // Silently handle fullscreen error
+        console.warn('自动全屏失败:', error);
+        setIsFullscreen(false);
       }
     };
 
@@ -110,19 +108,14 @@ export const WhiteBalance = () => {
       }
     };
 
-    const checkFullscreenStatus = async () => {
-      try {
-        const window = getCurrentWindow();
-        const currentFullscreen = await window.isFullscreen();
-        if (currentFullscreen !== isFullscreen()) {
-          setIsFullscreen(currentFullscreen);
-          // 退出全屏时重置面板位置
-          if (!currentFullscreen) {
-            setPanelPosition({ x: 0, y: 0 });
-          }
+    const checkFullscreenStatus = () => {
+      const currentFullscreen = !!document.fullscreenElement;
+      if (currentFullscreen !== isFullscreen()) {
+        setIsFullscreen(currentFullscreen);
+        // 退出全屏时重置面板位置
+        if (!currentFullscreen) {
+          setPanelPosition({ x: 0, y: 0 });
         }
-      } catch (error) {
-        // Silently handle error
       }
     };
 
@@ -139,17 +132,24 @@ export const WhiteBalance = () => {
 
   // listen to config_changed event
   createEffect(() => {
-    const unlisten = listen('config_changed', (event) => {
-      const { strips, color_calibration } =
-        event.payload as LedStripConfigContainer;
+    let unlisten: (() => void) | null = null;
+
+    adaptiveApi.onEvent('onConfigChanged', (data: LedStripConfigContainer) => {
+      const { strips, color_calibration } = data;
       setLedStripStore({
         strips,
         colorCalibration: color_calibration,
       });
+    }).then((unlistenFn) => {
+      unlisten = unlistenFn;
+    }).catch((error) => {
+      console.warn('Failed to listen to config_changed event:', error);
     });
 
-    onCleanup(async () => {
-      (await unlisten)();
+    onCleanup(() => {
+      if (unlisten) {
+        unlisten();
+      }
     });
   });
 
@@ -160,24 +160,27 @@ export const WhiteBalance = () => {
     const calibration = { ...ledStripStore.colorCalibration };
     calibration[key] = value;
     setLedStripStore('colorCalibration', calibration);
-    invoke('set_color_calibration', { calibration }).catch(() => {
+    adaptiveApi.updateGlobalColorCalibration(calibration).catch(() => {
       // Silently handle error
     });
   };
 
   const toggleFullscreen = async () => {
     try {
-      const window = getCurrentWindow();
-      const currentFullscreen = await window.isFullscreen();
-      await window.setFullscreen(!currentFullscreen);
-      setIsFullscreen(!currentFullscreen);
-
-      // 退出全屏时重置面板位置
-      if (currentFullscreen) {
+      if (!document.fullscreenElement) {
+        // 进入全屏
+        await document.documentElement.requestFullscreen();
+        setIsFullscreen(true);
+      } else {
+        // 退出全屏
+        await document.exitFullscreen();
+        setIsFullscreen(false);
+        // 退出全屏时重置面板位置
         setPanelPosition({ x: 0, y: 0 });
       }
     } catch (error) {
       // Silently handle fullscreen error
+      console.warn('全屏操作失败:', error);
     }
   };
 
@@ -193,9 +196,7 @@ export const WhiteBalance = () => {
   };
 
   const reset = () => {
-    invoke('set_color_calibration', {
-      calibration: new ColorCalibration(),
-    }).catch(() => {
+    adaptiveApi.updateGlobalColorCalibration(new ColorCalibration()).catch(() => {
       // Silently handle error
     });
   };

@@ -215,7 +215,7 @@ export class ApiAdapter {
 
   // ===== 应用信息相关API =====
 
-  public async getAppVersion(): Promise<string> {
+  public async getAppVersion(): Promise<any> {
     return this.call(
       'get_app_version_string',
       () => InfoApiService.getAppVersion()
@@ -372,6 +372,14 @@ export class ApiAdapter {
     );
   }
 
+  public async updateGlobalColorCalibration(calibration: any): Promise<void> {
+    return this.call(
+      'set_color_calibration',
+      () => ConfigApiService.updateGlobalColorCalibration(calibration),
+      { calibration }
+    );
+  }
+
   public async updateTheme(theme: string): Promise<void> {
     return this.call(
       'update_theme',
@@ -487,6 +495,7 @@ export const adaptiveApi = {
   updateWindowPreferences: (windowPrefs: any) => apiAdapter.updateWindowPreferences(windowPrefs),
   updateUIPreferences: (uiPrefs: any) => apiAdapter.updateUIPreferences(uiPrefs),
   updateViewScale: (scale: number) => apiAdapter.updateViewScale(scale),
+  updateGlobalColorCalibration: (calibration: any) => apiAdapter.updateGlobalColorCalibration(calibration),
   updateTheme: (theme: string) => apiAdapter.updateTheme(theme),
   getTheme: () => apiAdapter.getTheme(),
   updateNightModeThemeEnabled: (enabled: boolean) => apiAdapter.updateNightModeThemeEnabled(enabled),

@@ -59,6 +59,27 @@ impl UdpRpc {
         tokio::spawn(async move {
             shared_self_for_check.check_boards().await;
         });
+
+        // Subscribe to board changes and publish via WebSocket
+        let shared_self_for_websocket = shared_self.clone();
+        tokio::spawn(async move {
+            let mut receiver = shared_self_for_websocket.subscribe_boards_change();
+            loop {
+                if let Err(err) = receiver.changed().await {
+                    error!("boards change receiver changed error: {}", err);
+                    return;
+                }
+
+                let boards = receiver.borrow().clone();
+                info!(
+                    "Publishing boards change via WebSocket: {} boards",
+                    boards.len()
+                );
+
+                // Publish via WebSocket
+                crate::websocket_events::publish_boards_changed(&boards).await;
+            }
+        });
     }
 
     async fn search_boards(&self) -> anyhow::Result<()> {
@@ -111,7 +132,9 @@ impl UdpRpc {
 
                     drop(boards);
 
-                    sender.send(tx_boards)?;
+                    if let Err(err) = sender.send(tx_boards) {
+                        warn!("failed to send board change: {:?}", err);
+                    }
                 }
                 ServiceEvent::ServiceRemoved(_, fullname) => {
                     info!("removed board {:?}", fullname);
@@ -127,7 +150,9 @@ impl UdpRpc {
 
                     drop(boards);
 
-                    sender.send(tx_boards)?;
+                    if let Err(err) = sender.send(tx_boards) {
+                        warn!("failed to send board change: {:?}", err);
+                    }
                 }
                 _other_event => {
                     // log::info!("{:?}", &other_event);

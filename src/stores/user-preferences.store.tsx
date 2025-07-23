@@ -103,6 +103,12 @@ const updateUIPreferences = async (uiPrefs: UIPreferences) => {
 // Convenience functions for common updates
 const updateViewScale = async (scale: number) => {
   try {
+    // Validate scale value
+    if (!isFinite(scale) || scale <= 0 || scale > 10) {
+      console.warn('Invalid view scale value:', scale, 'skipping update');
+      return;
+    }
+
     await adaptiveApi.updateViewScale(scale);
     setUserPreferences(prev => ({
       ...prev,

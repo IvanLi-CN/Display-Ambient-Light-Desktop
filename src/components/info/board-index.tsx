@@ -21,9 +21,11 @@ export const BoardIndex: Component = () => {
 
   // WebSocket event handlers
   const webSocketHandlers = {
-    boards_changed: (data: BoardInfo[]) => {
+    onBoardsChanged: (data: any) => {
       logger('boards_changed', data);
-      setBoards(data);
+      // WebSocket消息格式: { boards: BoardInfo[] }
+      const boards = data.boards || data;
+      setBoards(Array.isArray(boards) ? boards : []);
     },
   };
   return (

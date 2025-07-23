@@ -104,6 +104,10 @@ impl ApiError {
         api::led::start_single_display_config,
         api::led::stop_single_display_config,
         api::led::set_active_strip_breathing,
+        api::led::start_led_test_effect,
+        api::led::stop_led_test_effect,
+        api::led::test_single_display_config,
+        api::led::test_led_data_sender,
         api::config::get_led_strip_configs,
         api::config::update_led_strip_configs,
         api::config::update_led_strip_length,
@@ -163,6 +167,17 @@ pub async fn create_server(config: ServerConfig) -> Result<Router, anyhow::Error
     let app_state = AppState {
         websocket_manager: websocket_publisher.get_websocket_manager().clone(),
     };
+
+    // 初始化UDP RPC服务（设备发现）
+    log::info!("🔍 Initializing UDP RPC service for device discovery...");
+    match crate::rpc::UdpRpc::global().await {
+        Ok(_) => {
+            log::info!("✅ UDP RPC service initialized successfully");
+        }
+        Err(e) => {
+            log::error!("❌ Failed to initialize UDP RPC service: {}", e);
+        }
+    }
 
     // 配置CORS
     let cors = if config.enable_cors {

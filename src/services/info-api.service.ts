@@ -8,9 +8,9 @@ export class InfoApiService {
   /**
    * 获取应用版本信息
    */
-  static async getAppVersion(): Promise<string> {
+  static async getAppVersion(): Promise<any> {
     const response = await api.get('/api/v1/info/version');
-    return (response as any).data;
+    return response;
   }
 
   /**

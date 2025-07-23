@@ -72,6 +72,13 @@ pub struct UpdateUIPreferencesRequest {
     pub ui_prefs: UIPreferences,
 }
 
+/// 全局颜色校准更新请求
+#[derive(Deserialize, ToSchema)]
+pub struct UpdateGlobalColorCalibrationRequest {
+    /// 颜色校准设置
+    pub calibration: ColorCalibration,
+}
+
 /// 获取LED灯带配置
 #[utoipa::path(
     get,
@@ -315,6 +322,35 @@ pub async fn update_view_scale(
     }
 }
 
+/// 更新全局颜色校准
+#[utoipa::path(
+    put,
+    path = "/api/v1/config/global-color-calibration",
+    request_body = UpdateGlobalColorCalibrationRequest,
+    responses(
+        (status = 200, description = "更新全局颜色校准成功", body = ApiResponse<String>),
+        (status = 500, description = "更新失败", body = ApiResponse<String>),
+    ),
+    tag = "config"
+)]
+pub async fn update_global_color_calibration(
+    Json(request): Json<UpdateGlobalColorCalibrationRequest>,
+) -> Result<Json<ApiResponse<String>>, StatusCode> {
+    let config_manager = ambient_light::ConfigManager::global().await;
+    match config_manager
+        .set_color_calibration(request.calibration)
+        .await
+    {
+        Ok(_) => Ok(Json(ApiResponse::success(
+            "Global color calibration updated successfully".to_string(),
+        ))),
+        Err(e) => {
+            log::error!("Failed to update global color calibration: {}", e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
 /// 更新用户偏好设置
 #[utoipa::path(
     put,
@@ -417,6 +453,10 @@ pub fn create_routes() -> Router<AppState> {
         .route("/theme", put(update_theme))
         .route("/view-scale", get(get_view_scale))
         .route("/view-scale", put(update_view_scale))
+        .route(
+            "/global-color-calibration",
+            put(update_global_color_calibration),
+        )
         .route(
             "/night-mode-theme-enabled",
             get(get_night_mode_theme_enabled),

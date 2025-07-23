@@ -113,21 +113,24 @@ const applyTheme = (theme: DaisyUITheme) => {
   }
 };
 
-// Save theme to backend (only after initialization)
-createEffect(() => {
-  const theme = currentTheme();
-  const initialized = isInitialized();
+// Initialize theme effects (should be called from App component)
+export const initializeThemeEffects = () => {
+  // Save theme to backend (only after initialization)
+  createEffect(() => {
+    const theme = currentTheme();
+    const initialized = isInitialized();
 
-  // Always apply theme to UI
-  applyTheme(theme);
+    // Always apply theme to UI
+    applyTheme(theme);
 
-  // Only save to backend after initialization to avoid overwriting loaded theme
-  if (initialized) {
-    userPreferencesStore.updateTheme(theme).catch(error => {
-      console.error('Failed to save theme to backend:', error);
-    });
-  }
-});
+    // Only save to backend after initialization to avoid overwriting loaded theme
+    if (initialized) {
+      userPreferencesStore.updateTheme(theme).catch(error => {
+        console.error('Failed to save theme to backend:', error);
+      });
+    }
+  });
+};
 
 // Initialize on first load
 if (typeof window !== 'undefined') {
