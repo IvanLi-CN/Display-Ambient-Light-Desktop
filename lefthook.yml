@@ -34,6 +34,12 @@ pre-commit:
       run: cd src-tauri && cargo test --all-features
       stage_fixed: false
 
+commit-msg:
+  commands:
+    # Commit message validation with commitlint
+    commitlint:
+      run: pnpm exec commitlint --edit $1
+
 pre-push:
   parallel: false
   commands:
