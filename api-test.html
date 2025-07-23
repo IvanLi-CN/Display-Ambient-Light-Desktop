@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .pending {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .stats {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .stat {
+            padding: 10px;
+            border-radius: 4px;
+            text-align: center;
+            min-width: 100px;
+        }
+        .stat-total { background-color: #e9ecef; }
+        .stat-success { background-color: #d4edda; }
+        .stat-error { background-color: #f8d7da; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 API集成测试</h1>
+        
+        <div class="stats">
+            <div class="stat stat-total">
+                <div>总计</div>
+                <div id="total-count">0</div>
+            </div>
+            <div class="stat stat-success">
+                <div>成功</div>
+                <div id="success-count">0</div>
+            </div>
+            <div class="stat stat-error">
+                <div>失败</div>
+                <div id="error-count">0</div>
+            </div>
+            <div class="stat">
+                <div>成功率</div>
+                <div id="success-rate">0%</div>
+            </div>
+        </div>
+
+        <div>
+            <button onclick="runAllTests()" id="run-btn">运行所有测试</button>
+            <button onclick="clearResults()">清空结果</button>
+        </div>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://127.0.0.1:3030';
+        let testResults = [];
+
+        async function apiCall(method, endpoint, data = null) {
+            const url = `${API_BASE}${endpoint}`;
+            const options = {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            };
+            
+            if (data && method !== 'GET') {
+                options.body = JSON.stringify(data);
+            }
+            
+            const response = await fetch(url, options);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            return await response.json();
+        }
+
+        async function runTest(name, method, endpoint, data = null) {
+            const startTime = Date.now();
+            
+            try {
+                const result = await apiCall(method, endpoint, data);
+                const duration = Date.now() - startTime;
+                
+                addTestResult(name, 'success', `成功 (${duration}ms)`, endpoint, method);
+                return true;
+            } catch (error) {
+                const duration = Date.now() - startTime;
+                addTestResult(name, 'error', `${error.message} (${duration}ms)`, endpoint, method);
+                return false;
+            }
+        }
+
+        function addTestResult(name, status, message, endpoint, method) {
+            testResults.push({ name, status, message, endpoint, method });
+            updateDisplay();
+        }
+
+        function updateDisplay() {
+            const resultsDiv = document.getElementById('results');
+            const total = testResults.length;
+            const success = testResults.filter(r => r.status === 'success').length;
+            const error = testResults.filter(r => r.status === 'error').length;
+            const successRate = total > 0 ? ((success / total) * 100).toFixed(1) : 0;
+
+            document.getElementById('total-count').textContent = total;
+            document.getElementById('success-count').textContent = success;
+            document.getElementById('error-count').textContent = error;
+            document.getElementById('success-rate').textContent = `${successRate}%`;
+
+            resultsDiv.innerHTML = testResults.map(result => `
+                <div class="test-result ${result.status}">
+                    <strong>${result.name}</strong> - ${result.method} ${result.endpoint}<br>
+                    ${result.message}
+                </div>
+            `).join('');
+        }
+
+        async function runAllTests() {
+            const runBtn = document.getElementById('run-btn');
+            runBtn.disabled = true;
+            runBtn.textContent = '测试运行中...';
+            
+            testResults = [];
+            updateDisplay();
+
+            // 健康检查
+            await runTest('健康检查', 'GET', '/health');
+            
+            // 通用API
+            await runTest('问候API', 'POST', '/api/v1/greet', { name: 'Test User' });
+            await runTest('Ping API', 'GET', '/api/v1/ping');
+            
+            // 信息API
+            await runTest('获取应用版本', 'GET', '/api/v1/info/version');
+            await runTest('获取系统信息', 'GET', '/api/v1/info/system');
+            await runTest('报告当前页面', 'POST', '/api/v1/info/current-page', { page_info: 'test-page' });
+            await runTest('导航到页面', 'POST', '/api/v1/info/navigate', { page: 'test-page' });
+            
+            // 配置API
+            await runTest('获取LED配置', 'GET', '/api/v1/config/led-strips');
+            await runTest('获取用户偏好设置', 'GET', '/api/v1/config/user-preferences');
+            await runTest('获取主题', 'GET', '/api/v1/config/theme');
+            await runTest('获取视图缩放', 'GET', '/api/v1/config/view-scale');
+            await runTest('获取当前语言', 'GET', '/api/v1/config/current-language');
+            
+            // LED API
+            await runTest('获取LED数据发送模式', 'GET', '/api/v1/led/mode');
+            await runTest('获取测试模式状态', 'GET', '/api/v1/led/test-mode-status');
+            
+            // 显示器API
+            await runTest('获取显示器列表', 'GET', '/api/v1/display');
+            await runTest('获取显示器信息', 'GET', '/api/v1/display/info');
+            
+            // 设备API
+            await runTest('获取设备列表', 'GET', '/api/v1/device/boards');
+            await runTest('获取自动启动状态', 'GET', '/api/v1/device/auto-start');
+            await runTest('获取环境光状态', 'GET', '/api/v1/device/ambient-light-state');
+
+            runBtn.disabled = false;
+            runBtn.textContent = '运行所有测试';
+        }
+
+        function clearResults() {
+            testResults = [];
+            updateDisplay();
+        }
+    </script>
+</body>
+</html>

@@ -5,6 +5,7 @@ import { WhiteBalance } from './components/white-balance/white-balance';
 import { LedStripTest } from './components/led-strip-test/led-strip-test';
 import { LedDataSenderTest } from './components/led-data-sender-test/led-data-sender-test';
 import { Settings } from './components/settings/settings';
+import { ApiTestRunner } from './components/api-test-runner/api-test-runner';
 import { createEffect, createSignal, onMount } from 'solid-js';
 import { adaptiveApi } from './services/api-adapter';
 import { setLedStripStore } from './stores/led-strip.store';
@@ -141,6 +142,7 @@ function App() {
               <li><A href="/white-balance" class="text-base-content hover:bg-base-200">{t('nav.whiteBalance')}</A></li>
               <li><A href="/led-strip-test" class="text-base-content hover:bg-base-200">{t('nav.ledTest')}</A></li>
               <li><A href="/led-data-sender-test" class="text-base-content hover:bg-base-200">数据发送测试</A></li>
+              <li><A href="/api-test" class="text-base-content hover:bg-base-200">API测试</A></li>
               <li><A href="/settings" class="text-base-content hover:bg-base-200">{t('nav.settings')}</A></li>
             </ul>
           </div>
@@ -153,6 +155,7 @@ function App() {
             <li><A href="/white-balance" class="btn btn-ghost text-base-content hover:text-primary">{t('nav.whiteBalance')}</A></li>
             <li><A href="/led-strip-test" class="btn btn-ghost text-base-content hover:text-primary">{t('nav.ledTest')}</A></li>
             <li><A href="/led-data-sender-test" class="btn btn-ghost text-base-content hover:text-primary">数据发送测试</A></li>
+            <li><A href="/api-test" class="btn btn-ghost text-base-content hover:text-primary">API测试</A></li>
             <li><A href="/settings" class="btn btn-ghost text-base-content hover:text-primary">{t('nav.settings')}</A></li>
           </ul>
         </div>
@@ -180,6 +183,7 @@ function App() {
           <Route path="/white-balance" component={WhiteBalance} />
           <Route path="/led-strip-test" element={<LedStripTest />} />
           <Route path="/led-data-sender-test" element={<LedDataSenderTest />} />
+          <Route path="/api-test" component={ApiTestRunner} />
           <Route path="/settings" component={Settings} />
         </Routes>
       </main>

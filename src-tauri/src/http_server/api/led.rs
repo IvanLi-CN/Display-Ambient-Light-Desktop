@@ -164,6 +164,156 @@ pub async fn set_data_send_mode(
     )))
 }
 
+/// 启用LED测试模式
+#[utoipa::path(
+    post,
+    path = "/api/v1/led/enable-test-mode",
+    responses(
+        (status = 200, description = "测试模式启用成功", body = ApiResponse<String>),
+        (status = 500, description = "启用失败", body = ApiResponse<String>),
+    ),
+    tag = "led"
+)]
+pub async fn enable_test_mode() -> Result<Json<ApiResponse<String>>, StatusCode> {
+    let publisher = ambient_light::LedColorsPublisher::global().await;
+    publisher.enable_test_mode().await;
+    log::info!("LED test mode enabled");
+    Ok(Json(ApiResponse::success(
+        "Test mode enabled successfully".to_string(),
+    )))
+}
+
+/// 禁用LED测试模式
+#[utoipa::path(
+    post,
+    path = "/api/v1/led/disable-test-mode",
+    responses(
+        (status = 200, description = "测试模式禁用成功", body = ApiResponse<String>),
+        (status = 500, description = "禁用失败", body = ApiResponse<String>),
+    ),
+    tag = "led"
+)]
+pub async fn disable_test_mode() -> Result<Json<ApiResponse<String>>, StatusCode> {
+    let publisher = ambient_light::LedColorsPublisher::global().await;
+    publisher.disable_test_mode().await;
+    log::info!("LED test mode disabled");
+    Ok(Json(ApiResponse::success(
+        "Test mode disabled successfully".to_string(),
+    )))
+}
+
+/// 获取LED测试模式状态
+#[utoipa::path(
+    get,
+    path = "/api/v1/led/test-mode-status",
+    responses(
+        (status = 200, description = "获取测试模式状态成功", body = ApiResponse<bool>),
+    ),
+    tag = "led"
+)]
+pub async fn get_test_mode_status() -> Result<Json<ApiResponse<bool>>, StatusCode> {
+    let publisher = ambient_light::LedColorsPublisher::global().await;
+    let is_active = publisher.is_test_mode_active().await;
+    Ok(Json(ApiResponse::success(is_active)))
+}
+
+/// 启动单屏配置发布器
+#[utoipa::path(
+    post,
+    path = "/api/v1/led/start-single-display-config",
+    request_body = SingleDisplayConfigRequest,
+    responses(
+        (status = 200, description = "单屏配置发布器启动成功", body = ApiResponse<String>),
+        (status = 500, description = "启动失败", body = ApiResponse<String>),
+    ),
+    tag = "led"
+)]
+pub async fn start_single_display_config(
+    Json(request): Json<SingleDisplayConfigRequest>,
+) -> Result<Json<ApiResponse<String>>, StatusCode> {
+    let publisher = ambient_light::LedColorsPublisher::global().await;
+    match publisher
+        .start_single_display_config_mode(request.strips, request.border_colors)
+        .await
+    {
+        Ok(_) => {
+            log::info!("Single display config publisher started");
+            Ok(Json(ApiResponse::success(
+                "Single display config publisher started successfully".to_string(),
+            )))
+        }
+        Err(e) => {
+            log::error!("Failed to start single display config publisher: {}", e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+/// 停止单屏配置发布器
+#[utoipa::path(
+    post,
+    path = "/api/v1/led/stop-single-display-config",
+    responses(
+        (status = 200, description = "单屏配置发布器停止成功", body = ApiResponse<String>),
+        (status = 500, description = "停止失败", body = ApiResponse<String>),
+    ),
+    tag = "led"
+)]
+pub async fn stop_single_display_config() -> Result<Json<ApiResponse<String>>, StatusCode> {
+    let publisher = ambient_light::LedColorsPublisher::global().await;
+    match publisher.stop_single_display_config_mode().await {
+        Ok(_) => {
+            log::info!("Single display config publisher stopped");
+            Ok(Json(ApiResponse::success(
+                "Single display config publisher stopped successfully".to_string(),
+            )))
+        }
+        Err(e) => {
+            log::error!("Failed to stop single display config publisher: {}", e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+/// 设置活跃灯带用于呼吸效果
+#[utoipa::path(
+    post,
+    path = "/api/v1/led/set-active-strip-breathing",
+    request_body = BreathingStripRequest,
+    responses(
+        (status = 200, description = "设置呼吸效果成功", body = ApiResponse<String>),
+        (status = 500, description = "设置失败", body = ApiResponse<String>),
+    ),
+    tag = "led"
+)]
+pub async fn set_active_strip_breathing(
+    Json(request): Json<BreathingStripRequest>,
+) -> Result<Json<ApiResponse<String>>, StatusCode> {
+    let publisher = ambient_light::LedColorsPublisher::global().await;
+    let display_id = request.display_id;
+    let border = request.border.clone();
+
+    match publisher
+        .set_active_strip_for_breathing(display_id, request.border)
+        .await
+    {
+        Ok(_) => {
+            log::info!(
+                "Active strip for breathing set: display_id={}, border={:?}",
+                display_id,
+                border
+            );
+            Ok(Json(ApiResponse::success(
+                "Active strip for breathing set successfully".to_string(),
+            )))
+        }
+        Err(e) => {
+            log::error!("Failed to set active strip for breathing: {}", e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
 /// 创建LED控制相关路由
 pub fn create_routes() -> Router<AppState> {
     Router::new()
@@ -171,4 +321,19 @@ pub fn create_routes() -> Router<AppState> {
         .route("/test-colors", post(send_test_colors_to_board))
         .route("/mode", get(get_data_send_mode))
         .route("/mode", put(set_data_send_mode))
+        .route("/enable-test-mode", post(enable_test_mode))
+        .route("/disable-test-mode", post(disable_test_mode))
+        .route("/test-mode-status", get(get_test_mode_status))
+        .route(
+            "/start-single-display-config",
+            post(start_single_display_config),
+        )
+        .route(
+            "/stop-single-display-config",
+            post(stop_single_display_config),
+        )
+        .route(
+            "/set-active-strip-breathing",
+            post(set_active_strip_breathing),
+        )
 }

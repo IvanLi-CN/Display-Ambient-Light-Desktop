@@ -503,8 +503,10 @@ async fn main() {
     let args: Vec<String> = std::env::args().collect();
     let mut target_page: Option<String> = None;
     let mut display_id: Option<String> = None;
+    let mut headless_mode = false;
+    let mut browser_mode = false;
 
-    // Look for --page, --display, and --test-single-display-config arguments
+    // Look for --page, --display, --headless, --browser, and --test-single-display-config arguments
     let mut test_single_display_config = false;
     for i in 0..args.len() {
         if args[i] == "--page" && i + 1 < args.len() {
@@ -513,9 +515,30 @@ async fn main() {
         } else if args[i] == "--display" && i + 1 < args.len() {
             display_id = Some(args[i + 1].clone());
             info!("Command line argument detected: --display {}", args[i + 1]);
+        } else if args[i] == "--headless" {
+            headless_mode = true;
+            info!("Command line argument detected: --headless");
+        } else if args[i] == "--browser" {
+            browser_mode = true;
+            info!("Command line argument detected: --browser");
         } else if args[i] == "--test-single-display-config" {
             test_single_display_config = true;
             info!("Command line argument detected: --test-single-display-config");
+        }
+    }
+
+    // Check environment variables
+    if !headless_mode {
+        if let Ok(_) = std::env::var("AMBIENT_LIGHT_HEADLESS") {
+            headless_mode = true;
+            info!("Environment variable detected: AMBIENT_LIGHT_HEADLESS");
+        }
+    }
+
+    if !browser_mode {
+        if let Ok(_) = std::env::var("AMBIENT_LIGHT_BROWSER") {
+            browser_mode = true;
+            info!("Environment variable detected: AMBIENT_LIGHT_BROWSER");
         }
     }
 
@@ -632,6 +655,48 @@ async fn main() {
     // WebSocket server will be started in the Tauri setup hook
 
     let _volume = VolumeManager::global().await;
+
+    // 如果是无头模式，只运行后端服务，不启动GUI
+    if headless_mode {
+        info!("🚀 Running in headless mode - HTTP API only");
+        info!("📡 HTTP API server: http://127.0.0.1:3030");
+        info!("🔌 WebSocket server: ws://127.0.0.1:8765");
+        info!("📖 API documentation: http://127.0.0.1:3030/swagger-ui/");
+        info!("💡 Press Ctrl+C to stop the server");
+
+        // 启动WebSocket服务器
+        tokio::spawn(async move {
+            if let Err(e) = start_websocket_server().await {
+                error!("Failed to start WebSocket server: {}", e);
+            }
+        });
+
+        // 在无头模式下保持程序运行
+        loop {
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        }
+    }
+
+    // 如果是浏览器模式，启动后端服务（不启动GUI）
+    if browser_mode {
+        info!("🌐 Running in browser mode - Backend only");
+        info!("📡 HTTP API server: http://127.0.0.1:3030");
+        info!("🔌 WebSocket server: ws://127.0.0.1:8765");
+        info!("🌐 Web interface available at: http://127.0.0.1:1420");
+        info!("💡 Press Ctrl+C to stop the server");
+
+        // 启动WebSocket服务器
+        tokio::spawn(async move {
+            if let Err(e) = start_websocket_server().await {
+                error!("Failed to start WebSocket server: {}", e);
+            }
+        });
+
+        // 在浏览器模式下保持程序运行
+        loop {
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        }
+    }
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
