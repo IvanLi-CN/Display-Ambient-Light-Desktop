@@ -238,6 +238,19 @@ impl Screenshot {
                 }
             }
             let color = LedColor::new((r / len) as u8, (g / len) as u8, (b / len) as u8);
+
+            // Debug: Log sampled colors for troubleshooting
+            if colors.len() < 5 {
+                log::debug!(
+                    "🎨 Sampled color for LED {}: RGB({}, {}, {}) from {} sample points",
+                    colors.len(),
+                    (r / len) as u8,
+                    (g / len) as u8,
+                    (b / len) as u8,
+                    led_points.len()
+                );
+            }
+
             colors.push(color);
         }
         colors
