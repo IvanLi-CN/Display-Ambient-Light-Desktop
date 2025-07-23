@@ -39,25 +39,33 @@ export const LedStripConfiguration = () => {
 
   // WebSocket event handlers
   const webSocketHandlers = {
-    config_changed: (data: any) => {
+    onConfigChanged: (data: any) => {
+      console.log('🔧 配置变化事件:', data);
       const { strips } = data as LedStripConfigContainer;
       setLedStripStore({
         strips,
       });
     },
-    led_colors_changed: (data: any) => {
+    onLedColorsChanged: (data: any) => {
       if (!window.document.hidden) {
-        const colors = data as Uint8ClampedArray;
+        console.log('🎨 LED颜色变化事件:', data);
+        // 数据应该是 { colors: Vec<u8> } 格式
+        const colors = data.colors || data;
+        const colorsArray = new Uint8ClampedArray(colors);
         setLedStripStore({
-          colors,
+          colors: colorsArray,
         });
       }
     },
-    led_sorted_colors_changed: (data: any) => {
+    // 添加LED排序颜色变化事件处理器
+    onLedSortedColorsChanged: (data: any) => {
       if (!window.document.hidden) {
-        const sortedColors = data as Uint8ClampedArray;
+        console.log('🌈 LED排序颜色变化事件:', data);
+        // 数据应该是 { sorted_colors: Vec<u8> } 格式
+        const sortedColors = data.sorted_colors || data;
+        const sortedColorsArray = new Uint8ClampedArray(sortedColors);
         setLedStripStore({
-          sortedColors,
+          sortedColors: sortedColorsArray,
         });
       }
     },

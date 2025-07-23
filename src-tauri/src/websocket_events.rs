@@ -38,17 +38,29 @@ impl WebSocketEventPublisher {
 
     /// 发布LED颜色变化事件
     pub async fn publish_led_colors_changed(&self, colors: Vec<u8>) {
+        log::debug!(
+            "🎨 Publishing LED colors changed event: {} bytes",
+            colors.len()
+        );
         let message = WsMessage::LedColorsChanged { colors };
         if let Err(e) = self.ws_manager.broadcast(message) {
             log::debug!("广播LED颜色变化失败: {}", e);
+        } else {
+            log::debug!("✅ LED颜色变化事件已广播");
         }
     }
 
     /// 发布LED排序颜色变化事件
     pub async fn publish_led_sorted_colors_changed(&self, sorted_colors: Vec<u8>) {
+        log::debug!(
+            "🌈 Publishing LED sorted colors changed event: {} bytes",
+            sorted_colors.len()
+        );
         let message = WsMessage::LedSortedColorsChanged { sorted_colors };
         if let Err(e) = self.ws_manager.broadcast(message) {
             log::debug!("广播LED排序颜色变化失败: {}", e);
+        } else {
+            log::debug!("✅ LED排序颜色变化事件已广播");
         }
     }
 

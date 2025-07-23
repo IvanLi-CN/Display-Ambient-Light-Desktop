@@ -16,6 +16,7 @@ export interface WebSocketStatus {
 // WebSocket事件处理器类型
 export interface WebSocketEventHandlers {
   onLedColorsChanged?: (data: any) => void;
+  onLedSortedColorsChanged?: (data: any) => void;
   onConfigChanged?: (data: any) => void;
   onAmbientLightStateChanged?: (data: any) => void;
   onBoardsChanged?: (data: any) => void;
@@ -59,12 +60,26 @@ export const WebSocketListener = (props: WebSocketListenerProps) => {
       if (props.handlers?.onLedColorsChanged) {
         const unlisten = await adaptiveApi.onEvent('LedColorsChanged', (data) => {
           console.log('🎨 LED颜色变化:', data);
-          setStatus(prev => ({ 
-            ...prev, 
+          setStatus(prev => ({
+            ...prev,
             lastMessage: 'LED颜色更新',
-            messageCount: prev.messageCount + 1 
+            messageCount: prev.messageCount + 1
           }));
           props.handlers?.onLedColorsChanged?.(data);
+        });
+        unlistenFunctions.push(unlisten);
+      }
+
+      // LED排序颜色变化事件
+      if (props.handlers?.onLedSortedColorsChanged) {
+        const unlisten = await adaptiveApi.onEvent('LedSortedColorsChanged', (data) => {
+          console.log('🌈 LED排序颜色变化:', data);
+          setStatus(prev => ({
+            ...prev,
+            lastMessage: 'LED排序颜色更新',
+            messageCount: prev.messageCount + 1
+          }));
+          props.handlers?.onLedSortedColorsChanged?.(data);
         });
         unlistenFunctions.push(unlisten);
       }

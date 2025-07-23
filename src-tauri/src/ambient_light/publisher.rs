@@ -103,12 +103,6 @@ impl LedColorsPublisher {
                 }
 
                 let screenshot = screenshot_rx.borrow().clone();
-                log::info!(
-                    "Received screenshot for display #{}: {}x{}",
-                    display_id,
-                    screenshot.width,
-                    screenshot.height
-                );
 
                 // 使用新的采样函数替换旧的采样逻辑
                 // 只处理属于当前显示器的LED灯带配置
@@ -118,24 +112,12 @@ impl LedColorsPublisher {
                     .cloned()
                     .collect();
 
-                log::info!(
-                    "Display #{}: Processing {} LED strips for this display",
-                    display_id,
-                    current_display_strips.len()
-                );
-
                 let colors_by_strips = screenshot
                     .get_colors_by_led_configs(&current_display_strips)
                     .await;
 
                 // 将二维颜色数组展平为一维数组，保持与旧API的兼容性
                 let colors: Vec<LedColor> = colors_by_strips.into_iter().flatten().collect();
-
-                log::info!(
-                    "🖼️ Got screenshot for display #{}, extracted {} colors using new sampling algorithm",
-                    display_id,
-                    colors.len()
-                );
 
                 let colors_copy = colors.clone();
 
@@ -153,14 +135,6 @@ impl LedColorsPublisher {
                     state_manager.is_enabled().await
                 };
 
-                log::info!(
-                    "Display #{}: test_mode_active={}, ambient_light_enabled={}, colors_count={}",
-                    display_id,
-                    test_mode_active,
-                    ambient_light_enabled,
-                    colors.len()
-                );
-
                 if !test_mode_active && ambient_light_enabled {
                     match Self::send_colors_by_display(
                         colors,
@@ -172,7 +146,7 @@ impl LedColorsPublisher {
                     .await
                     {
                         Ok(_) => {
-                            log::info!("Successfully sent colors for display #{}", display_id);
+                            log::debug!("Successfully sent colors for display #{}", display_id);
                         }
                         Err(err) => {
                             warn!("Failed to send colors:  #{: >15}\t{}", display_id, err);
@@ -187,7 +161,7 @@ impl LedColorsPublisher {
                             display_id
                         );
                     } else {
-                        log::info!(
+                        log::debug!(
                             "Skipping color send for display #{}: test_mode={}, enabled={}",
                             display_id,
                             test_mode_active,
@@ -215,12 +189,6 @@ impl LedColorsPublisher {
                 // Check if the inner task version changed
                 let version = internal_tasks_version.read().await.clone();
                 if version != init_version {
-                    log::info!(
-                        "inner task version changed, stop.  {} != {}",
-                        internal_tasks_version.read().await.clone(),
-                        init_version
-                    );
-
                     break;
                 }
             }
@@ -297,9 +265,12 @@ impl LedColorsPublisher {
                     };
 
                     // 通过WebSocket广播颜色变化
-                    crate::websocket_events::publish_led_colors_changed(flatten_colors).await;
-                    crate::websocket_events::WebSocketEventPublisher::global()
-                        .await
+                    let websocket_publisher =
+                        crate::websocket_events::WebSocketEventPublisher::global().await;
+                    websocket_publisher
+                        .publish_led_colors_changed(flatten_colors)
+                        .await;
+                    websocket_publisher
                         .publish_led_sorted_colors_changed(sorted_colors)
                         .await;
 
