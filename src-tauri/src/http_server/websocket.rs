@@ -7,8 +7,8 @@ use axum::{
 };
 use futures::{sink::SinkExt, stream::StreamExt};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use tokio::sync::broadcast;
+use std::{collections::{HashMap, HashSet}, sync::{Arc, atomic::{AtomicU64, Ordering}}};
+use tokio::sync::{broadcast, RwLock};
 
 use crate::http_server::AppState;
 
@@ -30,25 +30,90 @@ pub enum WsMessage {
     AmbientLightStateChanged { state: serde_json::Value },
     /// 导航事件
     Navigate { path: String },
+    /// 订阅事件
+    Subscribe { event_types: Vec<String> },
+    /// 取消订阅事件
+    Unsubscribe { event_types: Vec<String> },
+    /// 订阅确认
+    SubscriptionConfirmed { event_types: Vec<String> },
     /// 心跳
     Ping,
     /// 心跳响应
     Pong,
 }
 
+/// 连接ID类型
+pub type ConnectionId = u64;
+
+/// 连接订阅信息
+#[derive(Debug, Clone)]
+pub struct ConnectionSubscriptions {
+    pub connection_id: ConnectionId,
+    pub subscribed_events: HashSet<String>,
+}
+
 /// WebSocket连接管理器
 #[derive(Clone)]
 pub struct WebSocketManager {
     sender: broadcast::Sender<WsMessage>,
+    /// 连接订阅状态 - 连接ID -> 订阅的事件类型集合
+    subscriptions: Arc<RwLock<HashMap<ConnectionId, HashSet<String>>>>,
+    /// 连接ID计数器
+    connection_counter: Arc<AtomicU64>,
 }
 
 impl WebSocketManager {
     pub fn new() -> Self {
         let (sender, _) = broadcast::channel(1000);
-        Self { sender }
+        Self {
+            sender,
+            subscriptions: Arc::new(RwLock::new(HashMap::new())),
+            connection_counter: Arc::new(AtomicU64::new(0)),
+        }
     }
 
-    /// 广播消息给所有连接的客户端
+    /// 生成新的连接ID
+    pub fn generate_connection_id(&self) -> ConnectionId {
+        self.connection_counter.fetch_add(1, Ordering::SeqCst)
+    }
+
+    /// 添加连接订阅
+    pub async fn add_connection(&self, connection_id: ConnectionId) {
+        let mut subscriptions = self.subscriptions.write().await;
+        subscriptions.insert(connection_id, HashSet::new());
+        log::debug!("🔌 Added connection {}", connection_id);
+    }
+
+    /// 移除连接
+    pub async fn remove_connection(&self, connection_id: ConnectionId) {
+        let mut subscriptions = self.subscriptions.write().await;
+        subscriptions.remove(&connection_id);
+        log::debug!("🔌 Removed connection {}", connection_id);
+    }
+
+    /// 订阅事件
+    pub async fn subscribe_events(&self, connection_id: ConnectionId, event_types: Vec<String>) {
+        let mut subscriptions = self.subscriptions.write().await;
+        if let Some(connection_events) = subscriptions.get_mut(&connection_id) {
+            for event_type in event_types.iter() {
+                connection_events.insert(event_type.clone());
+            }
+            log::debug!("📝 Connection {} subscribed to events: {:?}", connection_id, event_types);
+        }
+    }
+
+    /// 取消订阅事件
+    pub async fn unsubscribe_events(&self, connection_id: ConnectionId, event_types: Vec<String>) {
+        let mut subscriptions = self.subscriptions.write().await;
+        if let Some(connection_events) = subscriptions.get_mut(&connection_id) {
+            for event_type in event_types.iter() {
+                connection_events.remove(event_type);
+            }
+            log::debug!("📝 Connection {} unsubscribed from events: {:?}", connection_id, event_types);
+        }
+    }
+
+    /// 广播消息给所有连接的客户端（旧方法，保持兼容性）
     pub fn broadcast(
         &self,
         message: WsMessage,
@@ -56,9 +121,32 @@ impl WebSocketManager {
         self.sender.send(message).map(|_| ())
     }
 
+    /// 根据订阅情况发送消息
+    pub async fn send_to_subscribers(&self, event_type: &str, message: WsMessage) -> Result<usize, broadcast::error::SendError<WsMessage>> {
+        let subscriptions = self.subscriptions.read().await;
+        let subscriber_count = subscriptions.values()
+            .filter(|events| events.contains(event_type))
+            .count();
+
+        if subscriber_count > 0 {
+            self.sender.send(message)?;
+            log::debug!("📤 Sent {} event to {} subscribers", event_type, subscriber_count);
+            Ok(subscriber_count)
+        } else {
+            log::debug!("📤 No subscribers for {} event, skipping", event_type);
+            Ok(0)
+        }
+    }
+
     /// 获取接收器
     pub fn subscribe(&self) -> broadcast::Receiver<WsMessage> {
         self.sender.subscribe()
+    }
+
+    /// 获取连接的订阅信息（用于调试）
+    pub async fn get_connection_subscriptions(&self, connection_id: ConnectionId) -> Option<HashSet<String>> {
+        let subscriptions = self.subscriptions.read().await;
+        subscriptions.get(&connection_id).cloned()
     }
 }
 
@@ -75,6 +163,10 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
     // 从AppState获取WebSocketManager
     let ws_manager = state.websocket_manager.clone();
     let mut ws_receiver = ws_manager.subscribe();
+
+    // 生成连接ID并注册连接
+    let connection_id = ws_manager.generate_connection_id();
+    ws_manager.add_connection(connection_id).await;
 
     // 发送连接确认消息
     if sender
@@ -105,6 +197,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
     log::info!("✅ Test LED colors message sent to WebSocket client");
 
     // 处理客户端消息的任务
+    let ws_manager_for_recv = ws_manager.clone();
     let mut recv_task = tokio::spawn(async move {
         while let Some(Ok(msg)) = receiver.next().await {
             match msg {
@@ -113,6 +206,20 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                         match ws_msg {
                             WsMessage::Ping => {
                                 log::debug!("收到WebSocket心跳");
+                            }
+                            WsMessage::Subscribe { event_types } => {
+                                log::debug!("收到订阅请求: {:?}", event_types);
+                                ws_manager_for_recv.subscribe_events(connection_id, event_types.clone()).await;
+
+                                // 发送订阅确认
+                                let confirmation = WsMessage::SubscriptionConfirmed { event_types };
+                                if let Err(e) = ws_manager_for_recv.broadcast(confirmation) {
+                                    log::warn!("发送订阅确认失败: {}", e);
+                                }
+                            }
+                            WsMessage::Unsubscribe { event_types } => {
+                                log::debug!("收到取消订阅请求: {:?}", event_types);
+                                ws_manager_for_recv.unsubscribe_events(connection_id, event_types).await;
                             }
                             _ => {
                                 // 处理其他客户端消息
@@ -132,6 +239,9 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                 _ => {}
             }
         }
+
+        // 连接关闭时清理订阅
+        ws_manager_for_recv.remove_connection(connection_id).await;
     });
 
     // 广播消息给客户端的任务

@@ -43,10 +43,15 @@ impl WebSocketEventPublisher {
             colors.len()
         );
         let message = WsMessage::LedColorsChanged { colors };
-        if let Err(e) = self.ws_manager.broadcast(message) {
-            log::debug!("广播LED颜色变化失败: {}", e);
-        } else {
-            log::debug!("✅ LED颜色变化事件已广播");
+        match self.ws_manager.send_to_subscribers("LedColorsChanged", message).await {
+            Ok(subscriber_count) => {
+                if subscriber_count > 0 {
+                    log::debug!("✅ LED颜色变化事件已发送给 {} 个订阅者", subscriber_count);
+                }
+            }
+            Err(e) => {
+                log::debug!("发送LED颜色变化事件失败: {}", e);
+            }
         }
     }
 
@@ -57,10 +62,15 @@ impl WebSocketEventPublisher {
             sorted_colors.len()
         );
         let message = WsMessage::LedSortedColorsChanged { sorted_colors };
-        if let Err(e) = self.ws_manager.broadcast(message) {
-            log::debug!("广播LED排序颜色变化失败: {}", e);
-        } else {
-            log::debug!("✅ LED排序颜色变化事件已广播");
+        match self.ws_manager.send_to_subscribers("LedSortedColorsChanged", message).await {
+            Ok(subscriber_count) => {
+                if subscriber_count > 0 {
+                    log::debug!("✅ LED排序颜色变化事件已发送给 {} 个订阅者", subscriber_count);
+                }
+            }
+            Err(e) => {
+                log::debug!("发送LED排序颜色变化事件失败: {}", e);
+            }
         }
     }
 
@@ -70,8 +80,15 @@ impl WebSocketEventPublisher {
             let message = WsMessage::ConfigChanged {
                 config: config_json,
             };
-            if let Err(e) = self.ws_manager.broadcast(message) {
-                log::debug!("广播配置变化失败: {}", e);
+            match self.ws_manager.send_to_subscribers("ConfigChanged", message).await {
+                Ok(subscriber_count) => {
+                    if subscriber_count > 0 {
+                        log::debug!("✅ 配置变化事件已发送给 {} 个订阅者", subscriber_count);
+                    }
+                }
+                Err(e) => {
+                    log::debug!("发送配置变化事件失败: {}", e);
+                }
             }
         } else {
             log::error!("序列化配置数据失败");
@@ -84,8 +101,15 @@ impl WebSocketEventPublisher {
             let message = WsMessage::BoardsChanged {
                 boards: boards_json,
             };
-            if let Err(e) = self.ws_manager.broadcast(message) {
-                log::debug!("广播设备列表变化失败: {}", e);
+            match self.ws_manager.send_to_subscribers("BoardsChanged", message).await {
+                Ok(subscriber_count) => {
+                    if subscriber_count > 0 {
+                        log::debug!("✅ 设备列表变化事件已发送给 {} 个订阅者", subscriber_count);
+                    }
+                }
+                Err(e) => {
+                    log::debug!("发送设备列表变化事件失败: {}", e);
+                }
             }
         } else {
             log::error!("序列化设备列表数据失败");
@@ -98,8 +122,15 @@ impl WebSocketEventPublisher {
             let message = WsMessage::DisplaysChanged {
                 displays: displays_json,
             };
-            if let Err(e) = self.ws_manager.broadcast(message) {
-                log::debug!("广播显示器状态变化失败: {}", e);
+            match self.ws_manager.send_to_subscribers("DisplaysChanged", message).await {
+                Ok(subscriber_count) => {
+                    if subscriber_count > 0 {
+                        log::debug!("✅ 显示器状态变化事件已发送给 {} 个订阅者", subscriber_count);
+                    }
+                }
+                Err(e) => {
+                    log::debug!("发送显示器状态变化事件失败: {}", e);
+                }
             }
         } else {
             log::error!("序列化显示器状态数据失败");
@@ -110,8 +141,15 @@ impl WebSocketEventPublisher {
     pub async fn publish_ambient_light_state_changed(&self, state: &AmbientLightState) {
         if let Ok(state_json) = serde_json::to_value(state) {
             let message = WsMessage::AmbientLightStateChanged { state: state_json };
-            if let Err(e) = self.ws_manager.broadcast(message) {
-                log::debug!("广播环境光状态变化失败: {}", e);
+            match self.ws_manager.send_to_subscribers("AmbientLightStateChanged", message).await {
+                Ok(subscriber_count) => {
+                    if subscriber_count > 0 {
+                        log::debug!("✅ 环境光状态变化事件已发送给 {} 个订阅者", subscriber_count);
+                    }
+                }
+                Err(e) => {
+                    log::debug!("发送环境光状态变化事件失败: {}", e);
+                }
             }
         } else {
             log::error!("序列化环境光状态数据失败");
@@ -135,8 +173,15 @@ impl WebSocketEventPublisher {
     /// 发布导航事件
     pub async fn publish_navigate(&self, path: String) {
         let message = WsMessage::Navigate { path };
-        if let Err(e) = self.ws_manager.broadcast(message) {
-            log::debug!("广播导航事件失败: {}", e);
+        match self.ws_manager.send_to_subscribers("Navigate", message).await {
+            Ok(subscriber_count) => {
+                if subscriber_count > 0 {
+                    log::debug!("✅ 导航事件已发送给 {} 个订阅者", subscriber_count);
+                }
+            }
+            Err(e) => {
+                log::debug!("发送导航事件失败: {}", e);
+            }
         }
     }
 

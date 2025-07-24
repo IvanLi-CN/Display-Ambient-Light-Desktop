@@ -45,6 +45,8 @@ export class ApiClient {
   private wsReconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
+  private subscribedEvents: Set<string> = new Set();
+  private pendingSubscriptions: Set<string> = new Set();
 
   private constructor(config: ApiClientConfig) {
     console.log('🔧 ApiClient构造函数被调用，配置:', config);
@@ -92,12 +94,21 @@ export class ApiClient {
       this.websocket.onopen = () => {
         console.log('🔌 WebSocket连接已建立');
         this.wsReconnectAttempts = 0;
+
+        // 连接建立后，重新订阅之前的事件
+        this.resubscribeEvents();
       };
 
       this.websocket.onmessage = (event) => {
         try {
           const message: WebSocketMessage = JSON.parse(event.data);
           console.log('📨 收到WebSocket消息:', message.type, message);
+
+          // 处理订阅确认消息
+          if (message.type === 'SubscriptionConfirmed' && message.data?.event_types) {
+            this.handleSubscriptionConfirmed(message.data.event_types);
+          }
+
           this.handleWebSocketMessage(message);
         } catch (error) {
           console.error('解析WebSocket消息失败:', error);
@@ -169,15 +180,87 @@ export class ApiClient {
   }
 
   /**
+   * 处理订阅确认
+   */
+  private handleSubscriptionConfirmed(eventTypes: string[]): void {
+    eventTypes.forEach(eventType => {
+      this.pendingSubscriptions.delete(eventType);
+      this.subscribedEvents.add(eventType);
+    });
+    console.log('✅ 订阅确认:', eventTypes);
+  }
+
+  /**
+   * 重新订阅事件（连接重建后）
+   */
+  private resubscribeEvents(): void {
+    if (this.subscribedEvents.size > 0) {
+      const eventTypes = Array.from(this.subscribedEvents);
+      console.log('🔄 重新订阅事件:', eventTypes);
+      this.subscribeToEvents(eventTypes);
+    }
+  }
+
+  /**
+   * 订阅事件
+   */
+  private subscribeToEvents(eventTypes: string[]): void {
+    if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+      const message = {
+        type: 'Subscribe',
+        data: { event_types: eventTypes }
+      };
+      this.websocket.send(JSON.stringify(message));
+
+      // 标记为待确认的订阅
+      eventTypes.forEach(eventType => {
+        this.pendingSubscriptions.add(eventType);
+      });
+
+      console.log('📤 发送订阅请求:', eventTypes);
+    } else {
+      console.warn('WebSocket未连接，无法发送订阅请求');
+    }
+  }
+
+  /**
+   * 取消订阅事件
+   */
+  private unsubscribeFromEvents(eventTypes: string[]): void {
+    if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+      const message = {
+        type: 'Unsubscribe',
+        data: { event_types: eventTypes }
+      };
+      this.websocket.send(JSON.stringify(message));
+
+      // 从订阅列表中移除
+      eventTypes.forEach(eventType => {
+        this.subscribedEvents.delete(eventType);
+        this.pendingSubscriptions.delete(eventType);
+      });
+
+      console.log('📤 发送取消订阅请求:', eventTypes);
+    } else {
+      console.warn('WebSocket未连接，无法发送取消订阅请求');
+    }
+  }
+
+  /**
    * 添加WebSocket事件监听器
    */
   public onWebSocketEvent(eventType: string, listener: WebSocketEventListener): () => void {
     if (!this.wsEventListeners.has(eventType)) {
       this.wsEventListeners.set(eventType, new Set());
+
+      // 如果是新的事件类型且不是全局监听器，则订阅该事件
+      if (eventType !== '*' && !this.subscribedEvents.has(eventType) && !this.pendingSubscriptions.has(eventType)) {
+        this.subscribeToEvents([eventType]);
+      }
     }
-    
+
     this.wsEventListeners.get(eventType)!.add(listener);
-    
+
     // 返回取消监听的函数
     return () => {
       const listeners = this.wsEventListeners.get(eventType);
@@ -185,6 +268,11 @@ export class ApiClient {
         listeners.delete(listener);
         if (listeners.size === 0) {
           this.wsEventListeners.delete(eventType);
+
+          // 如果没有监听器了且不是全局监听器，则取消订阅
+          if (eventType !== '*' && this.subscribedEvents.has(eventType)) {
+            this.unsubscribeFromEvents([eventType]);
+          }
         }
       }
     };
@@ -301,6 +389,8 @@ export class ApiClient {
       this.websocket = null;
     }
     this.wsEventListeners.clear();
+    this.subscribedEvents.clear();
+    this.pendingSubscriptions.clear();
   }
 
   /**
