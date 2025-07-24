@@ -69,7 +69,7 @@ pub async fn websocket_handler(ws: WebSocketUpgrade, State(state): State<AppStat
 
 /// 处理WebSocket连接
 async fn handle_socket(socket: WebSocket, state: AppState) {
-    log::info!("🔌 New WebSocket connection established");
+    log::info!("🔌 New WebSocket connection established for LED events");
     let (mut sender, mut receiver) = socket.split();
 
     // 从AppState获取WebSocketManager
@@ -87,7 +87,22 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
         log::warn!("❌ Failed to send connection confirmation message");
         return;
     }
-    log::debug!("✅ Connection confirmation message sent");
+    log::info!("✅ Connection confirmation message sent to LED events WebSocket");
+
+    // 发送一个测试LED颜色事件
+    let test_colors = vec![255u8, 0, 0, 255, 255, 255, 0, 255, 0, 255, 255, 255]; // 红色和绿色LED
+    let test_message = WsMessage::LedColorsChanged {
+        colors: test_colors,
+    };
+    if sender
+        .send(Message::Text(serde_json::to_string(&test_message).unwrap()))
+        .await
+        .is_err()
+    {
+        log::warn!("❌ Failed to send test LED colors message");
+        return;
+    }
+    log::info!("✅ Test LED colors message sent to WebSocket client");
 
     // 处理客户端消息的任务
     let mut recv_task = tokio::spawn(async move {

@@ -1,4 +1,4 @@
-import { createEffect, onCleanup } from 'solid-js';
+import { createEffect, createMemo, For } from 'solid-js';
 import { adaptiveApi } from '../../services/api-adapter';
 import { WebSocketListener } from '../websocket-listener';
 import { DisplayView } from './display-view';
@@ -20,6 +20,7 @@ export const LedStripConfiguration = () => {
   const { t } = useLanguage();
 
   console.log('🔧 LedStripConfiguration component loaded');
+
   createEffect(() => {
     adaptiveApi.listDisplayInfo().then((displays) => {
       const parsedDisplays = JSON.parse(displays);
@@ -41,10 +42,19 @@ export const LedStripConfiguration = () => {
   const webSocketHandlers = {
     onConfigChanged: (data: any) => {
       console.log('🔧 配置变化事件:', data);
-      const { strips } = data as LedStripConfigContainer;
-      setLedStripStore({
-        strips,
-      });
+      try {
+        const configData = data as LedStripConfigContainer;
+        // 安全检查：确保 strips 存在且是数组
+        if (configData && configData.strips && Array.isArray(configData.strips)) {
+          setLedStripStore({
+            strips: configData.strips,
+          });
+        } else {
+          console.warn('⚠️ 配置数据无效或缺少strips:', configData);
+        }
+      } catch (error) {
+        console.error('❌ 处理配置变化事件失败:', error);
+      }
     },
     onLedColorsChanged: (data: any) => {
       if (!window.document.hidden) {
@@ -97,6 +107,7 @@ export const LedStripConfiguration = () => {
   return (
     <div class="space-y-4">
       <WebSocketListener handlers={webSocketHandlers} />
+
       <div class="flex items-center justify-between">
         <h1 class="text-xl font-bold text-base-content">{t('ledConfig.title')}</h1>
         <div class="stats shadow">

@@ -18,6 +18,10 @@ const LedCountControlItem: Component<LedCountControlItemProps> = (props) => {
   const { t } = useLanguage();
 
   const config = createMemo(() => {
+    // 安全检查：确保 strips 存在且是数组
+    if (!ledStripStore.strips || !Array.isArray(ledStripStore.strips)) {
+      return undefined;
+    }
     return ledStripStore.strips.find(
       (s) => s.display_id === props.displayId && s.border === props.border
     );

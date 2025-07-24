@@ -131,6 +131,11 @@ const LedBorderStrips: Component<{
 }> = (props) => {
   // 获取该边框的LED灯带
   const borderStrips = createMemo(() => {
+    // 安全检查：确保 strips 存在且是数组
+    if (!props.strips || !Array.isArray(props.strips)) {
+      return [];
+    }
+
     // 强制转换为字符串并去除空白字符
     const targetBorder = String(props.border).trim();
 
@@ -297,9 +302,13 @@ const LedBorderAddButton: Component<{
   onCreateStrip: (border: 'Top' | 'Bottom' | 'Left' | 'Right') => void;
 }> = (props) => {
   // 获取该边框的LED灯带数量
-  const stripCount = createMemo(() =>
-    props.strips.filter(strip => strip.border === props.border).length
-  );
+  const stripCount = createMemo(() => {
+    // 安全检查：确保 strips 存在且是数组
+    if (!props.strips || !Array.isArray(props.strips)) {
+      return 0;
+    }
+    return props.strips.filter(strip => strip.border === props.border).length;
+  });
 
   const getAddButtonStyle = () => {
     const baseStyle = {

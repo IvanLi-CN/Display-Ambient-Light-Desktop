@@ -29,6 +29,10 @@ export const DisplayView: Component<DisplayViewProps> = (props) => {
   }));
 
   const ledStripConfigs = createMemo(() => {
+    // 安全检查：确保 strips 存在且是数组
+    if (!ledStripStore.strips || !Array.isArray(ledStripStore.strips)) {
+      return [];
+    }
     return ledStripStore.strips.filter((c) => c.display_id === props.display.id);
   });
 

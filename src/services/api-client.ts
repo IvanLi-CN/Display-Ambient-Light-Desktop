@@ -47,10 +47,14 @@ export class ApiClient {
   private reconnectDelay = 1000;
 
   private constructor(config: ApiClientConfig) {
+    console.log('🔧 ApiClient构造函数被调用，配置:', config);
     this.config = config;
-    
+
     if (config.enableWebSocket) {
+      console.log('🔧 WebSocket已启用，开始初始化WebSocket连接...');
       this.initWebSocket();
+    } else {
+      console.log('⚠️ WebSocket未启用');
     }
   }
 
@@ -65,6 +69,7 @@ export class ApiClient {
         enableWebSocket: true,
         webSocketUrl: 'ws://127.0.0.1:3030/ws'
       };
+      console.log('🔧 创建ApiClient实例，配置:', config || defaultConfig);
       ApiClient.instance = new ApiClient(config || defaultConfig);
     }
     return ApiClient.instance;
@@ -74,11 +79,16 @@ export class ApiClient {
    * 初始化WebSocket连接
    */
   private initWebSocket(): void {
-    if (!this.config.webSocketUrl) return;
+    if (!this.config.webSocketUrl) {
+      console.warn('⚠️ WebSocket URL未配置');
+      return;
+    }
+
+    console.log('🔄 正在初始化WebSocket连接:', this.config.webSocketUrl);
 
     try {
       this.websocket = new WebSocket(this.config.webSocketUrl);
-      
+
       this.websocket.onopen = () => {
         console.log('🔌 WebSocket连接已建立');
         this.wsReconnectAttempts = 0;
@@ -87,23 +97,24 @@ export class ApiClient {
       this.websocket.onmessage = (event) => {
         try {
           const message: WebSocketMessage = JSON.parse(event.data);
+          console.log('📨 收到WebSocket消息:', message.type, message);
           this.handleWebSocketMessage(message);
         } catch (error) {
           console.error('解析WebSocket消息失败:', error);
         }
       };
 
-      this.websocket.onclose = () => {
-        console.log('🔌 WebSocket连接已关闭');
+      this.websocket.onclose = (event) => {
+        console.log('🔌 WebSocket连接已关闭, code:', event.code, 'reason:', event.reason);
         this.websocket = null;
         this.scheduleReconnect();
       };
 
       this.websocket.onerror = (error) => {
-        console.error('WebSocket错误:', error);
+        console.error('❌ WebSocket错误:', error);
       };
     } catch (error) {
-      console.error('初始化WebSocket失败:', error);
+      console.error('❌ 初始化WebSocket失败:', error);
       this.scheduleReconnect();
     }
   }
