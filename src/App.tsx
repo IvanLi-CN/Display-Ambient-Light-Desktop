@@ -6,7 +6,7 @@ import { LedStripTest } from './components/led-strip-test/led-strip-test';
 import { LedDataSenderTest } from './components/led-data-sender-test/led-data-sender-test';
 import { Settings } from './components/settings/settings';
 import { ApiTestRunner } from './components/api-test-runner/api-test-runner';
-import { StatusBar } from './components/status-bar';
+import { StatusBar } from './components/status-bar/status-bar';
 import { createEffect, createSignal, onMount } from 'solid-js';
 import { adaptiveApi } from './services/api-adapter';
 import { setLedStripStore } from './stores/led-strip.store';
@@ -145,7 +145,7 @@ function App() {
             <ul class="menu menu-sm dropdown-content z-[100] p-2 shadow bg-base-100 rounded-box w-52 border border-base-300">
               <li><A href="/info" class="text-base-content hover:bg-base-200">{t('nav.info')}</A></li>
               <li><A href="/led-strips-configuration" class="text-base-content hover:bg-base-200">{t('nav.ledConfiguration')}</A></li>
-              <li><A href="/white-balance" class="text-base-content hover:bg-base-200">{t('nav.whiteBalance')}</A></li>
+              <li><A href="/color-calibration" class="text-base-content hover:bg-base-200">{t('nav.colorCalibration')}</A></li>
               <li><A href="/led-strip-test" class="text-base-content hover:bg-base-200">{t('nav.ledTest')}</A></li>
               <li><A href="/led-data-sender-test" class="text-base-content hover:bg-base-200">数据发送测试</A></li>
               <li><A href="/api-test" class="text-base-content hover:bg-base-200">API测试</A></li>
@@ -158,7 +158,7 @@ function App() {
           <ul class="menu menu-horizontal px-1">
             <li><A href="/info" class="btn btn-ghost text-base-content hover:text-primary">{t('nav.info')}</A></li>
             <li><A href="/led-strips-configuration" class="btn btn-ghost text-base-content hover:text-primary">{t('nav.ledConfiguration')}</A></li>
-            <li><A href="/color-calibration" class="btn btn-ghost text-base-content hover:text-primary">{t('nav.whiteBalance')}</A></li>
+            <li><A href="/color-calibration" class="btn btn-ghost text-base-content hover:text-primary">{t('nav.colorCalibration')}</A></li>
             <li><A href="/led-strip-test" class="btn btn-ghost text-base-content hover:text-primary">{t('nav.ledTest')}</A></li>
             <li><A href="/led-data-sender-test" class="btn btn-ghost text-base-content hover:text-primary">数据发送测试</A></li>
             <li><A href="/api-test" class="btn btn-ghost text-base-content hover:text-primary">API测试</A></li>
@@ -195,10 +195,7 @@ function App() {
       </main>
 
       {/* Status Bar - fixed at bottom */}
-      <StatusBar
-        compact={true}
-        class="border-t border-base-300 bg-base-100/95 backdrop-blur-sm"
-      />
+      <StatusBar />
     </div>
   );
 }

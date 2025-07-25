@@ -7,7 +7,7 @@ export interface TranslationDict {
     info: string;
     displays: string;
     ledConfiguration: string;
-    whiteBalance: string;
+    colorCalibration: string;
     ledTest: string;
     settings: string;
   };
@@ -181,8 +181,8 @@ export interface TranslationDict {
     endOffset: string;
   };
   
-  // White Balance
-  whiteBalance: {
+  // Color Calibration
+  colorCalibration: {
     title: string;
     colorCalibration: string;
     redChannel: string;
@@ -336,7 +336,7 @@ export interface TranslationDict {
     ambientLightDisabled: string;
     info: string;
     ledConfiguration: string;
-    whiteBalance: string;
+    colorCalibration: string;
     ledTest: string;
     settings: string;
     autoStart: string;

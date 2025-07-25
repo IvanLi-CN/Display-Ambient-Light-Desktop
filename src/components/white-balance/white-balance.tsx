@@ -207,7 +207,7 @@ export const WhiteBalance = () => {
       {!isFullscreen() && (
         <div class="space-y-6">
           <div class="flex items-center justify-between">
-            <h1 class="text-2xl font-bold text-base-content">{t('whiteBalance.title')}</h1>
+            <h1 class="text-2xl font-bold text-base-content">{t('colorCalibration.title')}</h1>
             <div class="flex gap-2">
               <button class="btn btn-outline btn-sm" onClick={toggleFullscreen} title={t('common.fullscreen')}>
                 <BsFullscreen size={16} />
@@ -217,9 +217,9 @@ export const WhiteBalance = () => {
                 <BiRegularReset size={16} />
                 {t('common.reset')}
               </button>
-              <button class="btn btn-primary btn-sm" onClick={exit} title={t('whiteBalance.back')}>
+              <button class="btn btn-primary btn-sm" onClick={exit} title={t('colorCalibration.back')}>
                 <VsClose size={16} />
-                {t('whiteBalance.back')}
+                {t('colorCalibration.back')}
               </button>
             </div>
           </div>
@@ -229,8 +229,8 @@ export const WhiteBalance = () => {
             <div class="card bg-base-200 shadow-lg">
               <div class="card-body p-4">
                 <div class="card-title text-base mb-3 flex items-center justify-between gap-2">
-                  <span class="flex-1 min-w-0">{t('whiteBalance.colorTest')}</span>
-                  <div class="badge badge-info badge-outline whitespace-nowrap">{t('whiteBalance.clickToTest')}</div>
+                  <span class="flex-1 min-w-0">{t('colorCalibration.colorTest')}</span>
+                  <div class="badge badge-info badge-outline whitespace-nowrap">{t('colorCalibration.clickToTest')}</div>
                 </div>
                 <div
                   class="aspect-square rounded-lg overflow-hidden border border-base-300"
@@ -241,7 +241,7 @@ export const WhiteBalance = () => {
                   <TestColorsBg />
                 </div>
                 <div class="text-xs text-base-content/50 mt-2">
-                  💡 {t('whiteBalance.colorTestTip')}
+                  💡 {t('colorCalibration.colorTestTip')}
                 </div>
               </div>
             </div>
@@ -250,14 +250,14 @@ export const WhiteBalance = () => {
             <div class="card bg-base-200 shadow-lg">
               <div class="card-body p-4">
                 <div class="card-title text-base mb-3">
-                  <span>{t('whiteBalance.rgbAdjustment')}</span>
-                  <div class="badge badge-secondary badge-outline">{t('whiteBalance.realtimeAdjustment')}</div>
+                  <span>{t('colorCalibration.rgbAdjustment')}</span>
+                  <div class="badge badge-secondary badge-outline">{t('colorCalibration.realtimeAdjustment')}</div>
                 </div>
 
                 <div class="space-y-4">
                   <div class="form-control">
                     <label class="label">
-                      <span class="label-text font-semibold text-red-500">{t('whiteBalance.redChannel')}</span>
+                      <span class="label-text font-semibold text-red-500">{t('colorCalibration.redChannel')}</span>
                       <Value value={ledStripStore.colorCalibration.r} />
                     </label>
                     <ColorSlider
@@ -274,7 +274,7 @@ export const WhiteBalance = () => {
 
                   <div class="form-control">
                     <label class="label">
-                      <span class="label-text font-semibold text-green-500">{t('whiteBalance.greenChannel')}</span>
+                      <span class="label-text font-semibold text-green-500">{t('colorCalibration.greenChannel')}</span>
                       <Value value={ledStripStore.colorCalibration.g} />
                     </label>
                     <ColorSlider
@@ -291,7 +291,7 @@ export const WhiteBalance = () => {
 
                   <div class="form-control">
                     <label class="label">
-                      <span class="label-text font-semibold text-blue-500">{t('whiteBalance.blueChannel')}</span>
+                      <span class="label-text font-semibold text-blue-500">{t('colorCalibration.blueChannel')}</span>
                       <Value value={ledStripStore.colorCalibration.b} />
                     </label>
                     <ColorSlider
@@ -308,7 +308,7 @@ export const WhiteBalance = () => {
 
                   <div class="form-control">
                     <label class="label">
-                      <span class="label-text font-semibold text-amber-500">{t('whiteBalance.whiteChannel')}</span>
+                      <span class="label-text font-semibold text-amber-500">{t('colorCalibration.whiteChannel')}</span>
                       <Value value={ledStripStore.colorCalibration.w} />
                     </label>
                     <ColorSlider
@@ -328,37 +328,37 @@ export const WhiteBalance = () => {
                 <div class="collapse collapse-arrow bg-base-100 mt-4">
                   <input type="checkbox" />
                   <div class="collapse-title text-sm font-medium text-base-content/80">
-                    💡 {t('whiteBalance.usageInstructions')}
+                    💡 {t('colorCalibration.usageInstructions')}
                   </div>
                   <div class="collapse-content text-xs text-base-content/70 space-y-3">
                     <div class="space-y-2">
-                      <p class="font-semibold text-primary">{t('whiteBalance.recommendedMethod')}</p>
+                      <p class="font-semibold text-primary">{t('colorCalibration.recommendedMethod')}</p>
                       <ol class="list-decimal list-inside space-y-1 ml-2">
-                        <li>{t('whiteBalance.fullscreenTip')}</li>
-                        <li>{t('whiteBalance.dragTip')}</li>
-                        <li>{t('whiteBalance.dragPanelTip')}</li>
-                        <li>{t('whiteBalance.compareColorsTip')}</li>
+                        <li>{t('colorCalibration.fullscreenTip')}</li>
+                        <li>{t('colorCalibration.dragTip')}</li>
+                        <li>{t('colorCalibration.dragPanelTip')}</li>
+                        <li>{t('colorCalibration.compareColorsTip')}</li>
                       </ol>
                     </div>
 
                     <div class="space-y-2">
-                      <p class="font-semibold text-secondary">{t('whiteBalance.adjustmentTips')}</p>
+                      <p class="font-semibold text-secondary">{t('colorCalibration.adjustmentTips')}</p>
                       <ul class="list-disc list-inside space-y-1 ml-2">
-                        <li>{t('whiteBalance.redStrong')}</li>
-                        <li>{t('whiteBalance.greenStrong')}</li>
-                        <li>{t('whiteBalance.blueStrong')}</li>
-                        <li>{t('whiteBalance.whiteYellow')}</li>
-                        <li>{t('whiteBalance.whiteBlue')}</li>
+                        <li>{t('colorCalibration.redStrong')}</li>
+                        <li>{t('colorCalibration.greenStrong')}</li>
+                        <li>{t('colorCalibration.blueStrong')}</li>
+                        <li>{t('colorCalibration.whiteYellow')}</li>
+                        <li>{t('colorCalibration.whiteBlue')}</li>
                       </ul>
                     </div>
 
                     <div class="space-y-2">
-                      <p class="font-semibold text-accent">{t('whiteBalance.comparisonMethod')}</p>
+                      <p class="font-semibold text-accent">{t('colorCalibration.comparisonMethod')}</p>
                       <ul class="list-disc list-inside space-y-1 ml-2">
-                        <li>{t('whiteBalance.whiteComparison')}</li>
-                        <li>{t('whiteBalance.colorComparison')}</li>
-                        <li>{t('whiteBalance.environmentTest')}</li>
-                        <li>{t('whiteBalance.resetNote')}</li>
+                        <li>{t('colorCalibration.whiteComparison')}</li>
+                        <li>{t('colorCalibration.colorComparison')}</li>
+                        <li>{t('colorCalibration.environmentTest')}</li>
+                        <li>{t('colorCalibration.resetNote')}</li>
                       </ul>
                     </div>
                   </div>
@@ -393,10 +393,10 @@ export const WhiteBalance = () => {
               >
                 <div class="flex items-center gap-2 flex-1 min-w-0">
                   <span class="text-xs opacity-60">⋮⋮</span>
-                  <span>{t('whiteBalance.rgbAdjustment')}</span>
-                  <div class="badge badge-secondary badge-outline whitespace-nowrap">{t('whiteBalance.draggable')}</div>
+                  <span>{t('colorCalibration.rgbAdjustment')}</span>
+                  <div class="badge badge-secondary badge-outline whitespace-nowrap">{t('colorCalibration.draggable')}</div>
                 </div>
-                <button class="btn btn-ghost btn-xs cursor-pointer flex-shrink-0" onClick={toggleFullscreen} title={t('whiteBalance.exitFullscreen')}>
+                <button class="btn btn-ghost btn-xs cursor-pointer flex-shrink-0" onClick={toggleFullscreen} title={t('colorCalibration.exitFullscreen')}>
                   <BsFullscreenExit size={14} />
                 </button>
               </div>
@@ -404,7 +404,7 @@ export const WhiteBalance = () => {
               <div class="space-y-4">
                 <div class="form-control">
                   <label class="label">
-                    <span class="label-text font-semibold text-red-500">{t('whiteBalance.redChannel')}</span>
+                    <span class="label-text font-semibold text-red-500">{t('colorCalibration.redChannel')}</span>
                     <Value value={ledStripStore.colorCalibration.r} />
                   </label>
                   <ColorSlider
@@ -421,7 +421,7 @@ export const WhiteBalance = () => {
 
                 <div class="form-control">
                   <label class="label">
-                    <span class="label-text font-semibold text-green-500">{t('whiteBalance.greenChannel')}</span>
+                    <span class="label-text font-semibold text-green-500">{t('colorCalibration.greenChannel')}</span>
                     <Value value={ledStripStore.colorCalibration.g} />
                   </label>
                   <ColorSlider
@@ -438,7 +438,7 @@ export const WhiteBalance = () => {
 
                 <div class="form-control">
                   <label class="label">
-                    <span class="label-text font-semibold text-blue-500">{t('whiteBalance.blueChannel')}</span>
+                    <span class="label-text font-semibold text-blue-500">{t('colorCalibration.blueChannel')}</span>
                     <Value value={ledStripStore.colorCalibration.b} />
                   </label>
                   <ColorSlider
@@ -455,7 +455,7 @@ export const WhiteBalance = () => {
 
                 <div class="form-control">
                   <label class="label">
-                    <span class="label-text font-semibold text-amber-500">{t('whiteBalance.whiteChannel')}</span>
+                    <span class="label-text font-semibold text-amber-500">{t('colorCalibration.whiteChannel')}</span>
                     <Value value={ledStripStore.colorCalibration.w} />
                   </label>
                   <ColorSlider
@@ -472,15 +472,15 @@ export const WhiteBalance = () => {
 
                 <div class="form-control">
                   <label class="label">
-                    <span class="label-text font-semibold text-base-content/70">{t('whiteBalance.whiteChannel')}</span>
-                    <div class="badge badge-outline badge-sm">{t('whiteBalance.notEnabled')}</div>
+                    <span class="label-text font-semibold text-base-content/70">{t('colorCalibration.whiteChannel')}</span>
+                    <div class="badge badge-outline badge-sm">{t('colorCalibration.notEnabled')}</div>
                   </label>
                   <ColorSlider class="from-yellow-50 to-cyan-50 opacity-50 pointer-events-none" />
                 </div>
               </div>
 
               <div class="text-xs text-base-content/60 mt-3 p-2 bg-base-300/50 rounded">
-                💡 {t('whiteBalance.fullscreenComparisonTip')}
+                💡 {t('colorCalibration.fullscreenComparisonTip')}
               </div>
 
               <div class="flex gap-2 mt-4">
@@ -488,9 +488,9 @@ export const WhiteBalance = () => {
                   <BiRegularReset size={14} />
                   {t('common.reset')}
                 </button>
-                <button class="btn btn-primary btn-sm flex-1" onClick={exit} title={t('whiteBalance.back')}>
+                <button class="btn btn-primary btn-sm flex-1" onClick={exit} title={t('colorCalibration.back')}>
                   <VsClose size={14} />
-                  {t('whiteBalance.back')}
+                  {t('colorCalibration.back')}
                 </button>
               </div>
             </div>

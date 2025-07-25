@@ -6,7 +6,7 @@ export const enUS: TranslationDict = {
     info: 'System Info',
     displays: 'Display Info',
     ledConfiguration: 'LED Configuration',
-    whiteBalance: 'Color Calibration',
+    colorCalibration: 'Color Calibration',
     ledTest: 'LED Test',
     settings: 'Settings',
   },
@@ -177,7 +177,7 @@ export const enUS: TranslationDict = {
     endOffset: 'End Offset',
   },
   
-  whiteBalance: {
+  colorCalibration: {
     title: 'Color Calibration',
     colorCalibration: 'Color Calibration',
     redChannel: 'Red (R)',
@@ -328,7 +328,7 @@ export const enUS: TranslationDict = {
     ambientLightDisabled: 'Ambient Light Disabled',
     info: 'System Info',
     ledConfiguration: 'LED Configuration',
-    whiteBalance: 'Color Calibration',
+    colorCalibration: 'Color Calibration',
     ledTest: 'LED Test',
     settings: 'Settings',
     autoStart: 'Auto Start',

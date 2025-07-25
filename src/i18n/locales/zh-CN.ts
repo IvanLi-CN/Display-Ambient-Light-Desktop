@@ -6,7 +6,7 @@ export const zhCN: TranslationDict = {
     info: '系统信息',
     displays: '显示器信息',
     ledConfiguration: '灯条配置',
-    whiteBalance: '颜色校准',
+    colorCalibration: '颜色校准',
     ledTest: '灯带测试',
     settings: '设置',
   },
@@ -177,7 +177,7 @@ export const zhCN: TranslationDict = {
     endOffset: '结束偏移',
   },
   
-  whiteBalance: {
+  colorCalibration: {
     title: '颜色校准',
     colorCalibration: '颜色校准',
     redChannel: '红色 (R)',
@@ -328,7 +328,7 @@ export const zhCN: TranslationDict = {
     ambientLightDisabled: '氛围灯已禁用',
     info: '系统信息',
     ledConfiguration: '灯条配置',
-    whiteBalance: '颜色校准',
+    colorCalibration: '颜色校准',
     ledTest: '灯带测试',
     settings: '设置',
     autoStart: '开机自启',
