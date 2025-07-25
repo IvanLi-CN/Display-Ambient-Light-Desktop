@@ -7,7 +7,13 @@ use axum::{
 };
 use futures::{sink::SinkExt, stream::StreamExt};
 use serde::{Deserialize, Serialize};
-use std::{collections::{HashMap, HashSet}, sync::{Arc, atomic::{AtomicU64, Ordering}}};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
+};
 use tokio::sync::{broadcast, RwLock};
 
 use crate::http_server::AppState;
@@ -20,6 +26,8 @@ pub enum WsMessage {
     LedColorsChanged { colors: Vec<u8> },
     /// LED排序颜色变化
     LedSortedColorsChanged { sorted_colors: Vec<u8> },
+    /// LED状态变化
+    LedStatusChanged { status: serde_json::Value },
     /// 配置变化
     ConfigChanged { config: serde_json::Value },
     /// 设备列表变化
@@ -98,7 +106,11 @@ impl WebSocketManager {
             for event_type in event_types.iter() {
                 connection_events.insert(event_type.clone());
             }
-            log::debug!("📝 Connection {} subscribed to events: {:?}", connection_id, event_types);
+            log::debug!(
+                "📝 Connection {} subscribed to events: {:?}",
+                connection_id,
+                event_types
+            );
         }
     }
 
@@ -109,7 +121,11 @@ impl WebSocketManager {
             for event_type in event_types.iter() {
                 connection_events.remove(event_type);
             }
-            log::debug!("📝 Connection {} unsubscribed from events: {:?}", connection_id, event_types);
+            log::debug!(
+                "📝 Connection {} unsubscribed from events: {:?}",
+                connection_id,
+                event_types
+            );
         }
     }
 
@@ -122,15 +138,24 @@ impl WebSocketManager {
     }
 
     /// 根据订阅情况发送消息
-    pub async fn send_to_subscribers(&self, event_type: &str, message: WsMessage) -> Result<usize, broadcast::error::SendError<WsMessage>> {
+    pub async fn send_to_subscribers(
+        &self,
+        event_type: &str,
+        message: WsMessage,
+    ) -> Result<usize, broadcast::error::SendError<WsMessage>> {
         let subscriptions = self.subscriptions.read().await;
-        let subscriber_count = subscriptions.values()
+        let subscriber_count = subscriptions
+            .values()
             .filter(|events| events.contains(event_type))
             .count();
 
         if subscriber_count > 0 {
             self.sender.send(message)?;
-            log::debug!("📤 Sent {} event to {} subscribers", event_type, subscriber_count);
+            log::debug!(
+                "📤 Sent {} event to {} subscribers",
+                event_type,
+                subscriber_count
+            );
             Ok(subscriber_count)
         } else {
             log::debug!("📤 No subscribers for {} event, skipping", event_type);
@@ -144,7 +169,10 @@ impl WebSocketManager {
     }
 
     /// 获取连接的订阅信息（用于调试）
-    pub async fn get_connection_subscriptions(&self, connection_id: ConnectionId) -> Option<HashSet<String>> {
+    pub async fn get_connection_subscriptions(
+        &self,
+        connection_id: ConnectionId,
+    ) -> Option<HashSet<String>> {
         let subscriptions = self.subscriptions.read().await;
         subscriptions.get(&connection_id).cloned()
     }
@@ -209,7 +237,9 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                             }
                             WsMessage::Subscribe { event_types } => {
                                 log::debug!("收到订阅请求: {:?}", event_types);
-                                ws_manager_for_recv.subscribe_events(connection_id, event_types.clone()).await;
+                                ws_manager_for_recv
+                                    .subscribe_events(connection_id, event_types.clone())
+                                    .await;
 
                                 // 发送订阅确认
                                 let confirmation = WsMessage::SubscriptionConfirmed { event_types };
@@ -219,7 +249,9 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                             }
                             WsMessage::Unsubscribe { event_types } => {
                                 log::debug!("收到取消订阅请求: {:?}", event_types);
-                                ws_manager_for_recv.unsubscribe_events(connection_id, event_types).await;
+                                ws_manager_for_recv
+                                    .unsubscribe_events(connection_id, event_types)
+                                    .await;
                             }
                             _ => {
                                 // 处理其他客户端消息

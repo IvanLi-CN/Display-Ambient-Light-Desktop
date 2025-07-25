@@ -9,6 +9,7 @@ mod http_server;
 mod language_manager;
 mod led_color;
 mod led_data_sender;
+mod led_status_manager;
 mod led_test_effects;
 mod rpc;
 mod screen_stream;

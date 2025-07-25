@@ -13,6 +13,7 @@ use crate::{
     ambient_light::{config, ConfigManager},
     led_color::LedColor,
     led_data_sender::{DataSendMode, LedDataSender},
+    led_status_manager::LedStatusManager,
     screenshot::{LedSamplePoints, Screenshot},
     screenshot_manager::ScreenshotManager,
 };
@@ -263,6 +264,15 @@ impl LedColorsPublisher {
                             warn!("Failed to send sorted colors: {}", err);
                         }
                     };
+
+                    // 通过状态管理器更新颜色数据
+                    let status_manager = LedStatusManager::global().await;
+                    if let Err(e) = status_manager
+                        .update_colors(flatten_colors.clone(), sorted_colors.clone())
+                        .await
+                    {
+                        warn!("Failed to update colors in status manager: {}", e);
+                    }
 
                     // 通过WebSocket广播颜色变化
                     let websocket_publisher =
@@ -738,6 +748,12 @@ impl LedColorsPublisher {
         let sender = LedDataSender::global().await;
         sender.set_mode(DataSendMode::AmbientLight).await;
 
+        // 通过状态管理器更新测试模式状态
+        let status_manager = LedStatusManager::global().await;
+        if let Err(e) = status_manager.set_test_mode_active(true).await {
+            warn!("Failed to update test mode status: {}", e);
+        }
+
         log::info!("Test mode enabled - normal LED publishing paused but connection maintained");
     }
 
@@ -749,6 +765,12 @@ impl LedColorsPublisher {
         // Set data send mode back to AmbientLight to resume normal publishing
         let sender = LedDataSender::global().await;
         sender.set_mode(DataSendMode::AmbientLight).await;
+
+        // 通过状态管理器更新测试模式状态
+        let status_manager = LedStatusManager::global().await;
+        if let Err(e) = status_manager.set_test_mode_active(false).await {
+            warn!("Failed to update test mode status: {}", e);
+        }
 
         log::info!("Test mode disabled - normal LED publishing resumed");
     }

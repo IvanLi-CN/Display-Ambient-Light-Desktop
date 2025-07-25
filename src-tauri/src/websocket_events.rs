@@ -6,6 +6,8 @@ use crate::{
     ambient_light_state::AmbientLightState,
     display::DisplayState,
     http_server::websocket::{WebSocketManager, WsMessage},
+    led_data_sender::DataSendMode,
+    led_status_manager::{LedStatusManager, LedStatusStats},
     rpc::BoardInfo,
     user_preferences::UserPreferences,
 };
@@ -43,7 +45,11 @@ impl WebSocketEventPublisher {
             colors.len()
         );
         let message = WsMessage::LedColorsChanged { colors };
-        match self.ws_manager.send_to_subscribers("LedColorsChanged", message).await {
+        match self
+            .ws_manager
+            .send_to_subscribers("LedColorsChanged", message)
+            .await
+        {
             Ok(subscriber_count) => {
                 if subscriber_count > 0 {
                     log::debug!("✅ LED颜色变化事件已发送给 {} 个订阅者", subscriber_count);
@@ -62,14 +68,131 @@ impl WebSocketEventPublisher {
             sorted_colors.len()
         );
         let message = WsMessage::LedSortedColorsChanged { sorted_colors };
-        match self.ws_manager.send_to_subscribers("LedSortedColorsChanged", message).await {
+        match self
+            .ws_manager
+            .send_to_subscribers("LedSortedColorsChanged", message)
+            .await
+        {
             Ok(subscriber_count) => {
                 if subscriber_count > 0 {
-                    log::debug!("✅ LED排序颜色变化事件已发送给 {} 个订阅者", subscriber_count);
+                    log::debug!(
+                        "✅ LED排序颜色变化事件已发送给 {} 个订阅者",
+                        subscriber_count
+                    );
                 }
             }
             Err(e) => {
                 log::debug!("发送LED排序颜色变化事件失败: {}", e);
+            }
+        }
+    }
+
+    /// 发布LED状态变化事件（使用统一状态管理器）
+    pub async fn publish_led_status_changed(&self, status: LedStatusStats) {
+        log::debug!(
+            "🔄 Publishing LED status changed event: mode={:?}, test_mode={}, config_mode={}",
+            status.data_send_mode,
+            status.test_mode_active,
+            status.single_display_config_mode
+        );
+
+        let message = WsMessage::LedStatusChanged {
+            status: serde_json::to_value(&status).unwrap_or_default(),
+        };
+
+        match self
+            .ws_manager
+            .send_to_subscribers("LedStatusChanged", message)
+            .await
+        {
+            Ok(subscriber_count) => {
+                if subscriber_count > 0 {
+                    log::debug!("✅ LED状态变化事件已发送给 {} 个订阅者", subscriber_count);
+                }
+            }
+            Err(e) => {
+                log::debug!("发送LED状态变化事件失败: {}", e);
+            }
+        }
+    }
+
+    /// 发布LED状态变化事件（兼容旧版本）
+    pub async fn publish_led_status_changed_legacy(&self) {
+        self.publish_led_status_changed_with_mode(None).await;
+    }
+
+    /// 发布LED状态变化事件（带指定模式）
+    pub async fn publish_led_status_changed_with_mode(&self, mode_override: Option<DataSendMode>) {
+        // 获取当前LED状态
+        let sender = crate::led_data_sender::LedDataSender::global().await;
+        let publisher = crate::ambient_light::LedColorsPublisher::global().await;
+        let config_manager = crate::ambient_light::ConfigManager::global().await;
+
+        // 获取当前模式（如果没有提供覆盖值）
+        let mode = if let Some(mode) = mode_override {
+            mode
+        } else {
+            sender.get_mode().await
+        };
+
+        // 获取测试模式状态
+        let test_mode_active = publisher.is_test_mode_active().await;
+
+        // 获取LED配置以计算总数量和数据长度
+        let configs = config_manager.configs().await;
+        let total_led_count: u32 = configs.strips.iter().map(|strip| strip.len as u32).sum();
+
+        // 计算数据长度（每个LED 3字节 RGB 或 4字节 RGBW）
+        let data_length: u32 = configs
+            .strips
+            .iter()
+            .map(|strip| {
+                match strip.led_type {
+                    crate::ambient_light::LedType::WS2812B => strip.len as u32 * 3, // RGB
+                    crate::ambient_light::LedType::SK6812 => strip.len as u32 * 4,  // RGBW
+                }
+            })
+            .sum();
+
+        // 根据模式确定频率
+        let frequency = match mode {
+            DataSendMode::AmbientLight => 30.0, // 氛围光模式30Hz
+            DataSendMode::StripConfig => 30.0,  // 配置模式30Hz
+            DataSendMode::TestEffect => 1.0,    // 测试效果1Hz
+            DataSendMode::None => 0.0,          // 无发送
+        };
+
+        // 创建状态对象
+        let status = serde_json::json!({
+            "mode": mode,
+            "frequency": frequency,
+            "data_length": data_length,
+            "total_led_count": total_led_count,
+            "test_mode_active": test_mode_active,
+            "timestamp": chrono::Utc::now().to_rfc3339()
+        });
+
+        log::info!(
+            "🔄 Publishing LED status changed event: mode={:?}, frequency={}Hz",
+            mode,
+            frequency
+        );
+
+        let message = WsMessage::LedStatusChanged { status };
+        match self
+            .ws_manager
+            .send_to_subscribers("LedStatusChanged", message)
+            .await
+        {
+            Ok(subscriber_count) => {
+                if subscriber_count > 0 {
+                    log::info!("✅ LED状态变化事件已发送给 {} 个订阅者", subscriber_count);
+                } else {
+                    log::info!("📭 没有订阅者接收LED状态变化事件");
+                }
+            }
+            Err(e) => {
+                log::warn!("发送LED状态变化事件失败: {}", e);
             }
         }
     }
@@ -80,7 +203,11 @@ impl WebSocketEventPublisher {
             let message = WsMessage::ConfigChanged {
                 config: config_json,
             };
-            match self.ws_manager.send_to_subscribers("ConfigChanged", message).await {
+            match self
+                .ws_manager
+                .send_to_subscribers("ConfigChanged", message)
+                .await
+            {
                 Ok(subscriber_count) => {
                     if subscriber_count > 0 {
                         log::debug!("✅ 配置变化事件已发送给 {} 个订阅者", subscriber_count);
@@ -101,7 +228,11 @@ impl WebSocketEventPublisher {
             let message = WsMessage::BoardsChanged {
                 boards: boards_json,
             };
-            match self.ws_manager.send_to_subscribers("BoardsChanged", message).await {
+            match self
+                .ws_manager
+                .send_to_subscribers("BoardsChanged", message)
+                .await
+            {
                 Ok(subscriber_count) => {
                     if subscriber_count > 0 {
                         log::debug!("✅ 设备列表变化事件已发送给 {} 个订阅者", subscriber_count);
@@ -122,10 +253,17 @@ impl WebSocketEventPublisher {
             let message = WsMessage::DisplaysChanged {
                 displays: displays_json,
             };
-            match self.ws_manager.send_to_subscribers("DisplaysChanged", message).await {
+            match self
+                .ws_manager
+                .send_to_subscribers("DisplaysChanged", message)
+                .await
+            {
                 Ok(subscriber_count) => {
                     if subscriber_count > 0 {
-                        log::debug!("✅ 显示器状态变化事件已发送给 {} 个订阅者", subscriber_count);
+                        log::debug!(
+                            "✅ 显示器状态变化事件已发送给 {} 个订阅者",
+                            subscriber_count
+                        );
                     }
                 }
                 Err(e) => {
@@ -141,10 +279,17 @@ impl WebSocketEventPublisher {
     pub async fn publish_ambient_light_state_changed(&self, state: &AmbientLightState) {
         if let Ok(state_json) = serde_json::to_value(state) {
             let message = WsMessage::AmbientLightStateChanged { state: state_json };
-            match self.ws_manager.send_to_subscribers("AmbientLightStateChanged", message).await {
+            match self
+                .ws_manager
+                .send_to_subscribers("AmbientLightStateChanged", message)
+                .await
+            {
                 Ok(subscriber_count) => {
                     if subscriber_count > 0 {
-                        log::debug!("✅ 环境光状态变化事件已发送给 {} 个订阅者", subscriber_count);
+                        log::debug!(
+                            "✅ 环境光状态变化事件已发送给 {} 个订阅者",
+                            subscriber_count
+                        );
                     }
                 }
                 Err(e) => {
@@ -173,7 +318,11 @@ impl WebSocketEventPublisher {
     /// 发布导航事件
     pub async fn publish_navigate(&self, path: String) {
         let message = WsMessage::Navigate { path };
-        match self.ws_manager.send_to_subscribers("Navigate", message).await {
+        match self
+            .ws_manager
+            .send_to_subscribers("Navigate", message)
+            .await
+        {
             Ok(subscriber_count) => {
                 if subscriber_count > 0 {
                     log::debug!("✅ 导航事件已发送给 {} 个订阅者", subscriber_count);

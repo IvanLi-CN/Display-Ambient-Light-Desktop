@@ -9,7 +9,7 @@ use tokio::fs::OpenOptions;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::{OnceCell, RwLock};
 
-use crate::rpc::UdpRpc;
+use crate::{led_status_manager::LedStatusManager, rpc::UdpRpc};
 
 /// LED数据发送模式
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -181,6 +181,12 @@ impl LedDataSender {
         *current_mode = mode;
 
         info!("LED data send mode changed: {} -> {}", old_mode, mode);
+
+        // 通过状态管理器更新状态
+        let status_manager = LedStatusManager::global().await;
+        if let Err(e) = status_manager.set_data_send_mode(mode).await {
+            warn!("Failed to update LED status manager: {}", e);
+        }
     }
 
     /// 检查是否可以发送指定模式的数据
@@ -376,6 +382,15 @@ impl LedDataSender {
             packet_count,
             complete_data.len()
         );
+
+        // 记录发送统计信息到状态管理器
+        let status_manager = LedStatusManager::global().await;
+        if let Err(e) = status_manager
+            .record_send_stats(packet_count as u64, complete_data.len() as u64, true)
+            .await
+        {
+            warn!("Failed to record send stats: {}", e);
+        }
 
         Ok(())
     }

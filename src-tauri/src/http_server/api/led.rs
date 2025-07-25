@@ -12,6 +12,7 @@ use crate::{
     ambient_light::{self, BorderColors, LedStripConfig},
     http_server::{ApiResponse, AppState},
     led_data_sender::{DataSendMode, LedDataSender},
+    led_status_manager::{LedStatusManager, LedStatusStats},
     led_test_effects,
 };
 
@@ -154,6 +155,21 @@ pub async fn send_test_colors_to_board(
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
+}
+
+/// 获取LED状态统计信息
+#[utoipa::path(
+    get,
+    path = "/api/v1/led/status",
+    responses(
+        (status = 200, description = "获取LED状态成功", body = ApiResponse<LedStatusStats>),
+    ),
+    tag = "led"
+)]
+pub async fn get_led_status() -> Result<Json<ApiResponse<LedStatusStats>>, StatusCode> {
+    let status_manager = LedStatusManager::global().await;
+    let status = status_manager.get_status().await;
+    Ok(Json(ApiResponse::success(status)))
 }
 
 /// 获取LED数据发送模式
@@ -465,6 +481,7 @@ pub async fn test_led_data_sender() -> Result<Json<ApiResponse<String>>, StatusC
 /// 创建LED控制相关路由
 pub fn create_routes() -> Router<AppState> {
     Router::new()
+        .route("/status", get(get_led_status))
         .route("/colors", post(send_colors))
         .route("/test-colors", post(send_test_colors_to_board))
         .route("/mode", get(get_data_send_mode))

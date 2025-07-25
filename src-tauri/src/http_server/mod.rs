@@ -94,6 +94,7 @@ impl ApiError {
         api::info::navigate_to_display_config,
         api::info::open_external_url,
         api::info::open_external_url_alt,
+        api::led::get_led_status,
         api::led::send_colors,
         api::led::send_test_colors_to_board,
         api::led::get_data_send_mode,
