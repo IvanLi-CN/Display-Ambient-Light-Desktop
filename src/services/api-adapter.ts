@@ -144,6 +144,33 @@ export class ApiAdapter {
     }
   }
 
+  /**
+   * 订阅WebSocket事件
+   */
+  public async subscribeToEvents(eventTypes: string[]): Promise<void> {
+    await this.initialize();
+
+    if (this.environmentInfo!.preferredMode === 'http' && this.environmentInfo!.isHttpApiAvailable) {
+      // 使用WebSocket订阅 - 发送正确格式的消息
+      // 后端期望的格式是 { "Subscribe": { "event_types": [...] } }
+      const subscribeMessage = {
+        Subscribe: {
+          event_types: eventTypes
+        }
+      };
+
+      // 使用apiClient的sendWebSocketMessage方法
+      import('./api-client').then(({ apiClient }) => {
+        apiClient.sendWebSocketMessage(subscribeMessage as any);
+        console.log('📤 Sent subscription message:', subscribeMessage);
+      }).catch(error => {
+        console.error('❌ Failed to send subscription message:', error);
+      });
+    } else {
+      console.warn('WebSocket不可用，无法订阅事件');
+    }
+  }
+
   // ===== LED相关API =====
 
   public async sendColors(offset: number, buffer: number[]): Promise<void> {
@@ -467,6 +494,7 @@ export const adaptiveApi = {
   // 事件
   onEvent: <T>(eventName: string, handler: (data: T) => void) => apiAdapter.onEvent(eventName, handler),
   emitEvent: (eventName: string, data: any) => apiAdapter.emitEvent(eventName, data),
+  subscribeToEvents: (eventTypes: string[]) => apiAdapter.subscribeToEvents(eventTypes),
   isConnected: () => api.isConnected(),
   
   // LED API

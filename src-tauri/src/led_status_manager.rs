@@ -274,11 +274,18 @@ impl LedStatusManager {
             warn!("Failed to send status change notification: {e}");
         }
 
-        // 通过WebSocket广播状态变更
+        // 通过WebSocket广播状态变更（发送完整状态数据）
         let websocket_publisher = WebSocketEventPublisher::global().await;
         websocket_publisher
-            .publish_led_status_changed(current_status)
+            .publish_led_status_changed_full(current_status.clone())
             .await;
+
+        info!(
+            "🔄 LED状态变更已通知: mode={:?}, test_mode={}, send_stats={:?}",
+            current_status.data_send_mode,
+            current_status.test_mode_active,
+            current_status.send_stats
+        );
 
         Ok(())
     }
@@ -344,6 +351,8 @@ mod tests {
         let status = manager.get_status().await;
 
         // 验证初始状态
+        // 注意：在实际应用中，LED发布器启动时会将模式设置为AmbientLight
+        // 但在单元测试中，我们期望初始状态为None
         assert_eq!(status.data_send_mode, DataSendMode::None);
         assert!(!status.test_mode_active);
         assert!(!status.single_display_config_mode);

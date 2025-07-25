@@ -197,20 +197,28 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
     }
     log::info!("✅ Connection confirmation message sent to LED events WebSocket");
 
-    // 发送一个测试LED颜色事件
-    let test_colors = vec![255u8, 0, 0, 255, 255, 255, 0, 255, 0, 255, 255, 255]; // 红色和绿色LED
-    let test_message = WsMessage::LedColorsChanged {
-        colors: test_colors,
-    };
-    if sender
-        .send(Message::Text(serde_json::to_string(&test_message).unwrap()))
-        .await
-        .is_err()
+    // 立即推送当前LED状态（WebSocket连接建立时）
     {
-        log::warn!("❌ Failed to send test LED colors message");
-        return;
+        use crate::led_status_manager::LedStatusManager;
+        let led_status_manager = LedStatusManager::global().await;
+        let current_status = led_status_manager.get_status().await;
+
+        let status_message = WsMessage::LedStatusChanged {
+            status: serde_json::to_value(&current_status).unwrap_or_default(),
+        };
+
+        if sender
+            .send(Message::Text(
+                serde_json::to_string(&status_message).unwrap(),
+            ))
+            .await
+            .is_err()
+        {
+            log::warn!("❌ Failed to send initial LED status message");
+        } else {
+            log::info!("✅ Initial LED status message sent to WebSocket client");
+        }
     }
-    log::info!("✅ Test LED colors message sent to WebSocket client");
 
     // 处理客户端消息的任务
     let ws_manager_for_recv = ws_manager.clone();
