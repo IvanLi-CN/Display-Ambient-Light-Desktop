@@ -78,6 +78,13 @@ pub struct UpdateGlobalColorCalibrationRequest {
     pub calibration: ColorCalibration,
 }
 
+/// 语言设置更新请求
+#[derive(Deserialize, ToSchema)]
+pub struct UpdateLanguageRequest {
+    /// 语言代码 (zh-CN, en-US)
+    pub language: String,
+}
+
 /// 获取LED灯带配置
 #[utoipa::path(
     get,
@@ -263,6 +270,39 @@ pub async fn get_current_language() -> Result<Json<ApiResponse<String>>, StatusC
     let language_manager = LanguageManager::global().await;
     let language = language_manager.get_language().await;
     Ok(Json(ApiResponse::success(language)))
+}
+
+/// 设置当前语言
+#[utoipa::path(
+    put,
+    path = "/api/v1/config/current-language",
+    request_body = UpdateLanguageRequest,
+    responses(
+        (status = 200, description = "设置语言成功", body = ApiResponse<String>),
+        (status = 500, description = "设置失败", body = ApiResponse<String>),
+    ),
+    tag = "config"
+)]
+pub async fn set_current_language(
+    Json(request): Json<UpdateLanguageRequest>,
+) -> Result<Json<ApiResponse<String>>, StatusCode> {
+    let language_manager = LanguageManager::global().await;
+
+    match language_manager
+        .set_language(request.language.clone())
+        .await
+    {
+        Ok(_) => {
+            log::info!("Language set to: {}", request.language);
+            Ok(Json(ApiResponse::success(
+                "Language set successfully".to_string(),
+            )))
+        }
+        Err(e) => {
+            log::error!("Failed to set language: {e}");
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
 }
 
 /// 获取主题
@@ -461,5 +501,8 @@ pub fn create_routes() -> Router<AppState> {
             get(get_night_mode_theme_enabled),
         )
         .route("/night-mode-theme", get(get_night_mode_theme))
-        .route("/current-language", get(get_current_language))
+        .route(
+            "/current-language",
+            get(get_current_language).put(set_current_language),
+        )
 }

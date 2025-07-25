@@ -9,6 +9,7 @@ import { BsFullscreen, BsFullscreenExit } from 'solid-icons/bs';
 import transparentBg from '../../assets/transparent-grid-background.svg?url';
 import { useLanguage } from '../../i18n/index';
 import { adaptiveApi } from '../../services/api-adapter';
+import { colorCalibrationService } from '../../services/color-calibration.service';
 
 const Value: Component<{ value: number }> = (props) => {
   return (
@@ -25,24 +26,37 @@ export const WhiteBalance = () => {
   const [isDragging, setIsDragging] = createSignal(false);
   const [dragOffset, setDragOffset] = createSignal({ x: 0, y: 0 });
 
-  // 自动进入全屏模式
+  // 初始化全屏状态检测
   createEffect(() => {
-    const autoEnterFullscreen = async () => {
+    const checkInitialFullscreenStatus = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    checkInitialFullscreenStatus();
+  });
+
+  // 颜色校准模式生命周期管理
+  createEffect(() => {
+    const enableColorCalibration = async () => {
       try {
-        if (!document.fullscreenElement) {
-          await document.documentElement.requestFullscreen();
-          setIsFullscreen(true);
-        } else {
-          setIsFullscreen(true);
-        }
+        await colorCalibrationService.enableColorCalibrationMode();
+        console.log('🎨 颜色校准模式已启用');
       } catch (error) {
-        // Silently handle fullscreen error
-        console.warn('自动全屏失败:', error);
-        setIsFullscreen(false);
+        console.error('❌ 启用颜色校准模式失败:', error);
       }
     };
 
-    autoEnterFullscreen();
+    enableColorCalibration();
+
+    // 组件卸载时禁用颜色校准模式
+    onCleanup(async () => {
+      try {
+        await colorCalibrationService.disableColorCalibrationMode();
+        console.log('🎨 颜色校准模式已禁用');
+      } catch (error) {
+        console.error('❌ 禁用颜色校准模式失败:', error);
+      }
+    });
   });
 
   // 初始化面板位置到屏幕中央
@@ -184,13 +198,21 @@ export const WhiteBalance = () => {
     }
   };
 
-  const exit = () => {
-    // 退出时确保退出全屏模式
-    if (isFullscreen()) {
-      toggleFullscreen().then(() => {
-        window.history.back();
-      });
-    } else {
+  const exit = async () => {
+    try {
+      // 禁用颜色校准模式
+      await colorCalibrationService.disableColorCalibrationMode();
+
+      // 退出时确保退出全屏模式
+      if (isFullscreen()) {
+        await toggleFullscreen();
+      }
+
+      // 返回上一页
+      window.history.back();
+    } catch (error) {
+      console.error('❌ 退出颜色校准界面失败:', error);
+      // 即使出错也要返回上一页
       window.history.back();
     }
   };

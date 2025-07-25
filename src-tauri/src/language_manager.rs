@@ -72,6 +72,11 @@ impl LanguageManager {
                 let config: LanguageConfig =
                     (LanguageConfig::read_config().await).unwrap_or_default();
 
+                log::info!(
+                    "🌐 LanguageManager initialized with language: {}",
+                    config.language
+                );
+
                 Self {
                     config: Arc::new(RwLock::new(config)),
                 }
@@ -81,7 +86,9 @@ impl LanguageManager {
 
     /// Get current language
     pub async fn get_language(&self) -> String {
-        self.config.read().await.language.clone()
+        let language = self.config.read().await.language.clone();
+        log::info!("🌐 LanguageManager::get_language() returning: {}", language);
+        language
     }
 
     /// Set language

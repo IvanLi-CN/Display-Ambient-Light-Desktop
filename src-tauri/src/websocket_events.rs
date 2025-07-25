@@ -91,43 +91,6 @@ impl WebSocketEventPublisher {
         self.publish_led_status_changed_with_mode(None).await;
     }
 
-    /// 发布完整的LED状态变化事件（使用LedStatusStats）
-    pub async fn publish_led_status_changed_full(
-        &self,
-        status: crate::led_status_manager::LedStatusStats,
-    ) {
-        log::info!(
-            "🔄 Publishing full LED status changed event: mode={:?}, test_mode={}, send_stats={:?}",
-            status.data_send_mode,
-            status.test_mode_active,
-            status.send_stats
-        );
-
-        let message = WsMessage::LedStatusChanged {
-            status: serde_json::to_value(&status).unwrap_or_default(),
-        };
-
-        match self
-            .ws_manager
-            .send_to_subscribers("LedStatusChanged", message)
-            .await
-        {
-            Ok(subscriber_count) => {
-                if subscriber_count > 0 {
-                    log::info!(
-                        "✅ 完整LED状态变化事件已发送给 {} 个订阅者",
-                        subscriber_count
-                    );
-                } else {
-                    log::info!("📭 没有订阅者接收完整LED状态变化事件");
-                }
-            }
-            Err(e) => {
-                log::warn!("发送完整LED状态变化事件失败: {}", e);
-            }
-        }
-    }
-
     /// 发布LED状态变化事件（带指定模式）
     pub async fn publish_led_status_changed_with_mode(&self, mode_override: Option<DataSendMode>) {
         // 获取当前LED状态
@@ -163,10 +126,11 @@ impl WebSocketEventPublisher {
 
         // 根据模式确定频率
         let frequency = match mode {
-            DataSendMode::AmbientLight => 30.0, // 氛围光模式30Hz
-            DataSendMode::StripConfig => 30.0,  // 配置模式30Hz
-            DataSendMode::TestEffect => 1.0,    // 测试效果1Hz
-            DataSendMode::None => 0.0,          // 无发送
+            DataSendMode::AmbientLight => 30.0,    // 氛围光模式30Hz
+            DataSendMode::StripConfig => 30.0,     // 配置模式30Hz
+            DataSendMode::TestEffect => 1.0,       // 测试效果1Hz
+            DataSendMode::ColorCalibration => 1.0, // 颜色校准1Hz
+            DataSendMode::None => 0.0,             // 无发送
         };
 
         // 创建状态对象

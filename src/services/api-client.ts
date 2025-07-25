@@ -101,17 +101,23 @@ export class ApiClient {
 
       this.websocket.onmessage = (event) => {
         try {
-          const message: WebSocketMessage = JSON.parse(event.data);
-          console.log('📨 收到WebSocket消息:', message.type, message);
+          // 现在连接到正确的WebSocket服务器，应该只接收JSON文本消息
+          if (typeof event.data === 'string') {
+            const message: WebSocketMessage = JSON.parse(event.data);
+            console.log('📨 收到WebSocket消息:', message.type, message);
 
-          // 处理订阅确认消息
-          if (message.type === 'SubscriptionConfirmed' && message.data?.event_types) {
-            this.handleSubscriptionConfirmed(message.data.event_types);
+            // 处理订阅确认消息
+            if (message.type === 'SubscriptionConfirmed' && message.data?.event_types) {
+              this.handleSubscriptionConfirmed(message.data.event_types);
+            }
+
+            this.handleWebSocketMessage(message);
+          } else {
+            console.warn('收到非文本WebSocket消息:', typeof event.data, event.data);
           }
-
-          this.handleWebSocketMessage(message);
         } catch (error) {
           console.error('解析WebSocket消息失败:', error);
+          console.error('原始消息数据:', event.data);
         }
       };
 
@@ -328,7 +334,13 @@ export class ApiClient {
 
       return result.data;
     } catch (error) {
-      console.error(`API请求失败 [${endpoint}]:`, error);
+      // 忽略AbortError，这通常是由于组件卸载或页面切换导致的正常行为
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.warn(`⚠️ API请求被中止 [${endpoint}]: ${error.message}`);
+        throw error; // 重新抛出，让调用者决定如何处理
+      }
+
+      console.error(`❌ API请求失败 [${endpoint}]:`, error);
       throw error;
     }
   }

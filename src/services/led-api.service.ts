@@ -25,6 +25,16 @@ export interface BorderColors {
   right: number[][];
 }
 
+// LED状态统计信息
+export interface LedStatusStats {
+  mode: DataSendMode;
+  frequency: number;
+  data_length: number;
+  total_led_count: number;
+  test_mode_active: boolean;
+  last_update: string;
+}
+
 /**
  * LED API服务类
  */
@@ -67,6 +77,13 @@ export class LedApiService {
    */
   static async setDataSendMode(mode: DataSendMode): Promise<void> {
     return api.put('/api/v1/led/mode', { mode });
+  }
+
+  /**
+   * 获取LED状态统计信息
+   */
+  static async getLedStatus(): Promise<LedStatusStats> {
+    return api.get('/api/v1/led/status');
   }
 
 
@@ -315,6 +332,14 @@ export class ConfigApiService {
    */
   static async getCurrentLanguage(): Promise<string> {
     return api.get('/api/v1/config/current-language');
+  }
+
+  /**
+   * 设置当前语言
+   * 替代: invoke('set_current_language', { language })
+   */
+  static async setCurrentLanguage(language: string): Promise<void> {
+    return api.put('/api/v1/config/current-language', { language });
   }
 
   /**

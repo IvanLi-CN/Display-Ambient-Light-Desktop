@@ -8,6 +8,7 @@ import { LedApiService, ConfigApiService } from './led-api.service';
 import { DisplayApiService, DeviceApiService, HealthApiService } from './display-api.service';
 import { InfoApiService } from './info-api.service';
 import { api, WebSocketEventListener } from './api-client';
+import { DataSendMode } from '../models/led-data-sender';
 
 // 环境检测结果
 export interface EnvironmentInfo {
@@ -200,6 +201,21 @@ export class ApiAdapter {
     return this.call(
       'disable_test_mode',
       () => LedApiService.disableTestMode()
+    );
+  }
+
+  public async setDataSendMode(mode: DataSendMode): Promise<void> {
+    return this.call(
+      'set_led_data_send_mode',
+      () => LedApiService.setDataSendMode(mode),
+      { mode }
+    );
+  }
+
+  public async getDataSendMode(): Promise<DataSendMode> {
+    return this.call(
+      'get_led_data_send_mode',
+      () => LedApiService.getDataSendMode()
     );
   }
 
@@ -471,6 +487,14 @@ export class ApiAdapter {
     );
   }
 
+  public async setCurrentLanguage(language: string): Promise<void> {
+    return this.call(
+      'set_current_language',
+      () => ConfigApiService.setCurrentLanguage(language),
+      { language }
+    );
+  }
+
   // ===== 问候API（测试用） =====
 
   public async greet(name: string): Promise<string> {
@@ -503,6 +527,8 @@ export const adaptiveApi = {
     apiAdapter.sendTestColorsToBoard(params.boardAddress, params.offset, params.buffer),
   enableTestMode: () => apiAdapter.enableTestMode(),
   disableTestMode: () => apiAdapter.disableTestMode(),
+  setDataSendMode: (mode: DataSendMode) => apiAdapter.setDataSendMode(mode),
+  getDataSendMode: () => apiAdapter.getDataSendMode(),
   startLedTestEffect: (params: any) => apiAdapter.startLedTestEffect(params),
   stopLedTestEffect: (params: any) => apiAdapter.stopLedTestEffect(params),
   startSingleDisplayConfigPublisher: (strips: any[], borderColors: any) =>
@@ -538,6 +564,7 @@ export const adaptiveApi = {
   getNightModeThemeEnabled: () => apiAdapter.getNightModeThemeEnabled(),
   getNightModeTheme: () => apiAdapter.getNightModeTheme(),
   getCurrentLanguage: () => apiAdapter.getCurrentLanguage(),
+  setCurrentLanguage: (language: string) => apiAdapter.setCurrentLanguage(language),
   
   // 显示器API
   listDisplayInfo: () => apiAdapter.listDisplayInfo(),

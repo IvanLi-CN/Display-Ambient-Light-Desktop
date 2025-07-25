@@ -23,6 +23,8 @@ pub enum DataSendMode {
     StripConfig,
     /// 测试效果数据
     TestEffect,
+    /// 颜色校准数据
+    ColorCalibration,
 }
 
 impl std::fmt::Display for DataSendMode {
@@ -32,6 +34,7 @@ impl std::fmt::Display for DataSendMode {
             DataSendMode::AmbientLight => write!(f, "AmbientLight"),
             DataSendMode::StripConfig => write!(f, "StripConfig"),
             DataSendMode::TestEffect => write!(f, "TestEffect"),
+            DataSendMode::ColorCalibration => write!(f, "ColorCalibration"),
         }
     }
 }
@@ -168,9 +171,12 @@ impl LedDataSender {
 
     /// 设置发送模式
     pub async fn set_mode(&self, mode: DataSendMode) {
-        let mut current_mode = self.current_mode.write().await;
-        let old_mode = *current_mode;
-        *current_mode = mode;
+        let old_mode = {
+            let mut current_mode = self.current_mode.write().await;
+            let old_mode = *current_mode;
+            *current_mode = mode;
+            old_mode
+        }; // 写锁在这里释放
 
         info!("LED data send mode changed: {old_mode} -> {mode}");
 
@@ -329,6 +335,7 @@ impl LedDataSender {
             "AmbientLight" => DataSendMode::AmbientLight,
             "StripConfig" => DataSendMode::StripConfig,
             "TestEffect" => DataSendMode::TestEffect,
+            "ColorCalibration" => DataSendMode::ColorCalibration,
             _ => DataSendMode::AmbientLight,
         };
 

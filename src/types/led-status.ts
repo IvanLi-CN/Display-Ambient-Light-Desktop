@@ -7,11 +7,12 @@
  * LED数据发送模式
  * 对应后端的 DataSendMode 枚举
  */
-export type DataSendMode = 
+export type DataSendMode =
   | 'None'           // 不发送任何数据
   | 'AmbientLight'   // 屏幕氛围光数据
   | 'StripConfig'    // 单灯条配置数据
-  | 'TestEffect';    // 测试效果数据
+  | 'TestEffect'     // 测试效果数据
+  | 'ColorCalibration'; // 颜色校准数据
 
 /**
  * LED数据发送统计
@@ -87,7 +88,8 @@ export const MODE_DISPLAY_NAMES: Record<DataSendMode, string> = {
   'None': '无',
   'AmbientLight': '氛围光',
   'StripConfig': '配置模式',
-  'TestEffect': '测试模式'
+  'TestEffect': '测试模式',
+  'ColorCalibration': '颜色校准'
 };
 
 /**
@@ -143,13 +145,15 @@ export function convertToStatusBarData(
   const frequency = calculateFrequency(safeStatus.send_stats);
   const totalLedCount = calculateLedCount(safeStatus.current_colors_bytes || 0);
 
+
+
   return {
-    mode: MODE_DISPLAY_NAMES[safeStatus.data_send_mode as DataSendMode] || '未知',
-    frequency,
-    data_length: safeStatus.current_colors_bytes || 0,
-    total_led_count: totalLedCount,
+    mode: MODE_DISPLAY_NAMES[safeStatus.mode as DataSendMode] || '未知',
+    frequency: safeStatus.frequency || frequency,
+    data_length: safeStatus.data_length || safeStatus.current_colors_bytes || 0,
+    total_led_count: safeStatus.total_led_count || totalLedCount,
     test_mode_active: safeStatus.test_mode_active || false,
-    last_update: formatTime(safeStatus.last_updated || new Date().toISOString()),
+    last_update: formatTime(safeStatus.timestamp || safeStatus.last_updated || new Date().toISOString()),
     connected
   };
 }

@@ -10,6 +10,8 @@ export enum DataSendMode {
   StripConfig = 'StripConfig',
   /** 测试效果数据 */
   TestEffect = 'TestEffect',
+  /** 颜色校准数据 */
+  ColorCalibration = 'ColorCalibration',
 }
 
 /**

@@ -678,7 +678,10 @@ export function SingleDisplayConfig() {
       await adaptiveApi.disableTestMode();
       console.log('LED test mode disabled, ambient light resumed');
     } catch (error) {
-      console.error('Failed to stop test mode:', error);
+      // 忽略AbortError，这是正常的页面切换行为
+      if (error instanceof Error && error.name !== 'AbortError') {
+        console.error('Failed to stop test mode:', error);
+      }
     }
   };
 

@@ -408,9 +408,17 @@ impl LedColorsPublisher {
 
     pub async fn send_colors(offset: u16, payload: Vec<u8>) -> anyhow::Result<()> {
         let sender = LedDataSender::global().await;
-        sender
-            .send_complete_led_data(offset, payload, "AmbientLight")
-            .await
+
+        // 根据当前模式确定数据源
+        let current_mode = sender.get_mode().await;
+        let source = match current_mode {
+            DataSendMode::ColorCalibration => "ColorCalibration",
+            DataSendMode::TestEffect => "TestEffect",
+            DataSendMode::StripConfig => "StripConfig",
+            _ => "AmbientLight",
+        };
+
+        sender.send_complete_led_data(offset, payload, source).await
     }
 
     /// Get updated configs with proper display IDs assigned

@@ -1,8 +1,8 @@
 import { createSignal, createEffect, onMount } from 'solid-js';
-import { invoke } from '@tauri-apps/api/core';
 import { useLanguage } from '../../i18n/index';
 import { AmbientLightControl } from '../ambient-light-control/ambient-light-control';
 import { ThemeSelector } from '../theme-selector/theme-selector';
+import { adaptiveApi } from '../../services/api-adapter';
 
 
 interface AutoStartConfig {
@@ -20,13 +20,13 @@ export const Settings = () => {
   // Load auto start status and user preferences on mount
   onMount(async () => {
     try {
-      const config = await invoke<AutoStartConfig>('get_auto_start_config');
-      setAutoStartEnabled(config.enabled);
+      // TODO: 实现获取自启动配置的HTTP API
+      // const config = await adaptiveApi.getAutoStartConfig();
+      // setAutoStartEnabled(config.enabled);
+      console.log('Auto start config loading not implemented for HTTP API');
     } catch (error) {
       console.error('Failed to load auto start config:', error);
     }
-
-
   });
 
   // Handle language change
@@ -36,10 +36,8 @@ export const Settings = () => {
       setLocale(newLocale);
 
       // Update backend language setting
-      await invoke('set_current_language', { language: newLocale });
-
-      // Update tray menu with new language
-      await invoke('update_tray_menu');
+      await adaptiveApi.setCurrentLanguage(newLocale);
+      console.log('Language changed to:', newLocale);
 
       showMessage('success', t('settings.languageDescription'));
     } catch (error) {
@@ -53,11 +51,9 @@ export const Settings = () => {
     setLoading(true);
     try {
       const newState = !autoStartEnabled();
-      await invoke('set_auto_start_enabled', { enabled: newState });
+      // TODO: 实现自启动设置的HTTP API
+      console.log('Auto start toggle to:', newState);
       setAutoStartEnabled(newState);
-
-      // Update tray menu to reflect new state
-      await invoke('update_tray_menu');
 
       showMessage('success', newState ? t('settings.autoStartEnabled') : t('settings.autoStartDisabled'));
     } catch (error) {
@@ -191,7 +187,8 @@ export const Settings = () => {
                 class="btn btn-outline btn-sm"
                 onClick={async () => {
                   try {
-                    await invoke('show_about_window');
+                    // TODO: 实现显示关于窗口的HTTP API
+                    console.log('Show about window clicked');
                   } catch (error) {
                     console.error('Failed to show about window:', error);
                   }
