@@ -349,7 +349,7 @@ fn handle_ambient_light_protocol<R: Runtime>(
                 } else {
                     match page_name {
                         "info" => "/info".to_string(),
-                        "white-balance" => "/white-balance".to_string(),
+                        "white-balance" | "color-calibration" => "/color-calibration".to_string(),
                         "led-strip-test" | "led-test" => "/led-strip-test".to_string(),
                         "led-data-sender-test" | "data-sender-test" => {
                             "/led-data-sender-test".to_string()
@@ -362,7 +362,7 @@ fn handle_ambient_light_protocol<R: Runtime>(
                 match page_name {
                     "info" => "/info",
                     "led-strips-configuration" | "led-config" => "/led-strips-configuration",
-                    "white-balance" => "/white-balance",
+                    "white-balance" | "color-calibration" => "/color-calibration",
                     "led-strip-test" | "led-test" => "/led-strip-test",
                     "led-data-sender-test" | "data-sender-test" => "/led-data-sender-test",
                     "settings" => "/settings",
