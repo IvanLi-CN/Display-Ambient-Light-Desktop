@@ -96,7 +96,7 @@ impl ScreenStreamManager {
         let streams_ref = self.streams.clone();
         tokio::spawn(async move {
             if let Err(e) = Self::run_stream(display_id, streams_ref).await {
-                log::error!("Stream {} error: {}", display_id, e);
+                log::error!("Stream {display_id} error: {e}");
             }
         });
 
@@ -107,7 +107,7 @@ impl ScreenStreamManager {
         display_id: u32,
         streams: Arc<RwLock<HashMap<u32, Arc<RwLock<StreamState>>>>>,
     ) -> Result<()> {
-        log::info!("Starting stream for display_id: {}", display_id);
+        log::info!("Starting stream for display_id: {display_id}");
 
         let screenshot_manager = ScreenshotManager::global().await;
 
@@ -125,27 +125,17 @@ impl ScreenStreamManager {
             display_id
         };
 
-        log::info!(
-            "Attempting to subscribe to display_id: {}",
-            actual_display_id
-        );
+        log::info!("Attempting to subscribe to display_id: {actual_display_id}");
         let screenshot_rx = match screenshot_manager
             .subscribe_by_display_id(actual_display_id)
             .await
         {
             Ok(rx) => {
-                log::info!(
-                    "Successfully subscribed to display_id: {}",
-                    actual_display_id
-                );
+                log::info!("Successfully subscribed to display_id: {actual_display_id}");
                 rx
             }
             Err(e) => {
-                log::error!(
-                    "Failed to subscribe to display_id {}: {}",
-                    actual_display_id,
-                    e
-                );
+                log::error!("Failed to subscribe to display_id {actual_display_id}: {e}");
                 return Err(e);
             }
         };
@@ -209,9 +199,7 @@ impl ScreenStreamManager {
                         let streams_lock = streams.read().await;
                         if let Some(stream_state) = streams_lock.get(&display_id) {
                             let mut state = stream_state.write().await;
-                            let changed = state
-                                .last_screenshot_hash
-                                .map_or(true, |hash| hash != frame_hash);
+                            let changed = state.last_screenshot_hash != Some(frame_hash);
                             let elapsed_ms = state.last_force_send.elapsed().as_millis();
                             let force_send = elapsed_ms > 500; // Force send every 500ms for better CPU performance
 
@@ -234,10 +222,9 @@ impl ScreenStreamManager {
                         if let Some(stream_state) = streams_lock.get(&display_id) {
                             let state = stream_state.read().await;
                             for tx in state.subscribers.iter() {
-                                if let Err(_) = tx.send(frame.clone()) {
+                                if tx.send(frame.clone()).is_err() {
                                     log::warn!(
-                                        "Failed to send frame to subscriber for display_id: {}",
-                                        display_id
+                                        "Failed to send frame to subscriber for display_id: {display_id}"
                                     );
                                 }
                             }
@@ -375,22 +362,19 @@ impl ScreenStreamManager {
     }
 
     pub async fn stop_stream(&self, display_id: u32) {
-        log::info!("Stopping stream for display_id: {}", display_id);
+        log::info!("Stopping stream for display_id: {display_id}");
         let mut streams = self.streams.write().await;
 
         if let Some(stream_state) = streams.get(&display_id) {
             // Mark stream as not running to stop the processing task
             let mut state = stream_state.write().await;
             state.is_running = false;
-            log::info!(
-                "Marked stream as not running for display_id: {}",
-                display_id
-            );
+            log::info!("Marked stream as not running for display_id: {display_id}");
         }
 
         // Remove the stream from the map
         streams.remove(&display_id);
-        log::info!("Removed stream from manager for display_id: {}", display_id);
+        log::info!("Removed stream from manager for display_id: {display_id}");
     }
 }
 
@@ -416,7 +400,7 @@ pub async fn handle_websocket_connection(stream: tokio::net::TcpStream) -> Resul
             ws
         }
         Err(e) => {
-            log::error!("WebSocket handshake failed: {}", e);
+            log::error!("WebSocket handshake failed: {e}");
             return Err(e.into());
         }
     };
@@ -432,7 +416,7 @@ pub async fn handle_websocket_connection(stream: tokio::net::TcpStream) -> Resul
             Ok(Some(msg)) => {
                 match msg {
                     Ok(Message::Text(text)) => {
-                        log::info!("Received configuration message: {}", text);
+                        log::info!("Received configuration message: {text}");
 
                         if let Ok(config_json) = serde_json::from_str::<serde_json::Value>(&text) {
                             // Parse configuration from JSON
@@ -461,11 +445,10 @@ pub async fn handle_websocket_connection(stream: tokio::net::TcpStream) -> Resul
                                 max_fps: 15,
                             };
 
-                            log::info!("Parsed stream config: display_id={}, width={}, height={}, quality={}",
-                                  display_id, width, height, quality);
+                            log::info!("Parsed stream config: display_id={display_id}, width={width}, height={height}, quality={quality}");
                             break config;
                         } else {
-                            log::warn!("Failed to parse configuration JSON: {}", text);
+                            log::warn!("Failed to parse configuration JSON: {text}");
                         }
                     }
                     Ok(Message::Close(_)) => {
@@ -473,7 +456,7 @@ pub async fn handle_websocket_connection(stream: tokio::net::TcpStream) -> Resul
                         return Ok(());
                     }
                     Err(e) => {
-                        log::warn!("WebSocket error while waiting for config: {}", e);
+                        log::warn!("WebSocket error while waiting for config: {e}");
                         return Err(e.into());
                     }
                     _ => {}
@@ -505,7 +488,7 @@ pub async fn handle_websocket_connection(stream: tokio::net::TcpStream) -> Resul
             rx
         }
         Err(e) => {
-            log::error!("Failed to start screen stream: {}", e);
+            log::error!("Failed to start screen stream: {e}");
             return Err(e);
         }
     };
@@ -521,7 +504,7 @@ pub async fn handle_websocket_connection(stream: tokio::net::TcpStream) -> Resul
             match sender.send(Message::Binary(frame.jpeg_data)).await {
                 Ok(_) => {}
                 Err(e) => {
-                    log::warn!("Failed to send frame: {}", e);
+                    log::warn!("Failed to send frame: {e}");
                     break;
                 }
             }
@@ -534,7 +517,7 @@ pub async fn handle_websocket_connection(stream: tokio::net::TcpStream) -> Resul
         while let Some(msg) = ws_receiver.next().await {
             match msg {
                 Ok(Message::Text(text)) => {
-                    log::info!("Received control message: {}", text);
+                    log::info!("Received control message: {text}");
                     // Additional configuration updates could be handled here
                 }
                 Ok(Message::Close(_)) => {
@@ -542,7 +525,7 @@ pub async fn handle_websocket_connection(stream: tokio::net::TcpStream) -> Resul
                     break;
                 }
                 Err(e) => {
-                    log::warn!("WebSocket error: {}", e);
+                    log::warn!("WebSocket error: {e}");
                     break;
                 }
                 _ => {}
@@ -559,8 +542,7 @@ pub async fn handle_websocket_connection(stream: tokio::net::TcpStream) -> Resul
 
     // Clean up resources when connection ends
     log::info!(
-        "WebSocket connection ending, cleaning up resources for display_id: {}",
-        display_id_for_cleanup
+        "WebSocket connection ending, cleaning up resources for display_id: {display_id_for_cleanup}"
     );
     let stream_manager = ScreenStreamManager::global().await;
     stream_manager.stop_stream(display_id_for_cleanup).await;

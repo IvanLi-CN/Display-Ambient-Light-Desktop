@@ -1,11 +1,10 @@
 use axum::{
-    extract::Path,
     http::StatusCode,
     response::Json,
     routing::{get, post, put},
     Router,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use utoipa::ToSchema;
 
 use crate::{
@@ -115,7 +114,7 @@ pub async fn update_led_strip_configs(
             "LED strip configs updated successfully".to_string(),
         ))),
         Err(e) => {
-            log::error!("Failed to update LED strip configs: {}", e);
+            log::error!("Failed to update LED strip configs: {e}");
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -144,7 +143,7 @@ pub async fn update_led_strip_length(
             "LED strip length updated successfully".to_string(),
         ))),
         Err(e) => {
-            log::error!("Failed to update LED strip length: {}", e);
+            log::error!("Failed to update LED strip length: {e}");
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -186,7 +185,7 @@ pub async fn update_theme(
             "Theme updated successfully".to_string(),
         ))),
         Err(e) => {
-            log::error!("Failed to update theme: {}", e);
+            log::error!("Failed to update theme: {e}");
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -215,7 +214,7 @@ pub async fn update_led_strip_type(
             "LED strip type updated successfully".to_string(),
         ))),
         Err(e) => {
-            log::error!("Failed to update LED strip type: {}", e);
+            log::error!("Failed to update LED strip type: {e}");
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -316,7 +315,7 @@ pub async fn update_view_scale(
             "View scale updated successfully".to_string(),
         ))),
         Err(e) => {
-            log::error!("Failed to update view scale: {}", e);
+            log::error!("Failed to update view scale: {e}");
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -345,7 +344,7 @@ pub async fn update_global_color_calibration(
             "Global color calibration updated successfully".to_string(),
         ))),
         Err(e) => {
-            log::error!("Failed to update global color calibration: {}", e);
+            log::error!("Failed to update global color calibration: {e}");
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -374,7 +373,7 @@ pub async fn update_user_preferences(
             "User preferences updated successfully".to_string(),
         ))),
         Err(e) => {
-            log::error!("Failed to update user preferences: {}", e);
+            log::error!("Failed to update user preferences: {e}");
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -403,7 +402,7 @@ pub async fn update_window_preferences(
             "Window preferences updated successfully".to_string(),
         ))),
         Err(e) => {
-            log::error!("Failed to update window preferences: {}", e);
+            log::error!("Failed to update window preferences: {e}");
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -432,7 +431,7 @@ pub async fn update_ui_preferences(
             "UI preferences updated successfully".to_string(),
         ))),
         Err(e) => {
-            log::error!("Failed to update UI preferences: {}", e);
+            log::error!("Failed to update UI preferences: {e}");
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }

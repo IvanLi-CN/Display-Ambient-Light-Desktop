@@ -32,31 +32,22 @@ impl DisplayHandler {
     pub async fn fetch_state(&self) {
         let mut controller = self.controller.write().await;
 
-        let mut temp_state = self.state.read().await.clone();
+        let mut temp_state = *self.state.read().await;
 
-        match controller.get_mut().handle.get_vcp_feature(0x10) {
-            Ok(value) => {
-                temp_state.max_brightness = value.maximum();
-                temp_state.min_brightness = 0;
-                temp_state.brightness = value.value();
-            }
-            Err(_) => {}
+        if let Ok(value) = controller.get_mut().handle.get_vcp_feature(0x10) {
+            temp_state.max_brightness = value.maximum();
+            temp_state.min_brightness = 0;
+            temp_state.brightness = value.value();
         };
-        match controller.get_mut().handle.get_vcp_feature(0x12) {
-            Ok(value) => {
-                temp_state.max_contrast = value.maximum();
-                temp_state.min_contrast = 0;
-                temp_state.contrast = value.value();
-            }
-            Err(_) => {}
+        if let Ok(value) = controller.get_mut().handle.get_vcp_feature(0x12) {
+            temp_state.max_contrast = value.maximum();
+            temp_state.min_contrast = 0;
+            temp_state.contrast = value.value();
         };
-        match controller.get_mut().handle.get_vcp_feature(0xdc) {
-            Ok(value) => {
-                temp_state.max_mode = value.maximum();
-                temp_state.min_mode = 0;
-                temp_state.mode = value.value();
-            }
-            Err(_) => {}
+        if let Ok(value) = controller.get_mut().handle.get_vcp_feature(0xdc) {
+            temp_state.max_mode = value.maximum();
+            temp_state.min_mode = 0;
+            temp_state.mode = value.value();
         };
 
         temp_state.last_fetched_at = SystemTime::now();

@@ -95,29 +95,26 @@ impl LedTestEffectManager {
         let task_board_address = board_address.clone();
         tokio::spawn(async move {
             if let Err(e) = manager.run_test_effect_loop(task_board_address).await {
-                log::error!("❌ Test effect loop failed: {}", e);
+                log::error!("❌ Test effect loop failed: {e}");
             }
         });
 
-        log::info!("✅ LED test effect started for board: {}", board_address);
+        log::info!("✅ LED test effect started for board: {board_address}");
         Ok(())
     }
 
     /// 停止LED测试效果
     pub async fn stop_test_effect(&self, board_address: &str) -> anyhow::Result<()> {
-        log::info!("🛑 Stopping LED test effect for board: {}", board_address);
+        log::info!("🛑 Stopping LED test effect for board: {board_address}");
 
         let mut tasks = self.active_tasks.write().await;
         if let Some(_task) = tasks.remove(board_address) {
-            log::info!("✅ LED test effect stopped for board: {}", board_address);
+            log::info!("✅ LED test effect stopped for board: {board_address}");
 
             // 发送全黑数据来清除LED
             self.send_clear_data(board_address, &_task.config).await?;
         } else {
-            log::warn!(
-                "⚠️ No active test effect found for board: {}",
-                board_address
-            );
+            log::warn!("⚠️ No active test effect found for board: {board_address}");
         }
 
         Ok(())
@@ -148,7 +145,7 @@ impl LedTestEffectManager {
 
     /// 运行测试效果循环
     async fn run_test_effect_loop(&self, board_address: String) -> anyhow::Result<()> {
-        log::info!("🔄 Starting test effect loop for board: {}", board_address);
+        log::info!("🔄 Starting test effect loop for board: {board_address}");
 
         loop {
             // 检查任务是否还存在
@@ -160,7 +157,7 @@ impl LedTestEffectManager {
             let task = match task {
                 Some(task) => task,
                 None => {
-                    log::info!("🏁 Test effect task removed for board: {}", board_address);
+                    log::info!("🏁 Test effect task removed for board: {board_address}");
                     break;
                 }
             };
@@ -179,7 +176,7 @@ impl LedTestEffectManager {
                 .send_test_data(&board_address, byte_offset, colors)
                 .await
             {
-                log::error!("❌ Failed to send test data to {}: {}", board_address, e);
+                log::error!("❌ Failed to send test data to {board_address}: {e}");
                 // 继续运行，不因为单次发送失败而停止
             }
 
@@ -187,7 +184,7 @@ impl LedTestEffectManager {
             tokio::time::sleep(Duration::from_millis(task.update_interval_ms as u64)).await;
         }
 
-        log::info!("✅ Test effect loop ended for board: {}", board_address);
+        log::info!("✅ Test effect loop ended for board: {board_address}");
         Ok(())
     }
 
@@ -254,7 +251,7 @@ impl LedTestEffects {
     }
 
     /// Convert RGB buffer to GRB for WS2812B
-    fn convert_rgb_to_grb(buffer: &mut Vec<u8>) {
+    fn convert_rgb_to_grb(buffer: &mut [u8]) {
         let bytes_per_led = 3; // RGB only
         for i in (0..buffer.len()).step_by(bytes_per_led) {
             if i + 2 < buffer.len() {
@@ -265,7 +262,7 @@ impl LedTestEffects {
     }
 
     /// Convert RGBW buffer to GRBW for SK6812-RGBW
-    fn convert_rgbw_to_grbw(buffer: &mut Vec<u8>) {
+    fn convert_rgbw_to_grbw(buffer: &mut [u8]) {
         let bytes_per_led = 4; // RGBW
         for i in (0..buffer.len()).step_by(bytes_per_led) {
             if i + 3 < buffer.len() {

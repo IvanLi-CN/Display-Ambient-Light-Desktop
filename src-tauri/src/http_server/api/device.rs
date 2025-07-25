@@ -4,7 +4,7 @@ use axum::{
     routing::{get, put},
     Router,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use utoipa::ToSchema;
 
 use crate::{
@@ -39,7 +39,7 @@ pub async fn get_boards() -> Result<Json<ApiResponse<Vec<BoardInfo>>>, StatusCod
             Ok(Json(ApiResponse::success(boards)))
         }
         Err(e) => {
-            log::error!("Failed to get UDP RPC: {}", e);
+            log::error!("Failed to get UDP RPC: {e}");
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -59,7 +59,7 @@ pub async fn get_auto_start_status() -> Result<Json<ApiResponse<bool>>, StatusCo
     match AutoStartManager::is_enabled() {
         Ok(enabled) => Ok(Json(ApiResponse::success(enabled))),
         Err(e) => {
-            log::error!("Failed to check auto start status: {}", e);
+            log::error!("Failed to check auto start status: {e}");
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -90,7 +90,7 @@ pub async fn set_auto_start_status(
             "Auto start status updated successfully".to_string(),
         ))),
         Err(e) => {
-            log::error!("Failed to set auto start status: {}", e);
+            log::error!("Failed to set auto start status: {e}");
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }

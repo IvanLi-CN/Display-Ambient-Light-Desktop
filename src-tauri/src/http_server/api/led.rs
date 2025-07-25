@@ -1,11 +1,10 @@
 use axum::{
-    extract::{Path, Query},
     http::StatusCode,
     response::Json,
-    routing::{delete, get, post, put},
+    routing::{get, post, put},
     Router,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use utoipa::ToSchema;
 
 use crate::{
@@ -13,7 +12,6 @@ use crate::{
     http_server::{ApiResponse, AppState},
     led_data_sender::{DataSendMode, LedDataSender},
     led_status_manager::{LedStatusManager, LedStatusStats},
-    led_test_effects,
 };
 
 /// LED颜色发送请求
@@ -117,7 +115,7 @@ pub async fn send_colors(
             "Colors sent successfully".to_string(),
         ))),
         Err(e) => {
-            log::error!("Failed to send colors: {}", e);
+            log::error!("Failed to send colors: {e}");
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -151,7 +149,7 @@ pub async fn send_test_colors_to_board(
             "Test colors sent successfully".to_string(),
         ))),
         Err(e) => {
-            log::error!("Failed to send test colors: {}", e);
+            log::error!("Failed to send test colors: {e}");
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -287,7 +285,7 @@ pub async fn start_single_display_config(
             )))
         }
         Err(e) => {
-            log::error!("Failed to start single display config publisher: {}", e);
+            log::error!("Failed to start single display config publisher: {e}");
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -313,7 +311,7 @@ pub async fn stop_single_display_config() -> Result<Json<ApiResponse<String>>, S
             )))
         }
         Err(e) => {
-            log::error!("Failed to stop single display config publisher: {}", e);
+            log::error!("Failed to stop single display config publisher: {e}");
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -343,16 +341,14 @@ pub async fn set_active_strip_breathing(
     {
         Ok(_) => {
             log::info!(
-                "Active strip for breathing set: display_id={}, border={:?}",
-                display_id,
-                border
+                "Active strip for breathing set: display_id={display_id}, border={border:?}"
             );
             Ok(Json(ApiResponse::success(
                 "Active strip for breathing set successfully".to_string(),
             )))
         }
         Err(e) => {
-            log::error!("Failed to set active strip for breathing: {}", e);
+            log::error!("Failed to set active strip for breathing: {e}");
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -380,7 +376,7 @@ pub async fn start_led_test_effect(
     // 解析效果配置
     let config: crate::led_test_effects::TestEffectConfig =
         serde_json::from_value(request.effect_config).map_err(|e| {
-            log::error!("Failed to parse effect config: {}", e);
+            log::error!("Failed to parse effect config: {e}");
             StatusCode::BAD_REQUEST
         })?;
 
@@ -399,7 +395,7 @@ pub async fn start_led_test_effect(
             request.board_address
         )))),
         Err(e) => {
-            log::error!("Failed to start LED test effect: {}", e);
+            log::error!("Failed to start LED test effect: {e}");
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -432,7 +428,7 @@ pub async fn stop_led_test_effect(
             request.board_address
         )))),
         Err(e) => {
-            log::error!("Failed to stop LED test effect: {}", e);
+            log::error!("Failed to stop LED test effect: {e}");
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }

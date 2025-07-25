@@ -5,7 +5,7 @@ use axum::{
     routing::get,
     Router,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use utoipa::ToSchema;
 
 use crate::{
@@ -56,13 +56,13 @@ pub async fn list_display_info() -> Result<Json<ApiResponse<String>>, StatusCode
             match serde_json::to_string(&displays) {
                 Ok(json_str) => Ok(Json(ApiResponse::success(json_str))),
                 Err(e) => {
-                    log::error!("Failed to serialize display info: {}", e);
+                    log::error!("Failed to serialize display info: {e}");
                     Err(StatusCode::INTERNAL_SERVER_ERROR)
                 }
             }
         }
         Err(e) => {
-            log::error!("Failed to get display info: {}", e);
+            log::error!("Failed to get display info: {e}");
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -98,7 +98,7 @@ pub async fn get_display_colors(
             match serde_json::from_str::<Vec<LedStripConfig>>(&led_configs_str) {
                 Ok(led_configs) => screenshot.get_colors_by_led_configs(&led_configs).await,
                 Err(e) => {
-                    log::error!("Failed to parse LED configs: {}", e);
+                    log::error!("Failed to parse LED configs: {e}");
                     return Err(StatusCode::BAD_REQUEST);
                 }
             }

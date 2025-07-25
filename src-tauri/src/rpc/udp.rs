@@ -85,7 +85,7 @@ impl UdpRpc {
     async fn search_boards(&self) -> anyhow::Result<()> {
         let service_type = "_ambient_light._udp.local.";
         let mdns = ServiceDaemon::new()?;
-        let receiver = mdns.browse(&service_type).map_err(|e| {
+        let receiver = mdns.browse(service_type).map_err(|e| {
             warn!("Failed to browse for {:?}: {:?}", service_type, e);
             e
         })?;
@@ -108,7 +108,7 @@ impl UdpRpc {
                     let board_info = BoardInfo::new(
                         info.get_fullname().to_string(),
                         info.get_hostname().to_string(),
-                        info.get_addresses().iter().next().unwrap().clone(),
+                        *info.get_addresses().iter().next().unwrap(),
                         info.get_port(),
                     );
 
@@ -173,7 +173,7 @@ impl UdpRpc {
         self.boards_change_sender.borrow().clone()
     }
 
-    pub async fn send_to_all(&self, buff: &Vec<u8>) -> anyhow::Result<()> {
+    pub async fn send_to_all(&self, buff: &[u8]) -> anyhow::Result<()> {
         let boards = self.boards.read().await;
 
         if boards.is_empty() {
@@ -190,7 +190,7 @@ impl UdpRpc {
         Ok(())
     }
 
-    pub async fn send_to(&self, buff: &Vec<u8>, target_addr: SocketAddr) -> anyhow::Result<()> {
+    pub async fn send_to(&self, buff: &[u8], target_addr: SocketAddr) -> anyhow::Result<()> {
         let boards = self.boards.read().await;
 
         if boards.is_empty() {
@@ -198,7 +198,7 @@ impl UdpRpc {
             return Err(anyhow::anyhow!("No boards available"));
         }
 
-        log::info!("🔍 Looking for target board: {}", target_addr);
+        log::info!("🔍 Looking for target board: {target_addr}");
         log::info!("📋 Available boards:");
         for (name, board) in boards.iter() {
             if let Some(socket_addr) = board.get_socket_addr() {
@@ -209,7 +209,7 @@ impl UdpRpc {
                     socket_addr == target_addr
                 );
             } else {
-                log::info!("  - {}: No socket address", name);
+                log::info!("  - {name}: No socket address");
             }
         }
 
@@ -236,11 +236,7 @@ impl UdpRpc {
     }
 
     /// 直接发送数据到指定地址，不检查设备列表（用于调试和测试）
-    pub async fn send_to_direct(
-        &self,
-        buff: &Vec<u8>,
-        target_addr: SocketAddr,
-    ) -> anyhow::Result<()> {
+    pub async fn send_to_direct(&self, buff: &[u8], target_addr: SocketAddr) -> anyhow::Result<()> {
         log::info!(
             "🚀 Direct send: {} bytes to {} (bypassing device check)",
             buff.len(),
@@ -252,11 +248,7 @@ impl UdpRpc {
 
         match socket.send_to(buff, target_addr).await {
             Ok(bytes_sent) => {
-                log::info!(
-                    "✅ Direct send successful: {} bytes sent to {}",
-                    bytes_sent,
-                    target_addr
-                );
+                log::info!("✅ Direct send successful: {bytes_sent} bytes sent to {target_addr}");
                 Ok(())
             }
             Err(err) => {

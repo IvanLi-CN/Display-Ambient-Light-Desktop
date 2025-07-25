@@ -8,7 +8,7 @@ use tokio::sync::{OnceCell, RwLock};
 
 const CONFIG_FILE_NAME: &str = "cc.ivanli.ambient_light/user_preferences.toml";
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct UserPreferences {
     pub window: WindowPreferences,
     pub ui: UIPreferences,
@@ -33,15 +33,6 @@ pub struct UIPreferences {
 }
 
 // DisplayPreferences removed - no implemented features
-
-impl Default for UserPreferences {
-    fn default() -> Self {
-        Self {
-            window: WindowPreferences::default(),
-            ui: UIPreferences::default(),
-        }
-    }
-}
 
 impl Default for WindowPreferences {
     fn default() -> Self {

@@ -14,16 +14,11 @@ pub enum Border {
     Right,
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Default)]
 pub enum LedType {
+    #[default]
     WS2812B,
     SK6812,
-}
-
-impl Default for LedType {
-    fn default() -> Self {
-        LedType::WS2812B
-    }
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug)]
@@ -94,7 +89,7 @@ impl ColorCalibration {
         }
     }
 
-    pub fn to_bytes(&self) -> [u8; 3] {
+    pub fn to_bytes(self) -> [u8; 3] {
         [
             (self.r * 255.0) as u8,
             (self.g * 255.0) as u8,
@@ -102,7 +97,7 @@ impl ColorCalibration {
         ]
     }
 
-    pub fn to_bytes_rgbw(&self) -> [u8; 4] {
+    pub fn to_bytes_rgbw(self) -> [u8; 4] {
         [
             (self.r * 255.0) as u8,
             (self.g * 255.0) as u8,
@@ -172,7 +167,7 @@ impl LedStripConfigGroup {
             .unwrap_or(current_dir().unwrap())
             .join(CONFIG_FILE_NAME);
 
-        log::info!("📁 Config file path: {:?}", path);
+        log::info!("📁 Config file path: {path:?}");
 
         let exists = tokio::fs::try_exists(path.clone())
             .await
@@ -317,12 +312,12 @@ mod tests {
         assert_eq!(config.strips[0].index, 0);
         assert_eq!(config.strips[0].border, Border::Top);
         assert_eq!(config.strips[0].led_type, LedType::WS2812B);
-        assert_eq!(config.strips[0].reversed, false);
+        assert!(!config.strips[0].reversed);
 
         assert_eq!(config.strips[1].index, 1);
         assert_eq!(config.strips[1].border, Border::Bottom);
         assert_eq!(config.strips[1].led_type, LedType::SK6812);
-        assert_eq!(config.strips[1].reversed, true);
+        assert!(config.strips[1].reversed);
 
         // 验证动态生成的 mappers
         assert_eq!(config.mappers[0].start, 0);

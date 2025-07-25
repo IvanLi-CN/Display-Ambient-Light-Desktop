@@ -87,7 +87,7 @@ impl VolumeManager {
     }
 
     fn set_volume(volume: f32) -> anyhow::Result<()> {
-        log::debug!("set volume: {}", volume);
+        log::debug!("set volume: {volume}");
 
         let device_id = get_default_device_id(false);
 
@@ -103,7 +103,7 @@ impl VolumeManager {
             mElement: 0,
         };
 
-        log::debug!("device id: {}", device_id);
+        log::debug!("device id: {device_id}");
         log::debug!("address: {address:?}");
 
         if 0 == unsafe { AudioObjectHasProperty(device_id, &address) } {

@@ -89,14 +89,14 @@ impl WebSocketManager {
     pub async fn add_connection(&self, connection_id: ConnectionId) {
         let mut subscriptions = self.subscriptions.write().await;
         subscriptions.insert(connection_id, HashSet::new());
-        log::debug!("🔌 Added connection {}", connection_id);
+        log::debug!("🔌 Added connection {connection_id}");
     }
 
     /// 移除连接
     pub async fn remove_connection(&self, connection_id: ConnectionId) {
         let mut subscriptions = self.subscriptions.write().await;
         subscriptions.remove(&connection_id);
-        log::debug!("🔌 Removed connection {}", connection_id);
+        log::debug!("🔌 Removed connection {connection_id}");
     }
 
     /// 订阅事件
@@ -106,11 +106,7 @@ impl WebSocketManager {
             for event_type in event_types.iter() {
                 connection_events.insert(event_type.clone());
             }
-            log::debug!(
-                "📝 Connection {} subscribed to events: {:?}",
-                connection_id,
-                event_types
-            );
+            log::debug!("📝 Connection {connection_id} subscribed to events: {event_types:?}");
         }
     }
 
@@ -121,11 +117,7 @@ impl WebSocketManager {
             for event_type in event_types.iter() {
                 connection_events.remove(event_type);
             }
-            log::debug!(
-                "📝 Connection {} unsubscribed from events: {:?}",
-                connection_id,
-                event_types
-            );
+            log::debug!("📝 Connection {connection_id} unsubscribed from events: {event_types:?}");
         }
     }
 
@@ -151,14 +143,10 @@ impl WebSocketManager {
 
         if subscriber_count > 0 {
             self.sender.send(message)?;
-            log::debug!(
-                "📤 Sent {} event to {} subscribers",
-                event_type,
-                subscriber_count
-            );
+            log::debug!("📤 Sent {event_type} event to {subscriber_count} subscribers");
             Ok(subscriber_count)
         } else {
-            log::debug!("📤 No subscribers for {} event, skipping", event_type);
+            log::debug!("📤 No subscribers for {event_type} event, skipping");
             Ok(0)
         }
     }
@@ -236,7 +224,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                                 log::debug!("收到WebSocket心跳");
                             }
                             WsMessage::Subscribe { event_types } => {
-                                log::debug!("收到订阅请求: {:?}", event_types);
+                                log::debug!("收到订阅请求: {event_types:?}");
                                 ws_manager_for_recv
                                     .subscribe_events(connection_id, event_types.clone())
                                     .await;
@@ -244,18 +232,18 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                                 // 发送订阅确认
                                 let confirmation = WsMessage::SubscriptionConfirmed { event_types };
                                 if let Err(e) = ws_manager_for_recv.broadcast(confirmation) {
-                                    log::warn!("发送订阅确认失败: {}", e);
+                                    log::warn!("发送订阅确认失败: {e}");
                                 }
                             }
                             WsMessage::Unsubscribe { event_types } => {
-                                log::debug!("收到取消订阅请求: {:?}", event_types);
+                                log::debug!("收到取消订阅请求: {event_types:?}");
                                 ws_manager_for_recv
                                     .unsubscribe_events(connection_id, event_types)
                                     .await;
                             }
                             _ => {
                                 // 处理其他客户端消息
-                                log::debug!("收到WebSocket消息: {:?}", ws_msg);
+                                log::debug!("收到WebSocket消息: {ws_msg:?}");
                             }
                         }
                     }
@@ -280,11 +268,11 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
     let mut send_task = tokio::spawn(async move {
         // 实现从ws_receiver接收广播消息并发送给客户端
         while let Ok(msg) = ws_receiver.recv().await {
-            log::debug!("📤 Sending WebSocket message: {:?}", msg);
+            log::debug!("📤 Sending WebSocket message: {msg:?}");
             let text = match serde_json::to_string(&msg) {
                 Ok(text) => text,
                 Err(e) => {
-                    log::error!("序列化WebSocket消息失败: {}", e);
+                    log::error!("序列化WebSocket消息失败: {e}");
                     continue;
                 }
             };

@@ -33,7 +33,6 @@ use tauri::{
 use user_preferences::UserPreferencesManager;
 
 use serde::{Deserialize, Serialize};
-use serde_json::to_string;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use volume::VolumeManager;
@@ -127,7 +126,7 @@ async fn create_tray_menu<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Resul
     let ambient_light_item = CheckMenuItem::with_id(
         app,
         "toggle_ambient_light",
-        t("ambient_light").to_string(),
+        t("ambient_light"),
         true,
         ambient_light_enabled,
         None::<&str>,
@@ -158,7 +157,7 @@ async fn create_tray_menu<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Resul
     let auto_start_item = CheckMenuItem::with_id(
         app,
         "toggle_auto_start",
-        t("auto_start").to_string(),
+        t("auto_start"),
         true,
         auto_start_enabled,
         None::<&str>,
@@ -273,23 +272,21 @@ async fn handle_menu_event<R: Runtime>(app: &tauri::AppHandle<R>, event: tauri::
 }
 
 async fn handle_tray_event<R: Runtime>(app: &tauri::AppHandle<R>, event: TrayIconEvent) {
-    match event {
-        TrayIconEvent::Click {
-            button: MouseButton::Left,
-            button_state: MouseButtonState::Up,
-            ..
-        } => {
-            // Left click to show/hide window
-            if let Some(window) = app.get_webview_window("main") {
-                if window.is_visible().unwrap_or(false) {
-                    let _ = window.hide();
-                } else {
-                    let _ = window.show();
-                    let _ = window.set_focus();
-                }
+    if let TrayIconEvent::Click {
+        button: MouseButton::Left,
+        button_state: MouseButtonState::Up,
+        ..
+    } = event
+    {
+        // Left click to show/hide window
+        if let Some(window) = app.get_webview_window("main") {
+            if window.is_visible().unwrap_or(false) {
+                let _ = window.hide();
+            } else {
+                let _ = window.show();
+                let _ = window.set_focus();
             }
         }
-        _ => {}
     }
 }
 
@@ -305,7 +302,7 @@ fn extract_page_from_url(url: &str) -> Option<String> {
 
         if let Some(display_id) = display_id {
             // For display-specific pages, create a combined page identifier
-            Some(format!("{}-display-{}", page_name, display_id))
+            Some(format!("{page_name}-display-{display_id}"))
         } else {
             Some(page_name.to_string())
         }
@@ -348,7 +345,7 @@ fn handle_ambient_light_protocol<R: Runtime>(
             let route = if let Some(display_id) = display_id {
                 // Handle display-specific navigation
                 if page_name == "led-strips-configuration" || page_name == "led-config" {
-                    format!("/led-strips-configuration/display/{}", display_id)
+                    format!("/led-strips-configuration/display/{display_id}")
                 } else {
                     match page_name {
                         "info" => "/info".to_string(),
@@ -508,7 +505,7 @@ async fn main() {
     let mut browser_mode = false;
 
     // Look for --page, --display, --headless, --browser, and --test-single-display-config arguments
-    let mut test_single_display_config = false;
+    let mut _test_single_display_config = false;
     for i in 0..args.len() {
         if args[i] == "--page" && i + 1 < args.len() {
             target_page = Some(args[i + 1].clone());
@@ -523,24 +520,20 @@ async fn main() {
             browser_mode = true;
             info!("Command line argument detected: --browser");
         } else if args[i] == "--test-single-display-config" {
-            test_single_display_config = true;
+            _test_single_display_config = true;
             info!("Command line argument detected: --test-single-display-config");
         }
     }
 
     // Check environment variables
-    if !headless_mode {
-        if let Ok(_) = std::env::var("AMBIENT_LIGHT_HEADLESS") {
-            headless_mode = true;
-            info!("Environment variable detected: AMBIENT_LIGHT_HEADLESS");
-        }
+    if !headless_mode && std::env::var("AMBIENT_LIGHT_HEADLESS").is_ok() {
+        headless_mode = true;
+        info!("Environment variable detected: AMBIENT_LIGHT_HEADLESS");
     }
 
-    if !browser_mode {
-        if let Ok(_) = std::env::var("AMBIENT_LIGHT_BROWSER") {
-            browser_mode = true;
-            info!("Environment variable detected: AMBIENT_LIGHT_BROWSER");
-        }
+    if !browser_mode && std::env::var("AMBIENT_LIGHT_BROWSER").is_ok() {
+        browser_mode = true;
+        info!("Environment variable detected: AMBIENT_LIGHT_BROWSER");
     }
 
     // In development mode, also check environment variables for navigation
@@ -563,7 +556,7 @@ async fn main() {
     // If both page and display are specified, combine them
     if let (Some(page), Some(display)) = (&target_page, &display_id) {
         if page == "led-strips-configuration" || page == "led-config" {
-            target_page = Some(format!("led-config-display-{}", display));
+            target_page = Some(format!("led-config-display-{display}"));
             info!(
                 "Combined navigation target: {}",
                 target_page.as_ref().unwrap()
@@ -723,7 +716,7 @@ async fn main() {
                     let urls = event.urls();
                     info!("Deep link received: {:?}", urls);
                     for url in urls {
-                        if let Some(page) = extract_page_from_url(&url.to_string()) {
+                        if let Some(page) = extract_page_from_url(url.as_ref()) {
                             info!("Navigating to page: {}", page);
                             let app_handle_clone = app_handle.clone();
                             tauri::async_runtime::spawn(async move {
@@ -737,7 +730,7 @@ async fn main() {
                                         _ => "/",
                                     };
                                     if let Err(e) =
-                                        window.eval(&format!("window.location.hash = '{}'", route))
+                                        window.eval(format!("window.location.hash = '{route}'"))
                                     {
                                         error!("Failed to navigate via deep link: {}", e);
                                     }
@@ -985,8 +978,7 @@ async fn main() {
                             "settings" => "/settings",
                             _ => "/",
                         };
-                        if let Err(e) = window.eval(&format!("window.location.hash = '{}'", route))
-                        {
+                        if let Err(e) = window.eval(format!("window.location.hash = '{route}'")) {
                             error!("Failed to navigate to page '{}': {}", page, e);
                         }
                     } else {

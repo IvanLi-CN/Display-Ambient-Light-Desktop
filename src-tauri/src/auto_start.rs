@@ -4,15 +4,9 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct AutoStartConfig {
     pub enabled: bool,
-}
-
-impl Default for AutoStartConfig {
-    fn default() -> Self {
-        Self { enabled: false }
-    }
 }
 
 pub struct AutoStartManager;
@@ -51,7 +45,7 @@ impl AutoStartManager {
     <string>cc.ivanli.ambient-light.desktop</string>
     <key>ProgramArguments</key>
     <array>
-        <string>{}</string>
+        <string>{exe_path}</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
@@ -64,8 +58,7 @@ impl AutoStartManager {
     <key>StandardErrorPath</key>
     <string>/tmp/ambient-light-control.err</string>
 </dict>
-</plist>"#,
-            exe_path
+</plist>"#
         );
 
         Ok(plist_content)

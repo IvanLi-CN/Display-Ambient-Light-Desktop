@@ -137,7 +137,7 @@ impl Board {
                 buf[1] = (volume * 100.0) as u8;
 
                 if let Err(err) = socket.send(&buf).await {
-                    log::warn!("send volume changed failed: {:?}", err);
+                    log::warn!("send volume changed failed: {err:?}");
                 }
             }
         });
@@ -148,7 +148,7 @@ impl Board {
         if let Some(socket) = self.socket.as_ref() {
             let buf = [4, (volume * 100.0) as u8];
             if let Err(err) = socket.send(&buf).await {
-                log::warn!("send volume failed: {:?}", err);
+                log::warn!("send volume failed: {err:?}");
             }
         } else {
             log::warn!("socket is none, skip send volume");
@@ -200,7 +200,7 @@ impl Board {
                     log::info!("send state of displays changed: {:?}", &buf[..]);
 
                     if let Err(err) = socket.send(&buf).await {
-                        log::warn!("send state of displays changed failed: {:?}", err);
+                        log::warn!("send state of displays changed failed: {err:?}");
                     }
                 }
             }
@@ -234,7 +234,7 @@ impl Board {
                 log::info!("send led strip config changed: {:?}", &buf[..]);
 
                 if let Err(err) = socket.send(&buf).await {
-                    log::warn!("send led strip config changed failed: {:?}", err);
+                    log::warn!("send led strip config changed failed: {err:?}");
                 }
             }
         });
@@ -294,18 +294,16 @@ impl Board {
                 let ttl = instant.elapsed();
                 if buf == [1] {
                     info.connect_status = BoardConnectStatus::Connected;
-                } else {
-                    if let BoardConnectStatus::Connecting(retry) = info.connect_status {
-                        if retry < 10 {
-                            info.connect_status = BoardConnectStatus::Connecting(retry + 1);
-                            info!("reconnect: {}", retry + 1);
-                        } else {
-                            info.connect_status = BoardConnectStatus::Disconnected;
-                            warn!("board Disconnected: bad pong.");
-                        }
-                    } else if info.connect_status != BoardConnectStatus::Disconnected {
-                        info.connect_status = BoardConnectStatus::Connecting(1);
+                } else if let BoardConnectStatus::Connecting(retry) = info.connect_status {
+                    if retry < 10 {
+                        info.connect_status = BoardConnectStatus::Connecting(retry + 1);
+                        info!("reconnect: {}", retry + 1);
+                    } else {
+                        info.connect_status = BoardConnectStatus::Disconnected;
+                        warn!("board Disconnected: bad pong.");
                     }
+                } else if info.connect_status != BoardConnectStatus::Disconnected {
+                    info.connect_status = BoardConnectStatus::Connecting(1);
                 }
                 info.ttl = Some(ttl.as_millis());
             }

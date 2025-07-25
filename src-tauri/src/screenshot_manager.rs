@@ -41,8 +41,8 @@ impl ScreenshotManager {
                 displays
             }
             Err(e) => {
-                log::error!("❌ Failed to detect displays: {}", e);
-                return Err(e.into());
+                log::error!("❌ Failed to detect displays: {e}");
+                return Err(e);
             }
         };
 
@@ -72,7 +72,7 @@ impl ScreenshotManager {
     }
 
     async fn start_one(&self, display_id: u32, scale_factor: f32) -> anyhow::Result<()> {
-        log::info!("Starting screenshot capture for display_id: {}", display_id);
+        log::info!("Starting screenshot capture for display_id: {display_id}");
 
         let merged_screenshot_tx = self.merged_screenshot_tx.clone();
 
@@ -113,11 +113,7 @@ impl ScreenshotManager {
                                 // log::warn!("merged_screenshot_tx.send failed: {}", err);
                             }
                             if let Err(err) = tx_for_send.send(screenshot.clone()) {
-                                log::warn!(
-                                    "display {} screenshot_tx.send failed: {}",
-                                    display_id,
-                                    err
-                                );
+                                log::warn!("display {display_id} screenshot_tx.send failed: {err}");
                             }
                         }
                         Err(err) => {
@@ -143,11 +139,7 @@ impl ScreenshotManager {
                                 // log::warn!("merged_screenshot_tx.send failed: {}", err);
                             }
                             if let Err(err) = tx_for_send.send(screenshot.clone()) {
-                                log::warn!(
-                                    "display {} screenshot_tx.send failed: {}",
-                                    display_id,
-                                    err
-                                );
+                                log::warn!("display {display_id} screenshot_tx.send failed: {err}");
                             }
                         }
                     }
@@ -211,10 +203,10 @@ impl ScreenshotManager {
         ))
     }
 
-    pub fn get_sorted_colors(colors: &Vec<u8>, _mappers: &Vec<SamplePointMapper>) -> Vec<u8> {
+    pub fn get_sorted_colors(colors: &[u8], _mappers: &[SamplePointMapper]) -> Vec<u8> {
         // 不再使用mappers，直接返回原始颜色数据
         // mappers配置已过时，现在直接基于strips配置处理数据
-        colors.clone()
+        colors.to_vec()
     }
 
     pub async fn subscribe_by_display_id(

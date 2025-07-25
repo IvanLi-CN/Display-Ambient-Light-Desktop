@@ -1,5 +1,5 @@
 use axum::{http::StatusCode, response::Json};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use utoipa::ToSchema;
 
 use crate::http_server::ApiResponse;

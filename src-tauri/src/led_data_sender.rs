@@ -12,9 +12,10 @@ use tokio::sync::{OnceCell, RwLock};
 use crate::{led_status_manager::LedStatusManager, rpc::UdpRpc};
 
 /// LED数据发送模式
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum DataSendMode {
     /// 不发送任何数据
+    #[default]
     None,
     /// 屏幕氛围光数据
     AmbientLight,
@@ -22,12 +23,6 @@ pub enum DataSendMode {
     StripConfig,
     /// 测试效果数据
     TestEffect,
-}
-
-impl Default for DataSendMode {
-    fn default() -> Self {
-        DataSendMode::None
-    }
 }
 
 impl std::fmt::Display for DataSendMode {
@@ -109,7 +104,7 @@ impl LedDataSender {
         // 确保目录存在
         if let Some(parent) = log_path.parent() {
             if let Err(e) = tokio::fs::create_dir_all(parent).await {
-                error!("Failed to create UDP log directory: {}", e);
+                error!("Failed to create UDP log directory: {e}");
                 return;
             }
         }
@@ -120,15 +115,12 @@ impl LedDataSender {
         // 格式化十六进制数据
         let hex_data = packet_data
             .iter()
-            .map(|b| format!("{:02x}", b))
+            .map(|b| format!("{b:02x}"))
             .collect::<Vec<_>>()
             .join(" ");
 
         // 构建日志行
-        let log_line = format!(
-            "[{}] UDP Packet (offset={}): {}\n",
-            timestamp, offset, hex_data
-        );
+        let log_line = format!("[{timestamp}] UDP Packet (offset={offset}): {hex_data}\n");
 
         // 写入文件
         match OpenOptions::new()
@@ -139,11 +131,11 @@ impl LedDataSender {
         {
             Ok(mut file) => {
                 if let Err(e) = file.write_all(log_line.as_bytes()).await {
-                    error!("Failed to write UDP packet to log file: {}", e);
+                    error!("Failed to write UDP packet to log file: {e}");
                 }
             }
             Err(e) => {
-                error!("Failed to open UDP log file: {}", e);
+                error!("Failed to open UDP log file: {e}");
             }
         }
     }
@@ -154,11 +146,11 @@ impl LedDataSender {
         *target = match address {
             Some(addr_str) => match SocketAddr::from_str(&addr_str) {
                 Ok(addr) => {
-                    info!("Test target address set to: {}", addr);
+                    info!("Test target address set to: {addr}");
                     Some(addr)
                 }
                 Err(e) => {
-                    error!("Failed to parse test target address '{}': {}", addr_str, e);
+                    error!("Failed to parse test target address '{addr_str}': {e}");
                     None
                 }
             },
@@ -180,12 +172,12 @@ impl LedDataSender {
         let old_mode = *current_mode;
         *current_mode = mode;
 
-        info!("LED data send mode changed: {} -> {}", old_mode, mode);
+        info!("LED data send mode changed: {old_mode} -> {mode}");
 
         // 通过状态管理器更新状态
         let status_manager = LedStatusManager::global().await;
         if let Err(e) = status_manager.set_data_send_mode(mode).await {
-            warn!("Failed to update LED status manager: {}", e);
+            warn!("Failed to update LED status manager: {e}");
         }
     }
 
@@ -214,7 +206,7 @@ impl LedDataSender {
         // 获取UDP RPC实例
         let udp_rpc = UdpRpc::global().await;
         if let Err(err) = udp_rpc {
-            warn!("UDP RPC not available: {}", err);
+            warn!("UDP RPC not available: {err}");
             return Err(anyhow::anyhow!("UDP RPC not available: {}", err));
         }
         let udp_rpc = udp_rpc.as_ref().unwrap();
@@ -235,14 +227,14 @@ impl LedDataSender {
         let hex_data = if packet_data.len() <= 64 {
             packet_data
                 .iter()
-                .map(|b| format!("{:02x}", b))
+                .map(|b| format!("{b:02x}"))
                 .collect::<Vec<_>>()
                 .join(" ")
         } else {
             let preview = &packet_data[..64];
             let hex_preview = preview
                 .iter()
-                .map(|b| format!("{:02x}", b))
+                .map(|b| format!("{b:02x}"))
                 .collect::<Vec<_>>()
                 .join(" ");
             format!(
@@ -262,12 +254,12 @@ impl LedDataSender {
             .await;
 
         // 根据模式选择发送方式
-        log::info!("🔍 Checking send mode: expected_mode={:?}", expected_mode);
+        log::info!("🔍 Checking send mode: expected_mode={expected_mode:?}");
         let send_result = if expected_mode == DataSendMode::TestEffect
             || expected_mode == DataSendMode::StripConfig
         {
             let target_addr_option = *self.test_target_address.read().await;
-            log::info!("🎯 Target address option: {:?}", target_addr_option);
+            log::info!("🎯 Target address option: {target_addr_option:?}");
 
             if let Some(target_addr) = target_addr_option {
                 log::info!(
@@ -279,14 +271,11 @@ impl LedDataSender {
                 // 首先尝试发送到已知设备
                 match udp_rpc.send_to(&packet_data, target_addr).await {
                     Ok(()) => {
-                        log::info!("📤 Successfully sent to known device: {}", target_addr);
+                        log::info!("📤 Successfully sent to known device: {target_addr}");
                         Ok(())
                     }
                     Err(e) => {
-                        log::warn!(
-                            "⚠️ Failed to send to known device: {}, trying direct send...",
-                            e
-                        );
+                        log::warn!("⚠️ Failed to send to known device: {e}, trying direct send...");
                         // 如果失败，尝试直接发送（用于调试设备）
                         udp_rpc.send_to_direct(&packet_data, target_addr).await
                     }
@@ -389,7 +378,7 @@ impl LedDataSender {
             .record_send_stats(packet_count as u64, complete_data.len() as u64, true)
             .await
         {
-            warn!("Failed to record send stats: {}", e);
+            warn!("Failed to record send stats: {e}");
         }
 
         Ok(())
@@ -399,7 +388,7 @@ impl LedDataSender {
     pub async fn force_send_packet(&self, packet: LedDataPacket) -> anyhow::Result<()> {
         let udp_rpc = UdpRpc::global().await;
         if let Err(err) = udp_rpc {
-            warn!("UDP RPC not available: {}", err);
+            warn!("UDP RPC not available: {err}");
             return Err(anyhow::anyhow!("UDP RPC not available: {}", err));
         }
         let udp_rpc = udp_rpc.as_ref().unwrap();
@@ -419,6 +408,6 @@ impl LedDataSender {
     /// Get statistics about the current state (for testing/debugging)
     pub async fn get_stats(&self) -> String {
         let mode = self.get_mode().await;
-        format!("Current mode: {}", mode)
+        format!("Current mode: {mode}")
     }
 }

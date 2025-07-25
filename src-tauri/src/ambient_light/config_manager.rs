@@ -27,8 +27,7 @@ impl ConfigManager {
 
                         if let Err(err) = config_update_sender.send(configs.clone()) {
                             log::error!(
-                                "Failed to send config update when read config first time: {}",
-                                err
+                                "Failed to send config update when read config first time: {err}"
                             );
                         }
                         drop(config_update_receiver);
@@ -38,7 +37,7 @@ impl ConfigManager {
                         }
                     }
                     Err(e) => {
-                        log::warn!("⚠️ Failed to load LED strip configuration: {}", e);
+                        log::warn!("⚠️ Failed to load LED strip configuration: {e}");
                         log::info!("🔄 Using default configuration instead...");
 
                         match LedStripConfigGroup::get_default_config().await {
@@ -52,8 +51,7 @@ impl ConfigManager {
                                 if let Err(err) = config_update_sender.send(default_config.clone())
                                 {
                                     log::error!(
-                                        "Failed to send config update when read default config: {}",
-                                        err
+                                        "Failed to send config update when read default config: {err}"
                                     );
                                 }
                                 drop(config_update_receiver);
@@ -64,12 +62,10 @@ impl ConfigManager {
                             }
                             Err(default_err) => {
                                 log::error!(
-                                    "❌ Failed to create default configuration: {}",
-                                    default_err
+                                    "❌ Failed to create default configuration: {default_err}"
                                 );
                                 panic!(
-                                    "Failed to initialize ConfigManager with default config: {}",
-                                    default_err
+                                    "Failed to initialize ConfigManager with default config: {default_err}"
                                 );
                             }
                         }
@@ -95,7 +91,7 @@ impl ConfigManager {
             .map_err(|e| anyhow::anyhow!("Failed to send config update: {}", e))?;
         yield_now().await;
 
-        log::debug!("config updated: {:?}", configs);
+        log::debug!("config updated: {configs:?}");
 
         // 通过WebSocket广播配置变化
         crate::websocket_events::publish_config_changed(configs).await;
@@ -118,7 +114,7 @@ impl ConfigManager {
         for strip in config.strips.iter_mut() {
             if strip.display_id == display_id && strip.border == border {
                 let target = strip.len as i64 + delta_len as i64;
-                if target < 0 || target > 1000 {
+                if !(0..=1000).contains(&target) {
                     return Err(anyhow::anyhow!(
                         "Overflow. range: 0-1000, current: {}",
                         target
@@ -196,10 +192,10 @@ impl ConfigManager {
                     ));
                 }
 
-                mapper.start = target_start as usize;
+                mapper.start = target_start;
                 mapper.end = target_end as usize;
 
-                log::info!("mapper: {:?}", mapper);
+                log::info!("mapper: {mapper:?}");
             }
         }
 
@@ -273,7 +269,7 @@ impl ConfigManager {
                         end: mapper.start + strip.len,
                         pos: prev_pos_end,
                     };
-                    prev_pos_end = prev_pos_end + strip.len;
+                    prev_pos_end += strip.len;
                     mapper
                 } else {
                     let mapper = SamplePointMapper {
@@ -281,7 +277,7 @@ impl ConfigManager {
                         start: mapper.end + strip.len,
                         pos: prev_pos_end,
                     };
-                    prev_pos_end = prev_pos_end + strip.len;
+                    prev_pos_end += strip.len;
                     mapper
                 }
             })
@@ -426,9 +422,7 @@ mod tests {
 
         // 1. Reverse the start and end of a mapper
         let mapper = &mut config.mappers[0];
-        let start = mapper.start;
-        mapper.start = mapper.end;
-        mapper.end = start;
+        std::mem::swap(&mut mapper.start, &mut mapper.end);
 
         // 2. Assert the change
         assert_eq!(config.mappers[0].start, original_end);
@@ -444,9 +438,8 @@ mod tests {
         config.strips[0].len = 40;
         config.strips[1].len = 20;
         // Simulate a reversed strip
-        let temp_start = config.mappers[2].start;
-        config.mappers[2].start = config.mappers[2].end;
-        config.mappers[2].end = temp_start;
+        let mapper = &mut config.mappers[2];
+        std::mem::swap(&mut mapper.start, &mut mapper.end);
 
         ConfigManager::rebuild_mappers(&mut config);
 

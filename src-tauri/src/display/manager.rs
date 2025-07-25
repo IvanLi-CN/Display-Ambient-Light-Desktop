@@ -31,7 +31,7 @@ impl DisplayManager {
     pub async fn global() -> &'static Self {
         static DISPLAY_MANAGER: OnceCell<DisplayManager> = OnceCell::const_new();
 
-        DISPLAY_MANAGER.get_or_init(|| Self::create()).await
+        DISPLAY_MANAGER.get_or_init(Self::create).await
     }
 
     pub async fn create() -> Self {
@@ -70,7 +70,7 @@ impl DisplayManager {
         let mut states = Vec::new();
 
         for display in displays.read().await.iter() {
-            let state = display.read().await.state.read().await.clone();
+            let state = *display.read().await.state.read().await;
             states.push(state);
         }
 
@@ -113,7 +113,7 @@ impl DisplayManager {
         let displays = self.displays.read().await;
         let mut states = Vec::new();
         for display in displays.iter() {
-            let state = display.read().await.state.read().await.clone();
+            let state = *display.read().await.state.read().await;
             states.push(state);
         }
         states
@@ -166,7 +166,7 @@ impl DisplayManager {
 
                 let mut states = Vec::new();
                 for display in displays.iter() {
-                    let state = display.read().await.state.read().await.clone();
+                    let state = *display.read().await.state.read().await;
                     states.push(state);
                 }
 
@@ -192,7 +192,7 @@ impl DisplayManager {
 
         let text = std::fs::read_to_string(path);
         if let Err(err) = text {
-            log::error!("failed to read config file: {}", err);
+            log::error!("failed to read config file: {err}");
             return;
         }
 
@@ -200,7 +200,7 @@ impl DisplayManager {
         let wrapper = toml::from_str::<DisplayStateWrapper>(&text);
 
         if let Err(err) = wrapper {
-            log::error!("failed to parse display states file: {}", err);
+            log::error!("failed to parse display states file: {err}");
             return;
         }
 
@@ -215,7 +215,7 @@ impl DisplayManager {
                 state.brightness = saved.brightness;
                 state.contrast = saved.contrast;
                 state.mode = saved.mode;
-                log::info!("restore display config. display#{}: {:?}", index, state);
+                log::info!("restore display config. display#{index}: {state:?}");
             }
         }
 
@@ -234,7 +234,7 @@ impl DisplayManager {
         let displays = displays.read().await;
         let mut states = Vec::new();
         for display in displays.iter() {
-            let state = display.read().await.state.read().await.clone();
+            let state = *display.read().await.state.read().await;
             states.push(state);
         }
 
@@ -242,7 +242,7 @@ impl DisplayManager {
 
         let text = toml::to_string(&wrapper);
         if let Err(err) = text {
-            log::error!("failed to serialize display states: {}", err);
+            log::error!("failed to serialize display states: {err}");
             log::error!("display states: {:?}", &wrapper);
             return;
         }
@@ -250,13 +250,13 @@ impl DisplayManager {
         let text = text.unwrap();
         if path.exists() {
             if let Err(err) = std::fs::remove_file(&path) {
-                log::error!("failed to remove old config file: {}", err);
+                log::error!("failed to remove old config file: {err}");
                 return;
             }
         }
 
         if let Err(err) = std::fs::write(&path, text) {
-            log::error!("failed to write config file: {}", err);
+            log::error!("failed to write config file: {err}");
             return;
         }
 

@@ -31,7 +31,7 @@ pub struct LedStatusStats {
 }
 
 /// LED数据发送统计
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct LedSendStats {
     /// 总发送包数
     pub total_packets_sent: u64,
@@ -41,17 +41,6 @@ pub struct LedSendStats {
     pub last_send_time: Option<chrono::DateTime<chrono::Utc>>,
     /// 发送错误次数
     pub send_errors: u64,
-}
-
-impl Default for LedSendStats {
-    fn default() -> Self {
-        Self {
-            total_packets_sent: 0,
-            total_bytes_sent: 0,
-            last_send_time: None,
-            send_errors: 0,
-        }
-    }
 }
 
 impl Default for LedStatusStats {
@@ -141,7 +130,7 @@ impl LedStatusManager {
         }
 
         self.notify_status_changed().await?;
-        info!("LED data send mode changed to: {}", mode);
+        info!("LED data send mode changed to: {mode}");
         Ok(())
     }
 
@@ -266,8 +255,7 @@ impl LedStatusManager {
 
         self.notify_status_changed().await?;
         debug!(
-            "LED send stats updated: {} packets, {} bytes, success: {}",
-            packets_sent, bytes_sent, success
+            "LED send stats updated: {packets_sent} packets, {bytes_sent} bytes, success: {success}"
         );
         Ok(())
     }
@@ -283,7 +271,7 @@ impl LedStatusManager {
 
         // 发送状态变更通知
         if let Err(e) = self.status_change_tx.send(current_status.clone()) {
-            warn!("Failed to send status change notification: {}", e);
+            warn!("Failed to send status change notification: {e}");
         }
 
         // 通过WebSocket广播状态变更
@@ -349,7 +337,6 @@ impl LedStatusManager {
 mod tests {
     use super::*;
     use crate::led_data_sender::DataSendMode;
-    use tokio;
 
     #[tokio::test]
     async fn test_led_status_manager_initialization() {
@@ -358,8 +345,8 @@ mod tests {
 
         // 验证初始状态
         assert_eq!(status.data_send_mode, DataSendMode::None);
-        assert_eq!(status.test_mode_active, false);
-        assert_eq!(status.single_display_config_mode, false);
+        assert!(!status.test_mode_active);
+        assert!(!status.single_display_config_mode);
         assert_eq!(status.active_breathing_strip, None);
         assert_eq!(status.current_colors_bytes, 0);
         assert_eq!(status.sorted_colors_bytes, 0);

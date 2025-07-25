@@ -23,7 +23,7 @@ impl LedColor {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.0.iter().any(|bit| *bit == 0)
+        self.0.contains(&0)
     }
 
     pub fn set_rgb(&mut self, r: u8, g: u8, b: u8) -> &Self {

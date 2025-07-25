@@ -83,23 +83,19 @@ impl LedColorsPublisher {
         let screenshot_rx = screenshot_manager.subscribe_by_display_id(display_id).await;
 
         if let Err(err) = screenshot_rx {
-            log::error!("{}", err);
+            log::error!("{err}");
             return;
         }
         let mut screenshot_rx = screenshot_rx.unwrap();
 
-        log::info!("Starting fetcher for display #{}", display_id);
+        log::info!("Starting fetcher for display #{display_id}");
 
         tokio::spawn(async move {
-            let init_version = internal_tasks_version.read().await.clone();
+            let init_version = *internal_tasks_version.read().await;
 
             loop {
                 if let Err(err) = screenshot_rx.changed().await {
-                    log::error!(
-                        "Screenshot channel closed for display #{}: {:?}",
-                        display_id,
-                        err
-                    );
+                    log::error!("Screenshot channel closed for display #{display_id}: {err:?}");
                     break;
                 }
 
@@ -147,7 +143,7 @@ impl LedColorsPublisher {
                     .await
                     {
                         Ok(_) => {
-                            log::debug!("Successfully sent colors for display #{}", display_id);
+                            log::debug!("Successfully sent colors for display #{display_id}");
                         }
                         Err(err) => {
                             warn!("Failed to send colors:  #{: >15}\t{}", display_id, err);
@@ -158,15 +154,11 @@ impl LedColorsPublisher {
                     // The test mode will handle its own data sending
                     if test_mode_active {
                         log::debug!(
-                            "Skipping ambient light data for display #{}: test mode active",
-                            display_id
+                            "Skipping ambient light data for display #{display_id}: test mode active"
                         );
                     } else {
                         log::debug!(
-                            "Skipping color send for display #{}: test_mode={}, enabled={}",
-                            display_id,
-                            test_mode_active,
-                            ambient_light_enabled
+                            "Skipping color send for display #{display_id}: test_mode={test_mode_active}, enabled={ambient_light_enabled}"
                         );
                     }
                 }
@@ -175,8 +167,7 @@ impl LedColorsPublisher {
                     display_id,
                     colors_copy
                         .into_iter()
-                        .map(|color| color.get_rgb())
-                        .flatten()
+                        .flat_map(|color| color.get_rgb())
                         .collect::<Vec<_>>(),
                 )) {
                     Ok(_) => {
@@ -188,7 +179,7 @@ impl LedColorsPublisher {
                 };
 
                 // Check if the inner task version changed
-                let version = internal_tasks_version.read().await.clone();
+                let version = *internal_tasks_version.read().await;
                 if version != init_version {
                     break;
                 }
@@ -377,7 +368,7 @@ impl LedColorsPublisher {
             cumulative_led_offset += strip.len;
         }
 
-        log::info!("计算的显示器起始偏移量: {:?}", display_start_offsets);
+        log::info!("计算的显示器起始偏移量: {display_start_offsets:?}");
 
         for sample_point_group in configs.sample_point_groups.clone() {
             let display_id = sample_point_group.display_id;
@@ -614,7 +605,7 @@ impl LedColorsPublisher {
     ) -> anyhow::Result<AllColorConfig> {
         // Get actual display information and assign IDs if needed
         let displays = display_info::DisplayInfo::all().map_err(|e| {
-            log::error!("Failed to get display info in get_colors_configs: {}", e);
+            log::error!("Failed to get display info in get_colors_configs: {e}");
             anyhow::anyhow!("Failed to get display info: {}", e)
         })?;
 
@@ -695,14 +686,13 @@ impl LedColorsPublisher {
                 display_info.width,
                 0, // bytes_per_row is not used for sample point calculation
                 Arc::new(vec![]),
-                display_info.scale_factor as f32,
-                display_info.scale_factor as f32,
+                display_info.scale_factor,
+                display_info.scale_factor,
             );
 
             let points: Vec<_> = led_strip_configs
                 .iter()
-                .map(|config| dummy_screenshot.get_sample_points(config))
-                .flatten()
+                .flat_map(|config| dummy_screenshot.get_sample_points(config))
                 .collect();
 
             if points.is_empty() {
@@ -721,7 +711,7 @@ impl LedColorsPublisher {
             let colors_config = DisplaySamplePointGroup {
                 display_id,
                 points,
-                bound_scale_factor: display_info.scale_factor as f32,
+                bound_scale_factor: display_info.scale_factor,
                 mappers: display_mappers,
             };
 
@@ -809,7 +799,7 @@ impl LedColorsPublisher {
 
         // 验证模式设置是否成功
         let current_mode = sender.get_mode().await;
-        log::info!("🔍 当前LED数据发送模式: {:?}", current_mode);
+        log::info!("🔍 当前LED数据发送模式: {current_mode:?}");
 
         // 设置目标硬件地址（如果有可用的硬件设备）
         let rpc = crate::rpc::UdpRpc::global().await;
@@ -818,7 +808,7 @@ impl LedColorsPublisher {
             if !boards.is_empty() {
                 let target_addr = format!("{}:{}", boards[0].address, boards[0].port);
                 sender.set_test_target(Some(target_addr.clone())).await;
-                log::info!("✅ 设置目标硬件地址为: {}", target_addr);
+                log::info!("✅ 设置目标硬件地址为: {target_addr}");
             } else {
                 log::warn!("⚠️ 没有找到可用的硬件设备，将使用广播模式");
                 sender.set_test_target(None).await;
@@ -900,8 +890,8 @@ impl LedColorsPublisher {
         border: Option<String>,
     ) -> anyhow::Result<()> {
         log::info!("🫁 设置活跃灯带用于呼吸效果");
-        log::info!("   - 显示器ID: {}", display_id);
-        log::info!("   - 边框: {:?}", border);
+        log::info!("   - 显示器ID: {display_id}");
+        log::info!("   - 边框: {border:?}");
 
         {
             let mut active_strip = self.active_strip_for_breathing.write().await;
@@ -931,10 +921,7 @@ impl LedColorsPublisher {
         let inner_tasks_version = self.inner_tasks_version.clone();
 
         tokio::spawn(async move {
-            log::info!(
-                "🚀 启动单屏配置模式30Hz发布任务 (版本: {})",
-                current_version
-            );
+            log::info!("🚀 启动单屏配置模式30Hz发布任务 (版本: {current_version})");
 
             let mut interval = tokio::time::interval(Duration::from_millis(33)); // 30Hz
 
@@ -942,12 +929,10 @@ impl LedColorsPublisher {
                 interval.tick().await;
 
                 // 检查任务版本是否已更改
-                let version = inner_tasks_version.read().await.clone();
+                let version = *inner_tasks_version.read().await;
                 if version != current_version {
                     log::info!(
-                        "🛑 单屏配置模式任务版本已更改，停止任务 ({} != {})",
-                        version,
-                        current_version
+                        "🛑 单屏配置模式任务版本已更改，停止任务 ({version} != {current_version})"
                     );
                     break;
                 }
@@ -957,7 +942,7 @@ impl LedColorsPublisher {
                     .generate_and_publish_config_colors(&config_group, &border_colors)
                     .await
                 {
-                    log::error!("❌ 生成和发布定位色数据失败: {}", e);
+                    log::error!("❌ 生成和发布定位色数据失败: {e}");
                 }
             }
 
@@ -1156,9 +1141,7 @@ impl LedColorsPublisher {
             .sum();
 
         log::info!(
-            "🎨 生成完整LED数据流(带呼吸效果): 总LED数={}, 总字节数={}",
-            total_leds,
-            total_bytes
+            "🎨 生成完整LED数据流(带呼吸效果): 总LED数={total_leds}, 总字节数={total_bytes}"
         );
 
         // 获取当前显示器的灯带ID集合

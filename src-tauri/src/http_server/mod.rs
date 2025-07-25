@@ -176,7 +176,7 @@ pub async fn create_server(config: ServerConfig) -> Result<Router, anyhow::Error
             log::info!("✅ UDP RPC service initialized successfully");
         }
         Err(e) => {
-            log::error!("❌ Failed to initialize UDP RPC service: {}", e);
+            log::error!("❌ Failed to initialize UDP RPC service: {e}");
         }
     }
 
@@ -204,7 +204,7 @@ pub async fn create_server(config: ServerConfig) -> Result<Router, anyhow::Error
     // 如果启用静态文件服务，添加静态文件路由
     if config.serve_static_files {
         if let Some(static_path) = &config.static_files_path {
-            log::info!("📁 Serving static files from: {}", static_path);
+            log::info!("📁 Serving static files from: {static_path}");
             app = app.fallback_service(ServeDir::new(static_path));
         }
     }
@@ -242,8 +242,8 @@ pub async fn start_server(config: ServerConfig) -> Result<(), anyhow::Error> {
     let addr = format!("{}:{}", config.host, config.port);
     let listener = tokio::net::TcpListener::bind(&addr).await?;
 
-    log::info!("🚀 HTTP服务器启动在 http://{}", addr);
-    log::info!("📚 API文档地址: http://{}/swagger-ui", addr);
+    log::info!("🚀 HTTP服务器启动在 http://{addr}");
+    log::info!("📚 API文档地址: http://{addr}/swagger-ui");
 
     axum::serve(listener, app).await?;
 

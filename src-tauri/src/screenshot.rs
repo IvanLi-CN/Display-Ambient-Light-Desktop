@@ -90,7 +90,7 @@ impl Screenshot {
 
                 // 调试：分析Bottom边框采样
                 log::debug!("🔍 Bottom border analysis:");
-                log::debug!("  Screen dimensions: {}x{}", width, height);
+                log::debug!("  Screen dimensions: {width}x{height}");
                 log::debug!("  LED count: {}", config.len);
                 log::debug!("  Generated {} LED groups", result.len());
 
@@ -108,7 +108,7 @@ impl Screenshot {
                         max_y,
                         height - 1
                     );
-                    log::debug!("  X range: {} - {}", min_x, max_x);
+                    log::debug!("  X range: {min_x} - {max_x}");
                     log::debug!(
                         "  Sample points: {:?}",
                         &first_led[0..first_led.len().min(5)]
@@ -207,8 +207,8 @@ impl Screenshot {
     }
 
     pub fn get_one_edge_colors(
-        sample_points_of_leds: &Vec<LedSamplePoints>,
-        bitmap: &Vec<u8>,
+        sample_points_of_leds: &[LedSamplePoints],
+        bitmap: &[u8],
         bytes_per_row: usize,
     ) -> Vec<LedColor> {
         let mut colors = vec![];
@@ -776,7 +776,7 @@ fn sample_colors_for_led_strip(
     let sample_points = screenshot.get_sample_points(config);
 
     // 使用现有的颜色采样逻辑
-    Screenshot::get_one_edge_colors(&sample_points, &image_data.to_vec(), bytes_per_row)
+    Screenshot::get_one_edge_colors(&sample_points, image_data, bytes_per_row)
 }
 
 #[cfg(test)]
