@@ -84,16 +84,16 @@ export interface LedStatusChangedEvent {
 }
 
 /**
- * 模式显示名称映射
+ * 模式显示名称映射（英文回退）
  * 注意：这个映射已被国际化替代，请使用 t('ledStatus.modes.{mode}') 获取翻译
  * @deprecated 使用 t('ledStatus.modes.{mode}') 替代
  */
 export const MODE_DISPLAY_NAMES: Record<DataSendMode, string> = {
-  'None': '无',
-  'AmbientLight': '氛围光',
-  'StripConfig': '配置模式',
-  'TestEffect': '测试模式',
-  'ColorCalibration': '颜色校准'
+  'None': 'None',
+  'AmbientLight': 'Ambient Light',
+  'StripConfig': 'Configuration',
+  'TestEffect': 'Test Mode',
+  'ColorCalibration': 'Color Calibration'
 };
 
 /**
@@ -199,7 +199,7 @@ export function convertToStatusBarData(
   const mode = (safeStatus.data_send_mode || safeStatus.mode) as DataSendMode;
   const modeDisplayName = t
     ? getModeDisplayName(mode, t)
-    : MODE_DISPLAY_NAMES[mode] || '未知';
+    : MODE_DISPLAY_NAMES[mode] || 'Unknown';
 
   return {
     mode: modeDisplayName,

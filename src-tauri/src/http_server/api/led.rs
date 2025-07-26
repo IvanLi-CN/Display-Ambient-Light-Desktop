@@ -23,6 +23,17 @@ pub struct SendColorsRequest {
     pub buffer: Vec<u8>,
 }
 
+/// 校准颜色发送请求
+#[derive(Deserialize, ToSchema)]
+pub struct SendCalibrationColorRequest {
+    /// 红色分量 (0-255)
+    pub r: u8,
+    /// 绿色分量 (0-255)
+    pub g: u8,
+    /// 蓝色分量 (0-255)
+    pub b: u8,
+}
+
 /// 测试颜色发送请求
 #[derive(Deserialize, ToSchema)]
 pub struct SendTestColorsRequest {
@@ -116,6 +127,31 @@ pub async fn send_colors(
         ))),
         Err(e) => {
             log::error!("Failed to send colors: {e}");
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+/// 发送校准颜色数据（推荐用于校准模式）
+#[utoipa::path(
+    post,
+    path = "/api/v1/led/calibration-color",
+    request_body = SendCalibrationColorRequest,
+    responses(
+        (status = 200, description = "校准颜色发送成功", body = ApiResponse<String>),
+        (status = 500, description = "发送失败", body = ApiResponse<String>),
+    ),
+    tag = "led"
+)]
+pub async fn send_calibration_color(
+    Json(request): Json<SendCalibrationColorRequest>,
+) -> Result<Json<ApiResponse<String>>, StatusCode> {
+    match ambient_light::LedColorsPublisher::send_calibration_color(request.r, request.g, request.b).await {
+        Ok(_) => Ok(Json(ApiResponse::success(
+            "Calibration color sent successfully".to_string(),
+        ))),
+        Err(e) => {
+            log::error!("Failed to send calibration color: {e}");
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -479,6 +515,7 @@ pub fn create_routes() -> Router<AppState> {
     Router::new()
         .route("/status", get(get_led_status))
         .route("/colors", post(send_colors))
+        .route("/calibration-color", post(send_calibration_color))
         .route("/test-colors", post(send_test_colors_to_board))
         .route("/mode", get(get_data_send_mode))
         .route("/mode", put(set_data_send_mode))

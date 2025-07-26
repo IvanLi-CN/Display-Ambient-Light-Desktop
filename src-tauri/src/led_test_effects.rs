@@ -1,4 +1,6 @@
 use crate::led_data_sender::LedDataSender;
+use crate::led_color::LedColor;
+use crate::ambient_light::LedType; // 使用统一的LedType
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::f64::consts::PI;
@@ -23,11 +25,7 @@ pub struct TestEffectConfig {
     pub offset: u32, // LED offset
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum LedType {
-    WS2812B,
-    SK6812,
-}
+
 
 /// LED测试效果任务信息
 #[derive(Debug, Clone)]
@@ -195,7 +193,34 @@ impl LedTestEffectManager {
         offset: u16,
         data: Vec<u8>,
     ) -> anyhow::Result<()> {
-        let sender = LedDataSender::global().await;
+        // 获取任务配置以确定LED类型和数量
+        let task_config = {
+            let tasks = self.active_tasks.read().await;
+            tasks.get(board_address).map(|task| task.config.clone())
+        };
+
+        let config = match task_config {
+            Some(config) => config,
+            None => {
+                log::warn!("⚠️ No active task found for board: {board_address}");
+                return Ok(());
+            }
+        };
+
+        // 将硬件数据转换为RGB颜色数组用于预览
+        let rgb_colors = LedTestEffects::hardware_data_to_rgb_colors(&data, &config.led_type);
+
+        // 使用LED数据处理器来发布预览数据并编码硬件数据
+        let hardware_data = crate::led_data_processor::LedDataProcessor::process_test_mode(
+            rgb_colors,
+            config.led_type,
+            config.led_count as usize,
+            crate::led_data_sender::DataSendMode::TestEffect,
+        )
+        .await?;
+
+        // 获取LED数据发送器
+        let sender = crate::led_data_sender::LedDataSender::global().await;
 
         // 设置为测试效果模式
         sender
@@ -207,9 +232,9 @@ impl LedTestEffectManager {
             .set_test_target(Some(board_address.to_string()))
             .await;
 
-        // 发送数据
+        // 发送处理后的硬件数据
         sender
-            .send_complete_led_data(offset, data, "TestEffect")
+            .send_complete_led_data(offset, hardware_data, "TestEffect")
             .await?;
 
         Ok(())
@@ -270,6 +295,40 @@ impl LedTestEffects {
                 buffer.swap(i, i + 1);
             }
         }
+    }
+
+    /// 将硬件数据转换为RGB颜色数组（用于预览）
+    fn hardware_data_to_rgb_colors(data: &[u8], led_type: &LedType) -> Vec<crate::led_color::LedColor> {
+        let mut rgb_colors = Vec::new();
+
+        let bytes_per_led = match led_type {
+            LedType::WS2812B => 3, // RGB
+            LedType::SK6812 => 4,  // RGBW
+        };
+
+        let mut i = 0;
+        while i + bytes_per_led <= data.len() {
+            match led_type {
+                LedType::WS2812B => {
+                    // GRB格式 -> RGB
+                    let g = data[i];
+                    let r = data[i + 1];
+                    let b = data[i + 2];
+                    rgb_colors.push(crate::led_color::LedColor::new(r, g, b));
+                }
+                LedType::SK6812 => {
+                    // GRBW格式 -> RGB（忽略W通道）
+                    let g = data[i];
+                    let r = data[i + 1];
+                    let b = data[i + 2];
+                    // 忽略W通道 data[i + 3]
+                    rgb_colors.push(crate::led_color::LedColor::new(r, g, b));
+                }
+            }
+            i += bytes_per_led;
+        }
+
+        rgb_colors
     }
     /// Generate LED colors for a specific test effect at a given time
     pub fn generate_colors(config: &TestEffectConfig, time_ms: u64) -> Vec<u8> {
@@ -487,8 +546,12 @@ mod tests {
             offset: 0,
         };
 
-        let colors = LedTestEffects::generate_colors(&config, 0);
-        assert_eq!(colors.len(), 30); // 10 LEDs * 3 bytes each
+        let colors_data = LedTestEffects::generate_colors(&config, 0);
+        assert_eq!(colors_data.len(), 30); // 10 LEDs * 3 bytes per LED = 30 bytes
+
+        // Convert hardware data back to RGB colors for verification
+        let rgb_colors = LedTestEffects::hardware_data_to_rgb_colors(&colors_data, &config.led_type);
+        assert_eq!(rgb_colors.len(), 10); // 10 LEDs
     }
 
     #[test]
@@ -540,17 +603,19 @@ mod tests {
             offset: 0,
         };
 
-        let colors = LedTestEffects::generate_colors(&config, 0);
-        assert_eq!(colors.len(), 60); // 20 LEDs * 3 bytes each
+        let colors_data = LedTestEffects::generate_colors(&config, 0);
+        assert_eq!(colors_data.len(), 60); // 20 LEDs * 3 bytes per LED = 60 bytes
 
-        // First 10 should be red (converted to GRB for WS2812B)
-        assert_eq!(colors[0], 0); // G
-        assert_eq!(colors[1], 255); // R
-        assert_eq!(colors[2], 0); // B
+        // Convert hardware data back to RGB colors for testing
+        let rgb_colors = LedTestEffects::hardware_data_to_rgb_colors(&colors_data, &config.led_type);
+        assert_eq!(rgb_colors.len(), 20); // 20 LEDs
 
-        // Next 10 should be green (converted to GRB for WS2812B)
-        assert_eq!(colors[30], 255); // G
-        assert_eq!(colors[31], 0); // R
-        assert_eq!(colors[32], 0); // B
+        // First 10 should be red
+        let first_color = rgb_colors[0].get_rgb();
+        assert_eq!(first_color, [255, 0, 0]); // RGB: Red
+
+        // Next 10 should be green
+        let tenth_color = rgb_colors[10].get_rgb();
+        assert_eq!(tenth_color, [0, 255, 0]); // RGB: Green
     }
 }

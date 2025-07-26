@@ -15,10 +15,17 @@ import {
   DataSendMode
 } from '../../types/led-status';
 import { useLanguage } from '../../i18n/index';
+import { LedPreview } from '../led-preview';
 
 export interface StatusBarProps {
   class?: string;
   compact?: boolean; // 紧凑模式，显示更少信息
+}
+
+interface LedPreviewStateChangedEvent {
+  state: {
+    enabled: boolean;
+  };
 }
 
 export function StatusBar(props: StatusBarProps) {
@@ -26,10 +33,12 @@ export function StatusBar(props: StatusBarProps) {
   const [statusData, setStatusData] = createSignal<StatusBarData | null>(null);
   const [connected, setConnected] = createSignal(false);
   const [lastMessageTime, setLastMessageTime] = createSignal<Date | null>(null);
+  const [ledPreviewEnabled, setLedPreviewEnabled] = createSignal(false);
 
   // WebSocket连接状态监听
   let unsubscribeStatus: (() => void) | null = null;
   let unsubscribeConnection: (() => void) | null = null;
+  let unsubscribeLedPreview: (() => void) | null = null;
 
   onMount(async () => {
     try {
@@ -73,13 +82,25 @@ export function StatusBar(props: StatusBarProps) {
         }
       );
 
+      // 监听LED预览状态变化事件
+      unsubscribeLedPreview = await adaptiveApi.onEvent<LedPreviewStateChangedEvent>(
+        'LedPreviewStateChanged',
+        (event) => {
+          console.log('🎨 Status bar received LED preview state update:', event);
+          if (event && event.state) {
+            setLedPreviewEnabled(event.state.enabled);
+            console.log('✅ LED preview state updated:', event.state.enabled);
+          }
+        }
+      );
+
       // 订阅LED状态变化事件
-      console.log('📤 Subscribing to LedStatusChanged events...');
+      console.log('📤 Subscribing to events...');
       try {
-        await adaptiveApi.subscribeToEvents(['LedStatusChanged']);
-        console.log('✅ Subscribed to LedStatusChanged events');
+        await adaptiveApi.subscribeToEvents(['LedStatusChanged', 'LedPreviewStateChanged']);
+        console.log('✅ Subscribed to events');
       } catch (subscribeError) {
-        console.error('❌ Failed to subscribe to LedStatusChanged events:', subscribeError);
+        console.error('❌ Failed to subscribe to events:', subscribeError);
       }
 
       // 设置连接状态为true（假设WebSocket已连接）
@@ -98,6 +119,9 @@ export function StatusBar(props: StatusBarProps) {
     }
     if (unsubscribeConnection) {
       unsubscribeConnection();
+    }
+    if (unsubscribeLedPreview) {
+      unsubscribeLedPreview();
     }
   });
 
@@ -124,101 +148,158 @@ export function StatusBar(props: StatusBarProps) {
 
   // 紧凑模式渲染 - 极简一行显示
   const renderCompact = () => (
-    <div class={`flex items-center gap-2 px-3 py-1 bg-base-200 rounded-lg text-sm ${props.class || ''}`}>
-      {/* 连接状态指示器 */}
-      <div
-        class="w-2 h-2 rounded-full flex-shrink-0"
-        style={{ 'background-color': getConnectionColor() }}
-        title={getConnectionText()}
-      />
+    <div class={`space-y-1 ${props.class || ''}`}>
+      <div class="flex items-center gap-2 px-3 py-1 bg-base-200 rounded-lg text-sm">
+        {/* 连接状态指示器 */}
+        <div
+          class="w-2 h-2 rounded-full flex-shrink-0"
+          style={{ 'background-color': getConnectionColor() }}
+          title={getConnectionText()}
+        />
 
-      <Show when={statusData()}>
-        {(data) => (
-          <>
-            {/* 模式徽章 */}
-            <div class={`badge badge-sm ${getModeBadgeStyle(data().raw_mode)} gap-1 flex-shrink-0`}>
-              <span class="text-xs">{getModeIcon(data().raw_mode)}</span>
-              {data().mode}
-            </div>
+        <Show when={statusData()}>
+          {(data) => (
+            <>
+              {/* 模式徽章 */}
+              <div class={`badge badge-sm ${getModeBadgeStyle(data().raw_mode)} gap-1 flex-shrink-0`}>
+                <span class="text-xs">{getModeIcon(data().raw_mode)}</span>
+                {data().mode}
+              </div>
 
-            {/* 测试模式标签 */}
-            <Show when={data().test_mode_active}>
-              <div class="badge badge-warning badge-xs flex-shrink-0">{t('ledStatus.testMode')}</div>
-            </Show>
 
-            {/* 频率 */}
-            <Show when={data().frequency > 0}>
-              <span class="text-base-content/80 flex-shrink-0">{data().frequency}Hz</span>
-            </Show>
 
-            {/* LED数量 */}
-            <span class="text-base-content/60 text-xs flex-shrink-0">
-              {data().total_led_count} LEDs
-            </span>
-          </>
-        )}
+              {/* 频率 */}
+              <Show when={data().frequency > 0}>
+                <span class="text-base-content/80 flex-shrink-0">{data().frequency}Hz</span>
+              </Show>
+
+              {/* LED数量 */}
+              <span class="text-base-content/60 text-xs flex-shrink-0">
+                {data().total_led_count} LEDs
+              </span>
+            </>
+          )}
+        </Show>
+
+        {/* LED预览切换按钮 */}
+        <div class="ml-auto">
+          <button
+            class={`btn btn-xs ${ledPreviewEnabled() ? 'btn-primary' : 'btn-ghost'}`}
+            onClick={toggleLedPreview}
+            title={ledPreviewEnabled() ? t('tray.ledPreviewEnabled') : t('tray.ledPreviewDisabled')}
+          >
+            🎨
+          </button>
+        </div>
+      </div>
+
+      {/* LED预览 */}
+      <Show when={ledPreviewEnabled()}>
+        <LedPreview maxLeds={100} />
       </Show>
     </div>
   );
 
+  // 切换LED预览状态
+  const toggleLedPreview = async () => {
+    try {
+      const newState = !ledPreviewEnabled();
+      setLedPreviewEnabled(newState);
+
+      // 这里可以调用API来保存状态到后端
+      // await adaptiveApi.setLedPreviewEnabled(newState);
+
+      console.log('LED preview toggled to:', newState);
+    } catch (error) {
+      console.error('Failed to toggle LED preview:', error);
+    }
+  };
+
   // 完整模式渲染 - 优化为一行显示
   const renderFull = () => (
-    <div class={`bg-base-100 border border-base-300 rounded-lg px-4 py-2 ${props.class || ''}`}>
-      <Show
-        when={statusData()}
-        fallback={
-          <div class="flex items-center gap-3 text-base-content/60">
-            <div
-              class="w-2 h-2 rounded-full"
-              style={{ 'background-color': getConnectionColor() }}
-            />
-            <span class="text-sm">{t('ledStatus.waitingForData')}</span>
-            <Show when={!connected()}>
-              <span class="text-xs">({t('ledStatus.websocketDisconnected')})</span>
-            </Show>
-          </div>
-        }
-      >
-        {(data) => (
-          <div class="flex items-center gap-3">
-            {/* 连接状态指示器 */}
-            <div
-              class="w-2 h-2 rounded-full flex-shrink-0"
-              style={{ 'background-color': getConnectionColor() }}
-              title={getConnectionText()}
-            />
+    <div class={`space-y-2 ${props.class || ''}`}>
+      {/* 状态栏 */}
+      <div class="bg-base-100 border border-base-300 rounded-lg px-4 py-2">
+        <Show
+          when={statusData()}
+          fallback={
+            <div class="flex items-center gap-3 text-base-content/60">
+              <div
+                class="w-2 h-2 rounded-full"
+                style={{ 'background-color': getConnectionColor() }}
+              />
+              <span class="text-sm">{t('ledStatus.waitingForData')}</span>
+              <Show when={!connected()}>
+                <span class="text-xs">({t('ledStatus.websocketDisconnected')})</span>
+              </Show>
 
-            {/* 模式徽章 */}
-            <div class={`badge badge-sm ${getModeBadgeStyle(data().raw_mode)} gap-1 flex-shrink-0`}>
-              <span class="text-xs">{getModeIcon(data().raw_mode)}</span>
-              {data().mode}
+              {/* LED预览切换按钮 */}
+              <div class="ml-auto">
+                <button
+                  class={`btn btn-xs ${ledPreviewEnabled() ? 'btn-primary' : 'btn-ghost'}`}
+                  onClick={toggleLedPreview}
+                  title={ledPreviewEnabled() ? t('tray.ledPreviewEnabled') : t('tray.ledPreviewDisabled')}
+                >
+                  🎨 {t('tray.ledPreview')}
+                </button>
+              </div>
             </div>
+          }
+        >
+          {(data) => (
+            <div class="flex items-center gap-3">
+              {/* 连接状态指示器 */}
+              <div
+                class="w-2 h-2 rounded-full flex-shrink-0"
+                style={{ 'background-color': getConnectionColor() }}
+                title={getConnectionText()}
+              />
 
-            {/* 测试模式标签 */}
-            <Show when={data().test_mode_active}>
-              <div class="badge badge-warning badge-xs flex-shrink-0">{t('ledStatus.testMode')}</div>
-            </Show>
+              {/* 模式徽章 */}
+              <div class={`badge badge-sm ${getModeBadgeStyle(data().raw_mode)} gap-1 flex-shrink-0`}>
+                <span class="text-xs">{getModeIcon(data().raw_mode)}</span>
+                {data().mode}
+              </div>
 
-            {/* 频率 */}
-            <Show when={data().frequency > 0}>
+
+
+              {/* 频率 */}
+              <Show when={data().frequency > 0}>
+                <span class="text-sm text-base-content/80 flex-shrink-0">
+                  {data().frequency}Hz
+                </span>
+              </Show>
+
+              {/* LED数量 */}
               <span class="text-sm text-base-content/80 flex-shrink-0">
-                {data().frequency}Hz
+                {data().total_led_count} LEDs
               </span>
-            </Show>
 
-            {/* LED数量 */}
-            <span class="text-sm text-base-content/80 flex-shrink-0">
-              {data().total_led_count} LEDs
-            </span>
+              {/* 数据大小（仅在有数据时显示） */}
+              <Show when={data().data_length > 0}>
+                <span class="text-xs text-base-content/60 flex-shrink-0">
+                  {formatDataSize(data().data_length)}
+                </span>
+              </Show>
 
-            {/* 数据大小（仅在有数据时显示） */}
-            <Show when={data().data_length > 0}>
-              <span class="text-xs text-base-content/60 flex-shrink-0">
-                {formatDataSize(data().data_length)}
-              </span>
-            </Show>
-          </div>
-        )}
+              {/* LED预览切换按钮 */}
+              <div class="ml-auto">
+                <button
+                  class={`btn btn-xs ${ledPreviewEnabled() ? 'btn-primary' : 'btn-ghost'}`}
+                  onClick={toggleLedPreview}
+                  title={ledPreviewEnabled() ? t('tray.ledPreviewEnabled') : t('tray.ledPreviewDisabled')}
+                >
+                  🎨 {t('tray.ledPreview')}
+                </button>
+              </div>
+            </div>
+          )}
+        </Show>
+      </div>
+
+      {/* LED预览 */}
+      <Show when={ledPreviewEnabled()}>
+        <LedPreview maxLeds={200} />
       </Show>
     </div>
   );

@@ -80,7 +80,7 @@ function App() {
 
 
 
-  // Monitor route changes and cleanup LED tests when leaving the test page
+  // Monitor route changes and reset LED mode to AmbientLight before entering any page
   createEffect(() => {
     const currentPath = location.pathname;
     const prevPath = previousPath();
@@ -105,14 +105,13 @@ function App() {
       console.error('Failed to report current page:', error);
     });
 
-    // Check if we're leaving the LED test page
-    const isLeavingTestPage = prevPath === '/led-strip-test' && currentPath !== '/led-strip-test';
-
-    if (isLeavingTestPage) {
-      // The LED test component will handle stopping the test effect via onCleanup
-      // We just need to ensure test mode is disabled to resume normal LED publishing
-      adaptiveApi.disableTestMode().catch((error) => {
-        console.error('Failed to disable test mode:', error);
+    // Reset LED mode to AmbientLight before entering any page (except on initial load and LED test pages)
+    if (prevPath !== '' && !currentPath.includes('/led-strip-test') && !currentPath.includes('/led-data-sender-test')) {
+      console.log(`🔄 Route change detected: ${prevPath} -> ${currentPath}, resetting LED mode to AmbientLight`);
+      adaptiveApi.setDataSendMode('AmbientLight').then(() => {
+        console.log('✅ LED mode reset to AmbientLight before entering new page');
+      }).catch((error) => {
+        console.error('❌ Failed to reset LED mode to AmbientLight:', error);
       });
     }
 

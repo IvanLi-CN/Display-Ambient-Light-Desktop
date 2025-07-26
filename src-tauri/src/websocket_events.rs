@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use tokio::sync::OnceCell;
 
 use crate::{
@@ -7,6 +6,7 @@ use crate::{
     display::DisplayState,
     http_server::websocket::{WebSocketManager, WsMessage},
     led_data_sender::DataSendMode,
+    led_preview_state::LedPreviewState,
     rpc::BoardInfo,
     user_preferences::UserPreferences,
 };
@@ -39,7 +39,7 @@ impl WebSocketEventPublisher {
 
     /// 发布LED颜色变化事件
     pub async fn publish_led_colors_changed(&self, colors: Vec<u8>) {
-        log::debug!(
+        log::info!(
             "🎨 Publishing LED colors changed event: {} bytes",
             colors.len()
         );
@@ -51,22 +51,35 @@ impl WebSocketEventPublisher {
         {
             Ok(subscriber_count) => {
                 if subscriber_count > 0 {
-                    log::debug!("✅ LED颜色变化事件已发送给 {} 个订阅者", subscriber_count);
+                    log::info!("✅ LED颜色变化事件已发送给 {} 个订阅者", subscriber_count);
+                } else {
+                    log::info!("📭 没有订阅者接收LED颜色变化事件");
                 }
             }
             Err(e) => {
-                log::debug!("发送LED颜色变化事件失败: {}", e);
+                log::error!("❌ 发送LED颜色变化事件失败: {}", e);
             }
         }
     }
 
     /// 发布LED排序颜色变化事件
-    pub async fn publish_led_sorted_colors_changed(&self, sorted_colors: Vec<u8>) {
-        log::debug!(
-            "🌈 Publishing LED sorted colors changed event: {} bytes",
-            sorted_colors.len()
+    pub async fn publish_led_sorted_colors_changed(&self, sorted_colors: Vec<u8>, led_offset: usize) {
+        // 获取当前模式信息
+        let sender = crate::led_data_sender::LedDataSender::global().await;
+        let current_mode = sender.get_mode().await;
+
+        log::info!(
+            "🌈 Publishing LED sorted colors changed event: {} bytes, mode={:?}, offset={}",
+            sorted_colors.len(),
+            current_mode,
+            led_offset
         );
-        let message = WsMessage::LedSortedColorsChanged { sorted_colors };
+
+        let message = WsMessage::LedSortedColorsChanged {
+            sorted_colors,
+            mode: current_mode,
+            led_offset,
+        };
         match self
             .ws_manager
             .send_to_subscribers("LedSortedColorsChanged", message)
@@ -74,14 +87,16 @@ impl WebSocketEventPublisher {
         {
             Ok(subscriber_count) => {
                 if subscriber_count > 0 {
-                    log::debug!(
+                    log::info!(
                         "✅ LED排序颜色变化事件已发送给 {} 个订阅者",
                         subscriber_count
                     );
+                } else {
+                    log::info!("📭 没有订阅者接收LED排序颜色变化事件");
                 }
             }
             Err(e) => {
-                log::debug!("发送LED排序颜色变化事件失败: {}", e);
+                log::error!("❌ 发送LED排序颜色变化事件失败: {}", e);
             }
         }
     }
@@ -95,7 +110,6 @@ impl WebSocketEventPublisher {
     pub async fn publish_led_status_changed_with_mode(&self, mode_override: Option<DataSendMode>) {
         // 获取当前LED状态
         let sender = crate::led_data_sender::LedDataSender::global().await;
-        let publisher = crate::ambient_light::LedColorsPublisher::global().await;
         let config_manager = crate::ambient_light::ConfigManager::global().await;
 
         // 获取当前模式（如果没有提供覆盖值）
@@ -105,8 +119,7 @@ impl WebSocketEventPublisher {
             sender.get_mode().await
         };
 
-        // 获取测试模式状态
-        let test_mode_active = publisher.is_test_mode_active().await;
+
 
         // 获取LED配置以计算总数量和数据长度
         let configs = config_manager.configs().await;
@@ -139,7 +152,7 @@ impl WebSocketEventPublisher {
             "frequency": frequency,
             "data_length": data_length,
             "total_led_count": total_led_count,
-            "test_mode_active": test_mode_active,
+            "test_mode_active": mode == DataSendMode::TestEffect,
             "timestamp": chrono::Utc::now().to_rfc3339()
         });
 
@@ -272,6 +285,32 @@ impl WebSocketEventPublisher {
         }
     }
 
+    /// 发布LED预览状态变化事件
+    pub async fn publish_led_preview_state_changed(&self, state: &LedPreviewState) {
+        if let Ok(state_json) = serde_json::to_value(state) {
+            let message = WsMessage::LedPreviewStateChanged { state: state_json };
+            match self
+                .ws_manager
+                .send_to_subscribers("LedPreviewStateChanged", message)
+                .await
+            {
+                Ok(subscriber_count) => {
+                    if subscriber_count > 0 {
+                        log::debug!(
+                            "✅ LED预览状态变化事件已发送给 {} 个订阅者",
+                            subscriber_count
+                        );
+                    }
+                }
+                Err(e) => {
+                    log::debug!("发送LED预览状态变化事件失败: {}", e);
+                }
+            }
+        } else {
+            log::error!("序列化LED预览状态数据失败");
+        }
+    }
+
     /// 发布用户偏好设置变化事件
     pub async fn publish_user_preferences_changed(&self, preferences: &UserPreferences) {
         if let Ok(preferences_json) = serde_json::to_value(preferences) {
@@ -356,6 +395,14 @@ pub async fn publish_ambient_light_state_changed(state: &AmbientLightState) {
     get_websocket_publisher()
         .await
         .publish_ambient_light_state_changed(state)
+        .await;
+}
+
+/// 便捷函数：发布LED预览状态变化
+pub async fn publish_led_preview_state_changed(state: &LedPreviewState) {
+    get_websocket_publisher()
+        .await
+        .publish_led_preview_state_changed(state)
         .await;
 }
 

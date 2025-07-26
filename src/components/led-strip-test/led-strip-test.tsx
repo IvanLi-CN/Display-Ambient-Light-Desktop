@@ -3,6 +3,7 @@ import { adaptiveApi } from '../../services/api-adapter';
 import { LedApiService } from '../../services/led-api.service';
 import { DeviceApiService } from '../../services/display-api.service';
 import { useLanguage } from '../../i18n/index';
+import { LedPreview } from '../led-preview/led-preview';
 
 interface BoardInfo {
   fullname: string;
@@ -133,7 +134,17 @@ export const LedStripTest = () => {
   // Load available boards on mount
   onMount(async () => {
     try {
-      // Initial load
+      // 1. 首先停止所有正在运行的测试效果并重置模式
+      console.log('🧹 Cleaning up any existing test effects...');
+      try {
+        // 禁用测试模式，这会停止所有测试效果并重置为AmbientLight模式
+        await adaptiveApi.disableTestMode();
+        console.log('✅ Test mode disabled and cleaned up');
+      } catch (error) {
+        console.warn('⚠️ Failed to disable test mode during cleanup:', error);
+      }
+
+      // 2. 加载可用的设备列表
       const boardList = await adaptiveApi.getBoards();
       setBoards(boardList);
       if (boardList.length > 0 && !selectedBoard()) {
@@ -199,11 +210,13 @@ export const LedStripTest = () => {
   // Cleanup when component is unmounted
   onCleanup(() => {
     if (isRunning() && selectedBoard()) {
-      // Stop the test effect in backend
+      // Use non-async cleanup to avoid the warning
       adaptiveApi.stopLedTestEffect({
         boardAddress: `${selectedBoard()!.address}:${selectedBoard()!.port}`,
         ledCount: ledCount(),
         ledType: ledType()
+      }).then(() => {
+        console.log('✅ Test effect stopped during cleanup');
       }).catch((error) => {
         console.error('Failed to stop test during cleanup:', error);
       });
@@ -263,7 +276,12 @@ export const LedStripTest = () => {
         offset: ledOffset()
       };
 
-      // Start the test effect in Rust backend
+      // 1. 首先启用测试模式
+      console.log('🧪 启用测试模式...');
+      await adaptiveApi.enableTestMode();
+
+      // 2. 启动测试效果
+      console.log('🚀 启动测试效果...');
       await adaptiveApi.startLedTestEffect({
         boardAddress: `${selectedBoard()!.address}:${selectedBoard()!.port}`,
         effectConfig: effectConfig,
@@ -272,6 +290,7 @@ export const LedStripTest = () => {
 
       setCurrentPattern(pattern);
       setIsRunning(true);
+      console.log('✅ 测试效果启动成功');
     } catch (error) {
       console.error('Failed to start test effect:', error);
     }
@@ -284,23 +303,35 @@ export const LedStripTest = () => {
       return;
     }
 
-    try {
-      // Stop the test effect in Rust backend
-      await adaptiveApi.stopLedTestEffect({
-        boardAddress: `${selectedBoard()!.address}:${selectedBoard()!.port}`,
-        ledCount: ledCount(),
-        ledType: ledType()
-      });
+    // 立即更新UI状态，让用户感觉停止是即时的
+    setIsRunning(false);
+    setCurrentPattern(null);
+    console.log('🛑 UI状态已更新，正在后台停止测试效果...');
 
-      // Only update UI state after successful backend call
-      setIsRunning(false);
-      setCurrentPattern(null);
-    } catch (error) {
-      console.error('Failed to stop test effect:', error);
-      // Still update UI state even if backend call fails
-      setIsRunning(false);
-      setCurrentPattern(null);
-    }
+    // 后台异步停止测试效果，不阻塞UI
+    const stopParams = {
+      boardAddress: `${selectedBoard()!.address}:${selectedBoard()!.port}`,
+      ledCount: ledCount(),
+      ledType: ledType()
+    };
+
+    // 使用Promise.resolve().then()来确保异步执行，不阻塞UI
+    Promise.resolve().then(async () => {
+      try {
+        // 1. 停止测试效果
+        console.log('🛑 停止测试效果...');
+        await adaptiveApi.stopLedTestEffect(stopParams);
+
+        // 2. 禁用测试模式，恢复环境光模式
+        console.log('🌈 禁用测试模式，恢复环境光模式...');
+        await adaptiveApi.disableTestMode();
+
+        console.log('✅ 测试效果已成功停止，已恢复环境光模式');
+      } catch (error) {
+        console.error('❌ 停止测试效果失败:', error);
+        // 如果后台停止失败，不影响UI状态，因为用户已经看到停止了
+      }
+    });
   };
 
   // 测试LED配置数据发送
@@ -404,6 +435,9 @@ export const LedStripTest = () => {
 
   return (
     <div class="container mx-auto p-6 space-y-6">
+      {/* LED Preview */}
+      <LedPreview class="mb-4" maxLeds={200} />
+
       <div class="card bg-base-200 shadow-xl">
         <div class="card-body">
           <h2 class="card-title text-2xl mb-4">{t('ledTest.title')}</h2>

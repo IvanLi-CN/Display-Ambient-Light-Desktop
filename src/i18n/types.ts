@@ -339,6 +339,9 @@ export interface TranslationDict {
     ambientLight: string;
     ambientLightEnabled: string;
     ambientLightDisabled: string;
+    ledPreview: string;
+    ledPreviewEnabled: string;
+    ledPreviewDisabled: string;
     info: string;
     ledConfiguration: string;
     colorCalibration: string;

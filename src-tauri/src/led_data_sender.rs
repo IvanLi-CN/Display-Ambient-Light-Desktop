@@ -339,6 +339,9 @@ impl LedDataSender {
             _ => DataSendMode::AmbientLight,
         };
 
+        // 注意：LED颜色预览数据由 ambient_light/publisher.rs 负责发布
+        // 这里不再重复发布，避免数据混乱和重复事件
+
         // 拆分数据为UDP包
         let max_data_size = 400; // 每个UDP包的最大数据大小（硬件限制：不超过400字节）
         let mut current_offset = start_offset;

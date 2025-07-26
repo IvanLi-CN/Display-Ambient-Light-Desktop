@@ -14,8 +14,6 @@ use crate::{
 pub struct LedStatusStats {
     /// 当前数据发送模式
     pub data_send_mode: DataSendMode,
-    /// 测试模式是否激活
-    pub test_mode_active: bool,
     /// 单屏配置模式是否激活
     pub single_display_config_mode: bool,
     /// 当前活跃的呼吸灯带（display_id, border）
@@ -47,7 +45,6 @@ impl Default for LedStatusStats {
     fn default() -> Self {
         Self {
             data_send_mode: DataSendMode::None,
-            test_mode_active: false,
             single_display_config_mode: false,
             active_breathing_strip: None,
             current_colors_bytes: 0,
@@ -134,21 +131,7 @@ impl LedStatusManager {
         Ok(())
     }
 
-    /// 设置测试模式状态
-    pub async fn set_test_mode_active(&self, active: bool) -> anyhow::Result<()> {
-        {
-            let mut status = self.status.write().await;
-            status.test_mode_active = active;
-            status.last_updated = chrono::Utc::now();
-        }
 
-        self.notify_status_changed().await?;
-        info!(
-            "LED test mode changed to: {}",
-            if active { "active" } else { "inactive" }
-        );
-        Ok(())
-    }
 
     /// 设置单屏配置模式状态
     pub async fn set_single_display_config_mode(
@@ -279,9 +262,8 @@ impl LedStatusManager {
         websocket_publisher.publish_led_status_changed().await;
 
         info!(
-            "🔄 LED状态变更已通知: mode={:?}, test_mode={}, send_stats={:?}",
+            "🔄 LED状态变更已通知: mode={:?}, send_stats={:?}",
             current_status.data_send_mode,
-            current_status.test_mode_active,
             current_status.send_stats
         );
 
@@ -311,7 +293,6 @@ impl LedStatusManager {
         format!(
             "LED Status Manager Debug Info:\n\
              - Data Send Mode: {:?}\n\
-             - Test Mode Active: {}\n\
              - Single Display Config Mode: {}\n\
              - Active Breathing Strip: {:?}\n\
              - Current Colors: {} bytes\n\
@@ -320,7 +301,6 @@ impl LedStatusManager {
              - Send Stats: {} packets, {} bytes, {} errors\n\
              - Last Updated: {}",
             status.data_send_mode,
-            status.test_mode_active,
             status.single_display_config_mode,
             status.active_breathing_strip,
             current_colors_len,
@@ -355,7 +335,6 @@ mod tests {
 
         // 重置状态管理器状态到初始值，因为其他测试可能已经修改了全局状态
         let _ = manager.set_data_send_mode(DataSendMode::None).await;
-        let _ = manager.set_test_mode_active(false).await;
         let _ = manager.set_single_display_config_mode(false, None).await;
         let _ = manager.set_active_breathing_strip(None, None).await;
 
@@ -363,7 +342,6 @@ mod tests {
 
         // 验证重置后的状态
         assert_eq!(status.data_send_mode, DataSendMode::None);
-        assert!(!status.test_mode_active);
         assert!(!status.single_display_config_mode);
         assert_eq!(status.active_breathing_strip, None);
         // 注意：current_colors_bytes 和 sorted_colors_bytes 可能被其他测试影响，

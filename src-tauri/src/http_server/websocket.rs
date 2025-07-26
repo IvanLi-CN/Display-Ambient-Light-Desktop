@@ -25,7 +25,12 @@ pub enum WsMessage {
     /// LED颜色变化
     LedColorsChanged { colors: Vec<u8> },
     /// LED排序颜色变化
-    LedSortedColorsChanged { sorted_colors: Vec<u8> },
+    LedSortedColorsChanged {
+        sorted_colors: Vec<u8>,
+        mode: crate::led_data_sender::DataSendMode,
+        /// LED偏移量（用于前端组装完整预览）
+        led_offset: usize,
+    },
     /// LED状态变化
     LedStatusChanged { status: serde_json::Value },
     /// 配置变化
@@ -36,6 +41,8 @@ pub enum WsMessage {
     DisplaysChanged { displays: serde_json::Value },
     /// 环境光状态变化
     AmbientLightStateChanged { state: serde_json::Value },
+    /// LED预览状态变化
+    LedPreviewStateChanged { state: serde_json::Value },
     /// 导航事件
     Navigate { path: String },
     /// 订阅事件
