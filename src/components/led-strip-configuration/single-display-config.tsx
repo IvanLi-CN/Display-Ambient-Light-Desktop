@@ -3,6 +3,8 @@ import { useParams, useNavigate } from '@solidjs/router';
 import { useLanguage } from '../../i18n/index';
 import { LedColorService } from '../../services/led-color-service';
 import { adaptiveApi } from '../../services/api-adapter';
+import { StatusBar } from '../status-bar/status-bar';
+import { WebSocketListener } from '../websocket-listener';
 
 // LED灯带配置类型
 interface LedStripConfig {
@@ -584,10 +586,14 @@ export function SingleDisplayConfig() {
   console.log('🔍 SingleDisplayConfig - URL params:', params);
 
   const displayId = () => {
-    const id = parseInt(params.displayId || '1');
-    console.log('🔍 SingleDisplayConfig - displayId params:', params.displayId, 'parsed:', id);
+    const paramValue = params.displayId;
+    const id = parseInt(paramValue || '1');
+    console.log('🔍 SingleDisplayConfig - URL:', window.location.href);
+    console.log('🔍 SingleDisplayConfig - displayId param value:', paramValue, 'type:', typeof paramValue);
+    console.log('🔍 SingleDisplayConfig - parsed id:', id, 'isNaN:', isNaN(id));
+
     if (isNaN(id)) {
-      console.error('❌ Invalid displayId parameter:', params.displayId);
+      console.error('❌ Invalid displayId parameter:', paramValue, 'defaulting to 1');
       return 1; // 默认返回显示器1
     }
     return id;
@@ -660,46 +666,19 @@ export function SingleDisplayConfig() {
     }
   };
 
-  // 启用测试模式
-  const startTestMode = async () => {
-    try {
-      console.log('Starting LED test mode...');
-      await adaptiveApi.enableTestMode();
-      console.log('LED test mode enabled');
-    } catch (error) {
-      console.error('Failed to start test mode:', error);
-    }
-  };
 
-  // 停止测试模式
-  const stopTestMode = async () => {
-    try {
-      console.log('Stopping LED test mode...');
-      await adaptiveApi.disableTestMode();
-      console.log('LED test mode disabled, ambient light resumed');
-    } catch (error) {
-      // 忽略AbortError，这是正常的页面切换行为
-      if (error instanceof Error && error.name !== 'AbortError') {
-        console.error('Failed to stop test mode:', error);
-      }
-    }
-  };
 
   // 加载LED灯带数据
   onMount(async () => {
     console.log('🔄 onMount 开始执行');
-    // 停止氛围光模式，启用测试模式
-    await startTestMode();
-    console.log('✅ startTestMode 完成');
 
     try {
-      // 检查是否在 Tauri 环境中
-      if (typeof window !== 'undefined' && (window as any).__TAURI__) {
-        console.log('=== 开始加载LED灯带配置 ===');
-        console.log('显示器ID:', displayId());
+      // 总是尝试加载配置，不管是否在 Tauri 环境中
+      console.log('=== 开始加载LED灯带配置 ===');
+      console.log('显示器ID:', displayId());
 
-        // 尝试从后端加载已保存的配置
-        const allConfigs = await adaptiveApi.readLedStripConfigs();
+      // 尝试从后端加载已保存的配置
+      const allConfigs = await adaptiveApi.readLedStripConfigs();
 
         console.log('从后端加载的完整配置组:', allConfigs);
         console.log('配置组类型:', typeof allConfigs);
@@ -745,21 +724,13 @@ export function SingleDisplayConfig() {
 
           console.log('✅ 成功加载已保存的LED灯带配置');
 
-          // 立即启动后端单屏配置模式
-          console.log('=== 立即启动后端单屏配置模式（已保存配置）===');
-          setTimeout(async () => {
-            console.log('⏰ setTimeout 回调执行，准备调用 startSingleDisplayConfigMode');
-            await startSingleDisplayConfigMode();
-            console.log('✅ startSingleDisplayConfigMode 调用完成');
-          }, 100); // 稍微延迟确保状态已更新
+          // 配置已加载，createEffect 会自动启动单屏配置模式
+          console.log('=== 配置已加载，等待 createEffect 自动启动单屏配置模式 ===');
 
           return; // 成功加载，不需要使用测试数据
         } else {
           console.log('No saved configuration found, starting with empty configuration');
         }
-      } else {
-        console.log('Not in Tauri environment, starting with empty configuration');
-      }
     } catch (error) {
       console.log('Failed to load saved configuration, starting with empty configuration:', error);
     }
@@ -829,36 +800,28 @@ export function SingleDisplayConfig() {
     setLedStrips(testStrips);
     setSelectedStrip(testStrips[0]);
 
-    // 通过API命令报告状态
-    try {
-      await adaptiveApi.reportCurrentPage(`🔧 单屏配置页面：已设置${testStrips.length}个测试灯带，准备启动单屏配置模式`);
-    } catch (e) {
-      console.error('Failed to report page info:', e);
-    }
-
-    // 立即启动后端单屏配置模式
-    console.log('=== 立即启动后端单屏配置模式（测试配置）===');
-    setTimeout(async () => {
-      try {
-        console.log('⏰ 测试配置 setTimeout 回调执行');
-        await adaptiveApi.reportCurrentPage('🚀 单屏配置页面：开始启动后端单屏配置模式');
-        console.log('📞 准备调用 startSingleDisplayConfigMode（测试配置）');
-        await startSingleDisplayConfigMode();
-        console.log('✅ startSingleDisplayConfigMode 调用完成（测试配置）');
-      } catch (e) {
-        console.error('Failed to start single display config mode:', e);
-        await adaptiveApi.reportCurrentPage(`❌ 单屏配置页面：启动失败 - ${e}`);
-      }
-    }, 100);
+    // 测试配置已设置，createEffect 会自动启动单屏配置模式
+    console.log('=== 测试配置已设置，等待 createEffect 自动启动单屏配置模式 ===');
   });
 
   // 组件卸载时的清理
   onCleanup(() => {
     console.log('🧹 SingleDisplayConfig 组件卸载，停止单屏配置模式');
-    // 先停止单屏配置模式
+
+    // 清理防抖定时器
+    if (configModeRestartTimer) {
+      clearTimeout(configModeRestartTimer);
+      configModeRestartTimer = undefined;
+    }
+
+    // 停止所有LED效果
+    const ledColorService = LedColorService.getInstance();
+    ledStrips().forEach((strip) => {
+      ledColorService.stopBreathingEffect(strip.id);
+    });
+
+    // 停止单屏配置模式
     stopSingleDisplayConfigMode();
-    // 然后恢复氛围光模式
-    stopTestMode();
   });
 
   // 创建新LED灯带
@@ -1017,19 +980,9 @@ export function SingleDisplayConfig() {
       console.log('灯带配置:', backendStrips);
       console.log('边框颜色:', borderColors);
 
-      // 通过API报告详细信息
-      await adaptiveApi.reportCurrentPage(`🚀 准备启动后端单屏配置模式，灯带数量: ${backendStrips.length}`);
-
-      // 报告每个灯带的详细信息
-      for (let i = 0; i < backendStrips.length; i++) {
-        const strip = backendStrips[i];
-        await adaptiveApi.reportCurrentPage(`灯带${i}: index=${strip.index}, border=${strip.border}, display_id=${strip.display_id}, len=${strip.len}, led_type=${strip.led_type}`);
-      }
-
       await adaptiveApi.startSingleDisplayConfigPublisher(backendStrips, borderColors);
 
       console.log('✅ 后端单屏配置模式已启动');
-      await adaptiveApi.reportCurrentPage('✅ 后端单屏配置模式启动成功');
     } catch (error) {
       console.error('❌ 启动后端单屏配置模式失败:', error);
     }
@@ -1124,44 +1077,50 @@ export function SingleDisplayConfig() {
     setActiveStripForBreathing(activeStrip);
   });
 
-  // 当灯带配置变化时，重新启动后端单屏配置模式
+  // 防抖的单屏配置模式启动
+  let configModeRestartTimer: ReturnType<typeof setTimeout> | undefined;
+
+  // 当灯带配置变化时，防抖重新启动后端单屏配置模式
   createEffect(() => {
     const strips = ledStrips();
-    // 通过访问每个灯带的所有属性来确保深度监听
+
+    // 只监听关键配置变化，避免过度触发
     const stripSignature = strips.map(strip =>
-      `${strip.id}-${strip.count}-${strip.reverse}-${strip.ledType}-${strip.startOffset}-${strip.endOffset}`
+      `${strip.id}-${strip.count}-${strip.reverse}-${strip.ledType}`
     ).join('|');
 
+    // 清除之前的定时器
+    if (configModeRestartTimer) {
+      clearTimeout(configModeRestartTimer);
+    }
+
     if (strips.length > 0) {
-      console.log(`=== 检测到${strips.length}个已配置的灯带，启动后端单屏配置模式 ===`);
+      console.log(`=== 检测到${strips.length}个已配置的灯带，准备启动后端单屏配置模式 ===`);
       console.log(`配置签名: ${stripSignature}`);
-      strips.forEach(strip => {
-        console.log(`灯带: ${strip.id} (${strip.border}边) - ${strip.count}个LED, 反向: ${strip.reverse}`);
-      });
-      // 重新启动后端单屏配置模式（这会处理所有配置变化）
-      startSingleDisplayConfigMode();
+
+      // 使用较短的防抖延迟，快速响应配置变化
+      configModeRestartTimer = setTimeout(() => {
+        console.log('🚀 防抖延迟后启动单屏配置模式');
+        startSingleDisplayConfigMode();
+      }, 300); // 减少到300ms防抖延迟
     } else {
       console.log('=== 没有配置的灯带，停止后端单屏配置模式 ===');
       stopSingleDisplayConfigMode();
     }
   });
 
-  // 清理效果：离开界面时停止所有LED效果
-  onCleanup(() => {
-    // 停止后端单屏配置模式
-    stopSingleDisplayConfigMode();
 
-    // 恢复氛围光模式
-    stopTestMode();
-
-    const ledColorService = LedColorService.getInstance();
-    ledStrips().forEach((strip) => {
-      ledColorService.stopBreathingEffect(strip.id);
-    });
-  });
 
   return (
     <div class="container mx-auto p-6 h-full">
+      {/* WebSocket监听器 */}
+      <WebSocketListener />
+
+      {/* LED状态栏 */}
+      <div class="mb-4">
+        <StatusBar compact={true} />
+      </div>
+
       <div class="flex justify-between items-center mb-6">
         <h1 class="text-2xl font-bold">{t('singleDisplayConfig.title')}</h1>
         <div class="flex gap-2 items-center">

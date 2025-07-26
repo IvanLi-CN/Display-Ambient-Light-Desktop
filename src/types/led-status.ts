@@ -148,7 +148,7 @@ export function convertToStatusBarData(
 
 
   return {
-    mode: MODE_DISPLAY_NAMES[safeStatus.mode as DataSendMode] || '未知',
+    mode: MODE_DISPLAY_NAMES[(safeStatus.data_send_mode || safeStatus.mode) as DataSendMode] || '未知',
     frequency: safeStatus.frequency || frequency,
     data_length: safeStatus.data_length || safeStatus.current_colors_bytes || 0,
     total_led_count: safeStatus.total_led_count || totalLedCount,

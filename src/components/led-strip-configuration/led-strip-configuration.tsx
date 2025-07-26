@@ -32,9 +32,47 @@ export const LedStripConfiguration = () => {
     });
 
     adaptiveApi.getConfig().then((configs) => {
-      setLedStripStore(configs);
+      console.log('🔧 获取到的配置数据:', configs);
+      console.log('🔧 配置数据类型:', typeof configs);
+      console.log('🔧 配置数据键:', Object.keys(configs || {}));
+
+      // 安全检查：确保 strips 存在且是数组
+      if (configs && configs.strips && Array.isArray(configs.strips)) {
+        console.log('✅ 有效的配置数据，strips数量:', configs.strips.length);
+        setLedStripStore({
+          strips: configs.strips,
+          colorCalibration: configs.color_calibration || {
+            r: 1.0,
+            g: 1.0,
+            b: 1.0,
+            w: 1.0
+          }
+        });
+      } else {
+        console.warn('⚠️ 配置数据无效或缺少strips:', configs);
+        // 设置空的配置
+        setLedStripStore({
+          strips: [],
+          colorCalibration: {
+            r: 1.0,
+            g: 1.0,
+            b: 1.0,
+            w: 1.0
+          }
+        });
+      }
     }).catch((error) => {
       console.error('Failed to load LED strip configs:', error);
+      // 设置空的配置
+      setLedStripStore({
+        strips: [],
+        colorCalibration: {
+          r: 1.0,
+          g: 1.0,
+          b: 1.0,
+          w: 1.0
+        }
+      });
     });
   });
 
@@ -43,14 +81,26 @@ export const LedStripConfiguration = () => {
     onConfigChanged: (data: any) => {
       console.log('🔧 配置变化事件:', data);
       try {
-        const configData = data as LedStripConfigContainer;
+        // 检查数据结构
+        let configData: LedStripConfigContainer;
+
+        if (data && data.config) {
+          // 如果数据包装在 config 字段中
+          configData = data.config as LedStripConfigContainer;
+        } else {
+          // 直接使用数据
+          configData = data as LedStripConfigContainer;
+        }
+
         // 安全检查：确保 strips 存在且是数组
         if (configData && configData.strips && Array.isArray(configData.strips)) {
+          console.log('✅ 有效的配置数据，strips数量:', configData.strips.length);
           setLedStripStore({
             strips: configData.strips,
           });
         } else {
           console.warn('⚠️ 配置数据无效或缺少strips:', configData);
+          console.warn('数据结构:', typeof configData, Object.keys(configData || {}));
         }
       } catch (error) {
         console.error('❌ 处理配置变化事件失败:', error);

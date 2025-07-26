@@ -122,12 +122,45 @@ function App() {
 
   createEffect(() => {
     adaptiveApi.getConfig().then((config: LedStripConfigContainer) => {
-      setLedStripStore({
-        strips: config.strips,
-        colorCalibration: config.color_calibration,
-      });
+      console.log('🔧 App.tsx - 获取到的配置数据:', config);
+
+      // 安全检查：确保 strips 存在且是数组
+      if (config && config.strips && Array.isArray(config.strips)) {
+        console.log('✅ App.tsx - 有效的配置数据，strips数量:', config.strips.length);
+        setLedStripStore({
+          strips: config.strips,
+          colorCalibration: config.color_calibration || {
+            r: 1.0,
+            g: 1.0,
+            b: 1.0,
+            w: 1.0
+          },
+        });
+      } else {
+        console.warn('⚠️ App.tsx - 配置数据无效或缺少strips:', config);
+        // 设置空的配置
+        setLedStripStore({
+          strips: [],
+          colorCalibration: {
+            r: 1.0,
+            g: 1.0,
+            b: 1.0,
+            w: 1.0
+          },
+        });
+      }
     }).catch((error: any) => {
       console.error('Failed to read config:', error);
+      // 设置空的配置
+      setLedStripStore({
+        strips: [],
+        colorCalibration: {
+          r: 1.0,
+          g: 1.0,
+          b: 1.0,
+          w: 1.0
+        },
+      });
     });
   });
 
