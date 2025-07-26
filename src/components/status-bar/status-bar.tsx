@@ -5,11 +5,14 @@
 
 import { createSignal, onMount, onCleanup, Show } from 'solid-js';
 import { adaptiveApi } from '../../services/api-adapter';
-import { 
-  LedStatusData, 
-  StatusBarData, 
+import {
+  LedStatusData,
+  StatusBarData,
   convertToStatusBarData,
-  LedStatusChangedEvent 
+  LedStatusChangedEvent,
+  getModeBadgeStyle,
+  getModeIcon,
+  DataSendMode
 } from '../../types/led-status';
 import { useLanguage } from '../../i18n/index';
 
@@ -135,7 +138,10 @@ export function StatusBar(props: StatusBarProps) {
         {(data) => (
           <>
             <div class="w-px h-4 bg-base-300" />
-            <span class="text-base-content">{data().mode}</span>
+            <div class={`badge badge-sm ${getModeBadgeStyle(data().raw_mode)} gap-1`}>
+              <span class="text-xs">{getModeIcon(data().raw_mode)}</span>
+              {data().mode}
+            </div>
             <Show when={data().frequency > 0}>
               <span class="text-base-content/60">|</span>
               <span class="text-base-content">{data().frequency}Hz</span>
@@ -180,7 +186,10 @@ export function StatusBar(props: StatusBarProps) {
             <div class="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span class="text-base-content/60">{t('ledStatus.mode')}:</span>
-                <span class="ml-2 text-base-content font-medium">{data().mode}</span>
+                <div class={`badge badge-sm ml-2 ${getModeBadgeStyle(data().raw_mode)} gap-1`}>
+                  <span class="text-xs">{getModeIcon(data().raw_mode)}</span>
+                  {data().mode}
+                </div>
                 <Show when={data().test_mode_active}>
                   <div class="badge badge-warning badge-xs ml-2">{t('ledStatus.testMode')}</div>
                 </Show>
