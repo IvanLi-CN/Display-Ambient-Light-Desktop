@@ -175,6 +175,11 @@ export const enUS: TranslationDict = {
     positionOffset: 'Position Offset',
     startOffset: 'Start Offset',
     endOffset: 'End Offset',
+    // Save status
+    configSaved: 'Configuration saved',
+    saveFailed: 'Save failed',
+    saving: 'Saving...',
+    saveConfig: 'Save Configuration',
   },
   
   colorCalibration: {
@@ -347,5 +352,28 @@ export const enUS: TranslationDict = {
     descriptionEnabled: 'Screen recording and LED data transmission are active',
     descriptionDisabled: 'Screen recording and LED data transmission are paused',
     toggleFailed: 'Failed to toggle ambient light',
+  },
+
+  ledStatus: {
+    title: 'LED Status',
+    mode: 'Mode',
+    frequency: 'Frequency',
+    data: 'Data',
+    led: 'LED',
+    update: 'Update',
+    received: 'Received',
+    connected: 'Connected',
+    disconnected: 'Disconnected',
+    waitingForData: 'Waiting for status data...',
+    websocketDisconnected: 'WebSocket disconnected',
+    testMode: 'Test',
+    // Mode names
+    modes: {
+      None: 'None',
+      AmbientLight: 'Ambient Light',
+      StripConfig: 'Configuration',
+      TestEffect: 'Test Mode',
+      ColorCalibration: 'Color Calibration',
+    },
   },
 };

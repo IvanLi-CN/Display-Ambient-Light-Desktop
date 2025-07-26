@@ -1130,7 +1130,7 @@ export function SingleDisplayConfig() {
               <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
               </svg>
-              配置已保存
+              {t('singleDisplayConfig.configSaved')}
             </div>
           </Show>
 
@@ -1139,7 +1139,7 @@ export function SingleDisplayConfig() {
               <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
               </svg>
-              保存失败
+              {t('singleDisplayConfig.saveFailed')}
             </div>
           </Show>
 
@@ -1157,7 +1157,7 @@ export function SingleDisplayConfig() {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3-3m0 0l-3 3m3-3v12"></path>
               </svg>
             </Show>
-            {isSaving() ? '保存中...' : '保存配置'}
+            {isSaving() ? t('singleDisplayConfig.saving') : t('singleDisplayConfig.saveConfig')}
           </button>
 
           <button

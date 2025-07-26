@@ -175,6 +175,11 @@ export const zhCN: TranslationDict = {
     positionOffset: '位置偏移',
     startOffset: '起始偏移',
     endOffset: '结束偏移',
+    // 保存状态
+    configSaved: '配置已保存',
+    saveFailed: '保存失败',
+    saving: '保存中...',
+    saveConfig: '保存配置',
   },
   
   colorCalibration: {
@@ -347,5 +352,28 @@ export const zhCN: TranslationDict = {
     descriptionEnabled: '屏幕录制和LED数据传输正在运行',
     descriptionDisabled: '屏幕录制和LED数据传输已暂停',
     toggleFailed: '切换氛围灯状态失败',
+  },
+
+  ledStatus: {
+    title: 'LED状态',
+    mode: '模式',
+    frequency: '频率',
+    data: '数据',
+    led: 'LED',
+    update: '更新',
+    received: '收到',
+    connected: '已连接',
+    disconnected: '未连接',
+    waitingForData: '等待状态数据...',
+    websocketDisconnected: 'WebSocket未连接',
+    testMode: '测试',
+    // 模式名称
+    modes: {
+      None: '无',
+      AmbientLight: '氛围光',
+      StripConfig: '配置模式',
+      TestEffect: '测试模式',
+      ColorCalibration: '颜色校准',
+    },
   },
 };

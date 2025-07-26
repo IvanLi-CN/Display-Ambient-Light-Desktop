@@ -83,6 +83,8 @@ export interface LedStatusChangedEvent {
 
 /**
  * 模式显示名称映射
+ * 注意：这个映射已被国际化替代，请使用 t('ledStatus.modes.{mode}') 获取翻译
+ * @deprecated 使用 t('ledStatus.modes.{mode}') 替代
  */
 export const MODE_DISPLAY_NAMES: Record<DataSendMode, string> = {
   'None': '无',
@@ -90,6 +92,13 @@ export const MODE_DISPLAY_NAMES: Record<DataSendMode, string> = {
   'StripConfig': '配置模式',
   'TestEffect': '测试模式',
   'ColorCalibration': '颜色校准'
+};
+
+/**
+ * 获取国际化的模式显示名称
+ */
+export const getModeDisplayName = (mode: DataSendMode, t: (key: string) => string): string => {
+  return t(`ledStatus.modes.${mode}`);
 };
 
 /**
@@ -137,7 +146,8 @@ export function formatTime(timestamp: string): string {
  */
 export function convertToStatusBarData(
   ledStatus: LedStatusData | any,
-  connected: boolean = true
+  connected: boolean = true,
+  t?: (key: string) => string
 ): StatusBarData {
   // 处理可能的数据结构不匹配
   const safeStatus = ledStatus || {};
@@ -145,10 +155,14 @@ export function convertToStatusBarData(
   const frequency = calculateFrequency(safeStatus.send_stats);
   const totalLedCount = calculateLedCount(safeStatus.current_colors_bytes || 0);
 
-
+  // 获取模式显示名称
+  const mode = (safeStatus.data_send_mode || safeStatus.mode) as DataSendMode;
+  const modeDisplayName = t
+    ? getModeDisplayName(mode, t)
+    : MODE_DISPLAY_NAMES[mode] || '未知';
 
   return {
-    mode: MODE_DISPLAY_NAMES[(safeStatus.data_send_mode || safeStatus.mode) as DataSendMode] || '未知',
+    mode: modeDisplayName,
     frequency: safeStatus.frequency || frequency,
     data_length: safeStatus.data_length || safeStatus.current_colors_bytes || 0,
     total_led_count: safeStatus.total_led_count || totalLedCount,

@@ -179,6 +179,11 @@ export interface TranslationDict {
     positionOffset: string;
     startOffset: string;
     endOffset: string;
+    // Save status
+    configSaved: string;
+    saveFailed: string;
+    saving: string;
+    saveConfig: string;
   };
   
   // Color Calibration
@@ -356,5 +361,28 @@ export interface TranslationDict {
     descriptionEnabled: string;
     descriptionDisabled: string;
     toggleFailed: string;
+  };
+
+  // LED Status
+  ledStatus: {
+    title: string;
+    mode: string;
+    frequency: string;
+    data: string;
+    led: string;
+    update: string;
+    received: string;
+    connected: string;
+    disconnected: string;
+    waitingForData: string;
+    websocketDisconnected: string;
+    testMode: string;
+    modes: {
+      None: string;
+      AmbientLight: string;
+      StripConfig: string;
+      TestEffect: string;
+      ColorCalibration: string;
+    };
   };
 }
