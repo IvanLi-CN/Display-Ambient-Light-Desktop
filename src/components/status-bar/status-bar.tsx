@@ -122,110 +122,101 @@ export function StatusBar(props: StatusBarProps) {
     return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
   };
 
-  // 紧凑模式渲染
+  // 紧凑模式渲染 - 极简一行显示
   const renderCompact = () => (
     <div class={`flex items-center gap-2 px-3 py-1 bg-base-200 rounded-lg text-sm ${props.class || ''}`}>
       {/* 连接状态指示器 */}
-      <div class="flex items-center gap-1">
-        <div 
-          class="w-2 h-2 rounded-full"
-          style={{ 'background-color': getConnectionColor() }}
-        />
-        <span class="text-xs text-base-content/60">{getConnectionText()}</span>
-      </div>
+      <div
+        class="w-2 h-2 rounded-full flex-shrink-0"
+        style={{ 'background-color': getConnectionColor() }}
+        title={getConnectionText()}
+      />
 
       <Show when={statusData()}>
         {(data) => (
           <>
-            <div class="w-px h-4 bg-base-300" />
-            <div class={`badge badge-sm ${getModeBadgeStyle(data().raw_mode)} gap-1`}>
+            {/* 模式徽章 */}
+            <div class={`badge badge-sm ${getModeBadgeStyle(data().raw_mode)} gap-1 flex-shrink-0`}>
               <span class="text-xs">{getModeIcon(data().raw_mode)}</span>
               {data().mode}
             </div>
-            <Show when={data().frequency > 0}>
-              <span class="text-base-content/60">|</span>
-              <span class="text-base-content">{data().frequency}Hz</span>
-            </Show>
+
+            {/* 测试模式标签 */}
             <Show when={data().test_mode_active}>
-              <div class="badge badge-warning badge-xs">{t('ledStatus.testMode')}</div>
+              <div class="badge badge-warning badge-xs flex-shrink-0">{t('ledStatus.testMode')}</div>
             </Show>
+
+            {/* 频率 */}
+            <Show when={data().frequency > 0}>
+              <span class="text-base-content/80 flex-shrink-0">{data().frequency}Hz</span>
+            </Show>
+
+            {/* LED数量 */}
+            <span class="text-base-content/60 text-xs flex-shrink-0">
+              {data().total_led_count} LEDs
+            </span>
           </>
         )}
       </Show>
     </div>
   );
 
-  // 完整模式渲染
+  // 完整模式渲染 - 优化为一行显示
   const renderFull = () => (
-    <div class={`bg-base-100 border border-base-300 rounded-lg p-3 ${props.class || ''}`}>
-      <div class="flex items-center justify-between mb-2">
-        <h3 class="text-sm font-medium text-base-content">{t('ledStatus.title')}</h3>
-        <div class="flex items-center gap-2">
-          <div 
-            class="w-2 h-2 rounded-full"
-            style={{ 'background-color': getConnectionColor() }}
-          />
-          <span class="text-xs text-base-content/60">{getConnectionText()}</span>
-        </div>
-      </div>
-
-      <Show 
-        when={statusData()} 
+    <div class={`bg-base-100 border border-base-300 rounded-lg px-4 py-2 ${props.class || ''}`}>
+      <Show
+        when={statusData()}
         fallback={
-          <div class="text-center text-base-content/60 py-4">
-            <div class="text-sm">{t('ledStatus.waitingForData')}</div>
+          <div class="flex items-center gap-3 text-base-content/60">
+            <div
+              class="w-2 h-2 rounded-full"
+              style={{ 'background-color': getConnectionColor() }}
+            />
+            <span class="text-sm">{t('ledStatus.waitingForData')}</span>
             <Show when={!connected()}>
-              <div class="text-xs mt-1">{t('ledStatus.websocketDisconnected')}</div>
+              <span class="text-xs">({t('ledStatus.websocketDisconnected')})</span>
             </Show>
           </div>
         }
       >
         {(data) => (
-          <div class="space-y-2">
-            {/* 主要状态信息 */}
-            <div class="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span class="text-base-content/60">{t('ledStatus.mode')}:</span>
-                <div class={`badge badge-sm ml-2 ${getModeBadgeStyle(data().raw_mode)} gap-1`}>
-                  <span class="text-xs">{getModeIcon(data().raw_mode)}</span>
-                  {data().mode}
-                </div>
-                <Show when={data().test_mode_active}>
-                  <div class="badge badge-warning badge-xs ml-2">{t('ledStatus.testMode')}</div>
-                </Show>
-              </div>
-              <div>
-                <span class="text-base-content/60">{t('ledStatus.frequency')}:</span>
-                <span class="ml-2 text-base-content">{data().frequency}Hz</span>
-              </div>
+          <div class="flex items-center gap-3">
+            {/* 连接状态指示器 */}
+            <div
+              class="w-2 h-2 rounded-full flex-shrink-0"
+              style={{ 'background-color': getConnectionColor() }}
+              title={getConnectionText()}
+            />
+
+            {/* 模式徽章 */}
+            <div class={`badge badge-sm ${getModeBadgeStyle(data().raw_mode)} gap-1 flex-shrink-0`}>
+              <span class="text-xs">{getModeIcon(data().raw_mode)}</span>
+              {data().mode}
             </div>
 
-            {/* 数据统计 */}
-            <div class="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span class="text-base-content/60">{t('ledStatus.data')}:</span>
-                <span class="ml-2 text-base-content">{formatDataSize(data().data_length)}</span>
-              </div>
-              <div>
-                <span class="text-base-content/60">{t('ledStatus.led')}:</span>
-                <span class="ml-2 text-base-content">{data().total_led_count}</span>
-              </div>
-            </div>
+            {/* 测试模式标签 */}
+            <Show when={data().test_mode_active}>
+              <div class="badge badge-warning badge-xs flex-shrink-0">{t('ledStatus.testMode')}</div>
+            </Show>
 
-            {/* 更新时间 */}
-            <div class="text-xs text-base-content/60 pt-1 border-t border-base-300">
-              {t('ledStatus.update')}: {data().last_update}
-              <Show when={lastMessageTime()}>
-                <span class="ml-2">
-                  ({t('ledStatus.received')}: {lastMessageTime()!.toLocaleTimeString(undefined, {
-                    hour12: false,
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit'
-                  })})
-                </span>
-              </Show>
-            </div>
+            {/* 频率 */}
+            <Show when={data().frequency > 0}>
+              <span class="text-sm text-base-content/80 flex-shrink-0">
+                {data().frequency}Hz
+              </span>
+            </Show>
+
+            {/* LED数量 */}
+            <span class="text-sm text-base-content/80 flex-shrink-0">
+              {data().total_led_count} LEDs
+            </span>
+
+            {/* 数据大小（仅在有数据时显示） */}
+            <Show when={data().data_length > 0}>
+              <span class="text-xs text-base-content/60 flex-shrink-0">
+                {formatDataSize(data().data_length)}
+              </span>
+            </Show>
           </div>
         )}
       </Show>
