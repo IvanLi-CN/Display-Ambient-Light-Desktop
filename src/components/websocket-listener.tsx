@@ -59,7 +59,7 @@ export const WebSocketListener = (props: WebSocketListenerProps) => {
       // LED颜色变化事件
       if (props.handlers?.onLedColorsChanged) {
         const unlisten = await adaptiveApi.onEvent('LedColorsChanged', (data) => {
-          console.log('🎨 LED颜色变化:', data);
+          // 移除频繁的颜色变化日志
           setStatus(prev => ({
             ...prev,
             lastMessage: 'LED颜色更新',
@@ -101,11 +101,13 @@ export const WebSocketListener = (props: WebSocketListenerProps) => {
       // 环境光状态变化事件
       if (props.handlers?.onAmbientLightStateChanged) {
         const unlisten = await adaptiveApi.onEvent('AmbientLightStateChanged', (data) => {
-          console.log('💡 环境光状态变化:', data);
-          setStatus(prev => ({ 
-            ...prev, 
+          if (import.meta.env.DEV) {
+            console.log('环境光状态变化:', data);
+          }
+          setStatus(prev => ({
+            ...prev,
             lastMessage: '环境光状态更新',
-            messageCount: prev.messageCount + 1 
+            messageCount: prev.messageCount + 1
           }));
           props.handlers?.onAmbientLightStateChanged?.(data);
         });
@@ -115,11 +117,13 @@ export const WebSocketListener = (props: WebSocketListenerProps) => {
       // 设备列表变化事件
       if (props.handlers?.onBoardsChanged) {
         const unlisten = await adaptiveApi.onEvent('BoardsChanged', (data) => {
-          console.log('🔌 设备列表变化:', data);
-          setStatus(prev => ({ 
-            ...prev, 
+          if (import.meta.env.DEV) {
+            console.log('设备列表变化:', data);
+          }
+          setStatus(prev => ({
+            ...prev,
             lastMessage: '设备列表更新',
-            messageCount: prev.messageCount + 1 
+            messageCount: prev.messageCount + 1
           }));
           props.handlers?.onBoardsChanged?.(data);
         });
@@ -129,11 +133,13 @@ export const WebSocketListener = (props: WebSocketListenerProps) => {
       // 显示器状态变化事件
       if (props.handlers?.onDisplaysChanged) {
         const unlisten = await adaptiveApi.onEvent('DisplaysChanged', (data) => {
-          console.log('🖥️ 显示器状态变化:', data);
-          setStatus(prev => ({ 
-            ...prev, 
+          if (import.meta.env.DEV) {
+            console.log('显示器状态变化:', data);
+          }
+          setStatus(prev => ({
+            ...prev,
             lastMessage: '显示器状态更新',
-            messageCount: prev.messageCount + 1 
+            messageCount: prev.messageCount + 1
           }));
           props.handlers?.onDisplaysChanged?.(data);
         });
@@ -143,25 +149,31 @@ export const WebSocketListener = (props: WebSocketListenerProps) => {
       // 导航事件
       if (props.handlers?.onNavigate) {
         const unlisten = await adaptiveApi.onEvent('Navigate', (data) => {
-          console.log('🧭 导航事件:', data);
-          setStatus(prev => ({ 
-            ...prev, 
+          if (import.meta.env.DEV) {
+            console.log('导航事件:', data);
+          }
+          setStatus(prev => ({
+            ...prev,
             lastMessage: '导航更新',
-            messageCount: prev.messageCount + 1 
+            messageCount: prev.messageCount + 1
           }));
           props.handlers?.onNavigate?.(data);
         });
         unlistenFunctions.push(unlisten);
       }
 
-      // 监听所有事件（用于调试）
-      const unlistenAll = await adaptiveApi.onEvent('*', (message) => {
-        console.log('📡 WebSocket消息:', message);
-      });
-      unlistenFunctions.push(unlistenAll);
+      // 只在开发模式下监听所有事件（用于调试）
+      if (import.meta.env.DEV) {
+        const unlistenAll = await adaptiveApi.onEvent('*', (message) => {
+          console.log('WebSocket消息:', message);
+        });
+        unlistenFunctions.push(unlistenAll);
+      }
 
       updateConnectionStatus(true);
-      console.log('✅ WebSocket事件监听器已注册');
+      if (import.meta.env.DEV) {
+        console.log('WebSocket事件监听器已注册');
+      }
 
     } catch (error) {
       console.error('❌ 注册WebSocket事件监听器失败:', error);

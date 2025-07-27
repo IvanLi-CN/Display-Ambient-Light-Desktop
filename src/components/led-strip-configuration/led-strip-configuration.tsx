@@ -32,13 +32,17 @@ export const LedStripConfiguration = () => {
     });
 
     adaptiveApi.getConfig().then((configs) => {
-      console.log('🔧 获取到的配置数据:', configs);
-      console.log('🔧 配置数据类型:', typeof configs);
-      console.log('🔧 配置数据键:', Object.keys(configs || {}));
+      if (import.meta.env.DEV) {
+        console.log('获取到的配置数据:', configs);
+        console.log('配置数据类型:', typeof configs);
+        console.log('配置数据键:', Object.keys(configs || {}));
+      }
 
       // 安全检查：确保 strips 存在且是数组
       if (configs && configs.strips && Array.isArray(configs.strips)) {
-        console.log('✅ 有效的配置数据，strips数量:', configs.strips.length);
+        if (import.meta.env.DEV) {
+          console.log('有效的配置数据，strips数量:', configs.strips.length);
+        }
         setLedStripStore({
           strips: configs.strips,
           colorCalibration: configs.color_calibration || {
@@ -49,7 +53,7 @@ export const LedStripConfiguration = () => {
           }
         });
       } else {
-        console.warn('⚠️ 配置数据无效或缺少strips:', configs);
+        console.warn('配置数据无效或缺少strips:', configs);
         // 设置空的配置
         setLedStripStore({
           strips: [],

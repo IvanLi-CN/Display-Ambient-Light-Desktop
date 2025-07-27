@@ -42,27 +42,28 @@ export function StatusBar(props: StatusBarProps) {
 
   onMount(async () => {
     try {
-      console.log('🔧 Status bar initializing...');
+      if (import.meta.env.DEV) {
+        console.log('Status bar initializing...');
+      }
 
       // 监听LED状态变化事件
       unsubscribeStatus = await adaptiveApi.onEvent<LedStatusChangedEvent>(
         'LedStatusChanged',
         (event) => {
-          console.log('🔄 Status bar received LED status update:', event);
-          console.log('🔍 Event status structure:', event?.status);
-
           if (event && event.status) {
             try {
               const statusBarData = convertToStatusBarData(event.status, connected(), t);
               setStatusData(statusBarData);
               setLastMessageTime(new Date());
-              console.log('✅ Status bar data updated:', statusBarData);
+              // 移除频繁的状态更新日志
             } catch (error) {
-              console.error('❌ Error converting status data:', error);
-              console.log('🔍 Raw status data:', event.status);
+              console.error('Error converting status data:', error);
+              if (import.meta.env.DEV) {
+                console.log('Raw status data:', event.status);
+              }
             }
           } else {
-            console.warn('⚠️ Invalid LED status event received:', event);
+            console.warn('Invalid LED status event received:', event);
           }
         }
       );

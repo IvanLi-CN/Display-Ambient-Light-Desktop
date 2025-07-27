@@ -27,7 +27,7 @@ export function LedPreview(props: LedPreviewProps) {
   let unsubscribeConnection: (() => void) | null = null;
 
   // 防抖动相关变量
-  let debounceTimer: number | null = null;
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let lastDataSize = 0;
   let stableDataCount = 0;
   const DEBOUNCE_DELAY = 100; // 100ms防抖

@@ -54,13 +54,13 @@ function App() {
       await adaptiveApi.initialize();
 
       const unlisten = await adaptiveApi.onEvent<string>('navigate', (targetPath) => {
-        console.log('🎯 Received navigation event from backend:', targetPath);
-        console.log('🎯 Current location before navigation:', window.location.href);
+        // 只在开发模式下记录导航日志
+        if (import.meta.env.DEV) {
+          console.log('Navigation event:', targetPath);
+        }
 
         // Use SolidJS navigate function for proper routing
         navigate(targetPath);
-
-        console.log('🎯 Navigation called, new location:', window.location.href);
 
         // Report successful navigation
         adaptiveApi.reportCurrentPage(`Navigation event processed: ${targetPath}`)
@@ -107,11 +107,16 @@ function App() {
 
     // Reset LED mode to AmbientLight before entering any page (except on initial load and LED test pages)
     if (prevPath !== '' && !currentPath.includes('/led-strip-test') && !currentPath.includes('/led-data-sender-test')) {
-      console.log(`🔄 Route change detected: ${prevPath} -> ${currentPath}, resetting LED mode to AmbientLight`);
+      // 只在开发模式下记录路由变化日志
+      if (import.meta.env.DEV) {
+        console.log(`Route change: ${prevPath} -> ${currentPath}, resetting LED mode`);
+      }
       adaptiveApi.setDataSendMode('AmbientLight').then(() => {
-        console.log('✅ LED mode reset to AmbientLight before entering new page');
+        if (import.meta.env.DEV) {
+          console.log('LED mode reset to AmbientLight');
+        }
       }).catch((error) => {
-        console.error('❌ Failed to reset LED mode to AmbientLight:', error);
+        console.error('Failed to reset LED mode to AmbientLight:', error);
       });
     }
 

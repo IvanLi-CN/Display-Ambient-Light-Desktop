@@ -49,7 +49,9 @@ const loadPreferences = async () => {
     setIsLoading(true);
     const preferences = await adaptiveApi.getUserPreferences();
     setUserPreferences(preferences);
-    console.log('User preferences loaded:', preferences);
+    if (import.meta.env.DEV) {
+      console.log('User preferences loaded:', preferences);
+    }
   } catch (error) {
     console.error('Failed to load user preferences:', error);
     // Use default preferences on error

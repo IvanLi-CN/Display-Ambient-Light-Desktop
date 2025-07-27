@@ -8,7 +8,7 @@ import { LedApiService, ConfigApiService } from './led-api.service';
 import { DisplayApiService, DeviceApiService, HealthApiService } from './display-api.service';
 import { InfoApiService } from './info-api.service';
 import { api, WebSocketEventListener } from './api-client';
-import { DataSendMode } from '../models/led-data-sender';
+import { DataSendMode } from '../types/led-status';
 
 // 环境检测结果
 export interface EnvironmentInfo {

@@ -6,7 +6,7 @@
 import { adaptiveApi } from './api-adapter';
 import { ledStripStore } from '../stores/led-strip.store';
 import { LedStripConfig, LedType } from '../models/led-strip-config';
-import { DataSendMode } from '../models/led-data-sender';
+import { DataSendMode } from '../types/led-status';
 
 /**
  * RGB颜色数据
@@ -47,7 +47,7 @@ export class ColorCalibrationService {
       this.previousMode = await adaptiveApi.getDataSendMode();
 
       // 切换到颜色校准模式
-      await adaptiveApi.setDataSendMode(DataSendMode.ColorCalibration);
+      await adaptiveApi.setDataSendMode('ColorCalibration');
 
       this.isActive = true;
       console.log('✅ 颜色校准模式已启用');
@@ -70,7 +70,7 @@ export class ColorCalibrationService {
       if (this.previousMode !== null) {
         await adaptiveApi.setDataSendMode(this.previousMode);
       } else {
-        await adaptiveApi.setDataSendMode(DataSendMode.None);
+        await adaptiveApi.setDataSendMode('None');
       }
 
       this.isActive = false;

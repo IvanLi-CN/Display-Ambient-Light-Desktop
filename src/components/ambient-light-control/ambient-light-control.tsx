@@ -26,7 +26,9 @@ export const AmbientLightControl = () => {
   // Listen for ambient light state changes from tray menu
   createEffect(() => {
     const unlisten = listen<AmbientLightState>('ambient_light_state_changed', (event) => {
-      console.log('Ambient light state changed from tray:', event.payload);
+      if (import.meta.env.DEV) {
+        console.log('Ambient light state changed from tray:', event.payload);
+      }
       setAmbientLightEnabled(event.payload.enabled);
 
       // Show notification message

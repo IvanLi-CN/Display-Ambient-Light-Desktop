@@ -1,10 +1,10 @@
 import { createSignal, onMount } from 'solid-js';
 import { adaptiveApi } from '../../services/api-adapter';
 import { LedApiService } from '../../services/led-api.service';
-import { DataSendMode } from '../../models/led-data-sender';
+import { DataSendMode } from '../../types/led-status';
 
 export const LedDataSenderTest = () => {
-  const [currentMode, setCurrentMode] = createSignal<DataSendMode>(DataSendMode.None);
+  const [currentMode, setCurrentMode] = createSignal<DataSendMode>('None');
   const [testResult, setTestResult] = createSignal<string>('');
   const [isLoading, setIsLoading] = createSignal(false);
 
@@ -78,7 +78,7 @@ export const LedDataSenderTest = () => {
         <div class="card-body">
           <h2 class="card-title">模式切换</h2>
           <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {Object.values(DataSendMode).map((mode) => (
+            {(['None', 'AmbientLight', 'StripConfig', 'TestEffect', 'ColorCalibration'] as DataSendMode[]).map((mode) => (
               <button
                 class={`btn ${currentMode() === mode ? 'btn-primary' : 'btn-outline'}`}
                 onClick={() => setMode(mode)}

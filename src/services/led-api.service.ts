@@ -6,7 +6,7 @@
 import { api } from './api-client';
 import { LedStripConfig, LedType } from '../models/led-strip-config';
 import { Borders } from '../constants/border';
-import { DataSendMode } from '../models/led-data-sender';
+import { DataSendMode } from '../types/led-status';
 
 // LED测试效果配置
 export interface TestEffectConfig {
