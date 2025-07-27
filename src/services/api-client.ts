@@ -300,20 +300,24 @@ export class ApiClient {
    */
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit & { timeout?: number } = {}
   ): Promise<T> {
     const url = `${this.config.baseUrl}${endpoint}`;
-    
+
+    // 提取自定义超时时间
+    const { timeout, ...requestOptions } = options;
+    const requestTimeout = timeout || this.config.timeout;
+
     const defaultOptions: RequestInit = {
       headers: {
         'Content-Type': 'application/json',
       },
-      ...options,
+      ...requestOptions,
     };
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
+      const timeoutId = setTimeout(() => controller.abort(), requestTimeout);
 
       const response = await fetch(url, {
         ...defaultOptions,
@@ -368,10 +372,11 @@ export class ApiClient {
   /**
    * POST请求
    */
-  public async post<T>(endpoint: string, data?: any): Promise<T> {
+  public async post<T>(endpoint: string, data?: any, options?: { timeout?: number }): Promise<T> {
     return this.request<T>(endpoint, {
       method: 'POST',
       body: data ? JSON.stringify(data) : undefined,
+      ...options,
     });
   }
 
@@ -426,7 +431,7 @@ export const apiClient = ApiClient.getInstance();
 // 导出便捷方法
 export const api = {
   get: <T>(endpoint: string, params?: Record<string, any>) => apiClient.get<T>(endpoint, params),
-  post: <T>(endpoint: string, data?: any) => apiClient.post<T>(endpoint, data),
+  post: <T>(endpoint: string, data?: any, options?: { timeout?: number }) => apiClient.post<T>(endpoint, data, options),
   put: <T>(endpoint: string, data?: any) => apiClient.put<T>(endpoint, data),
   delete: <T>(endpoint: string) => apiClient.delete<T>(endpoint),
   onEvent: (eventType: string, listener: WebSocketEventListener) => apiClient.onWebSocketEvent(eventType, listener),

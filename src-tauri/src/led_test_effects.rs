@@ -7,6 +7,7 @@ use std::f64::consts::PI;
 use std::sync::Arc;
 use tokio::sync::{OnceCell, RwLock};
 use tokio::time::{Duration, Instant};
+use tokio_util::sync::CancellationToken;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TestEffectType {
@@ -32,6 +33,7 @@ pub struct TestEffectTask {
     pub config: TestEffectConfig,
     pub update_interval_ms: u32,
     pub start_time: Instant,
+    pub cancellation_token: CancellationToken,
 }
 
 /// LED测试效果管理器
@@ -73,11 +75,13 @@ impl LedTestEffectManager {
         self.stop_test_effect(&board_address).await?;
 
         // 创建新任务
+        let cancellation_token = CancellationToken::new();
         let task = TestEffectTask {
             board_address: board_address.clone(),
             config: config.clone(),
             update_interval_ms,
             start_time: Instant::now(),
+            cancellation_token: cancellation_token.clone(),
         };
 
         // 添加到活跃任务列表
@@ -104,11 +108,13 @@ impl LedTestEffectManager {
         log::info!("🛑 Stopping LED test effect for board: {board_address}");
 
         let mut tasks = self.active_tasks.write().await;
-        if let Some(_task) = tasks.remove(board_address) {
-            log::info!("✅ LED test effect stopped for board: {board_address}");
+        if let Some(task) = tasks.remove(board_address) {
+            // 立即取消任务，唤醒睡眠中的循环
+            task.cancellation_token.cancel();
+            log::info!("✅ LED test effect stopped and cancelled for board: {board_address}");
 
             // 发送全黑数据来清除LED
-            self.send_clear_data(board_address, &_task.config).await?;
+            self.send_clear_data(board_address, &task.config).await?;
         } else {
             log::warn!("⚠️ No active test effect found for board: {board_address}");
         }
@@ -176,8 +182,16 @@ impl LedTestEffectManager {
                 // 继续运行，不因为单次发送失败而停止
             }
 
-            // 等待下一次更新
-            tokio::time::sleep(Duration::from_millis(task.update_interval_ms as u64)).await;
+            // 等待下一次更新，或者被取消
+            tokio::select! {
+                _ = tokio::time::sleep(Duration::from_millis(task.update_interval_ms as u64)) => {
+                    // 正常等待完成，继续下一次循环
+                }
+                _ = task.cancellation_token.cancelled() => {
+                    log::info!("🚫 Test effect cancelled for board: {board_address}");
+                    break;
+                }
+            }
         }
 
         log::info!("✅ Test effect loop ended for board: {board_address}");

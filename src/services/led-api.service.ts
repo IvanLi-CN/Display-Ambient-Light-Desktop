@@ -157,7 +157,8 @@ export class LedApiService {
    * 停止LED测试效果
    */
   static async stopLedTestEffect(params: any): Promise<void> {
-    await api.post('/api/v1/led/stop-test-effect', params);
+    // 使用较短的超时时间（3秒），避免用户等待过久
+    await api.post('/api/v1/led/stop-test-effect', params, { timeout: 3000 });
   }
 
   /**

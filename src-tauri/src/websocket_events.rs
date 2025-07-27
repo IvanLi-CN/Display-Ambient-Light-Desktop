@@ -158,10 +158,11 @@ impl WebSocketEventPublisher {
             "timestamp": chrono::Utc::now().to_rfc3339()
         });
 
-        log::debug!(
-            "Publishing LED status changed event: mode={:?}, frequency={}Hz",
+        log::info!(
+            "🔄 Publishing LED status changed event: mode={:?}, frequency={}Hz, test_mode_active={}",
             mode,
-            frequency
+            frequency,
+            mode == DataSendMode::TestEffect
         );
 
         let message = WsMessage::LedStatusChanged { status };
@@ -172,9 +173,10 @@ impl WebSocketEventPublisher {
         {
             Ok(subscriber_count) => {
                 if subscriber_count > 0 {
-                    log::debug!("LED状态变化事件已发送给 {} 个订阅者", subscriber_count);
+                    log::info!("✅ LED状态变化事件已发送给 {} 个订阅者", subscriber_count);
+                } else {
+                    log::warn!("📭 没有订阅者接收LED状态变化事件");
                 }
-                // 移除无订阅者的日志，减少输出
             }
             Err(e) => {
                 log::warn!("发送LED状态变化事件失败: {}", e);

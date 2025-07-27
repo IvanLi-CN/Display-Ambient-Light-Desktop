@@ -46,6 +46,33 @@ export function StatusBar(props: StatusBarProps) {
         console.log('Status bar initializing...');
       }
 
+      // 初始化时主动获取一次状态
+      try {
+        console.log('🔄 Fetching initial LED status...');
+        const initialMode = await adaptiveApi.getLedDataMode();
+        console.log('📊 Initial LED mode:', initialMode);
+
+        // 创建一个模拟的WebSocket事件来初始化状态
+        const mockEvent = {
+          status: {
+            mode: initialMode,
+            frequency: initialMode === 'AmbientLight' ? 30 : (initialMode === 'None' ? 0 : 1),
+            data_length: 0,
+            total_led_count: 0,
+            test_mode_active: initialMode === 'TestEffect',
+            timestamp: new Date().toISOString()
+          }
+        };
+
+        const statusBarData = convertToStatusBarData(mockEvent.status, true, t);
+        console.log('📊 Initial status bar data:', statusBarData);
+        setStatusData(statusBarData);
+        setConnected(true);
+        console.log('✅ Initial status loaded successfully');
+      } catch (error) {
+        console.error('❌ Failed to fetch initial status:', error);
+      }
+
       // 监听LED状态变化事件
       unsubscribeStatus = await adaptiveApi.onEvent<LedStatusChangedEvent>(
         'LedStatusChanged',
@@ -53,6 +80,7 @@ export function StatusBar(props: StatusBarProps) {
           if (event && event.status) {
             try {
               const statusBarData = convertToStatusBarData(event.status, connected(), t);
+              console.log(`📊 [${new Date().toISOString()}] Status bar received mode: ${statusBarData.raw_mode}, test_mode_active: ${statusBarData.test_mode_active}`);
               setStatusData(statusBarData);
               setLastMessageTime(new Date());
               // 移除频繁的状态更新日志

@@ -778,9 +778,20 @@ impl LedColorsPublisher {
     /// Disable test mode - this will resume normal LED data publishing
     pub async fn disable_test_mode(&self) {
         let sender = LedDataSender::global().await;
-        sender.set_mode(DataSendMode::AmbientLight).await;
 
-        log::info!("Test mode disabled - data send mode set to AmbientLight");
+        // Check if ambient light is enabled to determine the correct mode to restore
+        let ambient_light_state_manager = crate::ambient_light_state::AmbientLightStateManager::global().await;
+        let ambient_light_enabled = ambient_light_state_manager.is_enabled().await;
+
+        let restore_mode = if ambient_light_enabled {
+            DataSendMode::AmbientLight
+        } else {
+            DataSendMode::None
+        };
+
+        sender.set_mode(restore_mode).await;
+
+        log::info!("Test mode disabled - data send mode restored to: {:?}", restore_mode);
     }
 
     /// Check if test mode is currently active
@@ -892,12 +903,21 @@ impl LedColorsPublisher {
             *version += 1;
         }
 
-        // 恢复LED数据发送模式为AmbientLight
+        // 恢复LED数据发送模式，根据环境光状态决定
         let sender = crate::led_data_sender::LedDataSender::global().await;
-        sender
-            .set_mode(crate::led_data_sender::DataSendMode::AmbientLight)
-            .await;
-        log::info!("✅ 恢复LED数据发送模式为AmbientLight");
+
+        // Check if ambient light is enabled to determine the correct mode to restore
+        let ambient_light_state_manager = crate::ambient_light_state::AmbientLightStateManager::global().await;
+        let ambient_light_enabled = ambient_light_state_manager.is_enabled().await;
+
+        let restore_mode = if ambient_light_enabled {
+            crate::led_data_sender::DataSendMode::AmbientLight
+        } else {
+            crate::led_data_sender::DataSendMode::None
+        };
+
+        sender.set_mode(restore_mode).await;
+        log::info!("✅ 恢复LED数据发送模式为: {:?}", restore_mode);
 
         // 🔧 重新启动氛围光处理任务
         log::info!("🔄 重新启动氛围光处理任务...");

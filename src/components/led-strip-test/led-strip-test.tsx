@@ -297,7 +297,14 @@ export const LedStripTest = () => {
   };
 
   const stopTest = async () => {
+    const startTime = Date.now();
+    console.log(`🛑 [${new Date().toISOString()}] stopTest函数被调用`);
+    console.log('🔍 当前选中的板子:', selectedBoard());
+    console.log('🔍 当前运行状态:', isRunning());
+    console.log('🔍 当前测试模式:', currentPattern());
+
     if (!selectedBoard()) {
+      console.log('⚠️ 没有选中的板子，直接更新UI状态');
       setIsRunning(false);
       setCurrentPattern(null);
       return;
@@ -306,7 +313,7 @@ export const LedStripTest = () => {
     // 立即更新UI状态，让用户感觉停止是即时的
     setIsRunning(false);
     setCurrentPattern(null);
-    console.log('🛑 UI状态已更新，正在后台停止测试效果...');
+    console.log(`🛑 [${new Date().toISOString()}] UI状态已更新，正在后台停止测试效果...`);
 
     // 后台异步停止测试效果，不阻塞UI
     const stopParams = {
@@ -319,17 +326,32 @@ export const LedStripTest = () => {
     Promise.resolve().then(async () => {
       try {
         // 1. 停止测试效果
-        console.log('🛑 停止测试效果...');
+        console.log(`🛑 [${new Date().toISOString()}] 停止测试效果...`);
         await adaptiveApi.stopLedTestEffect(stopParams);
 
         // 2. 禁用测试模式，恢复环境光模式
-        console.log('🌈 禁用测试模式，恢复环境光模式...');
+        console.log(`🌈 [${new Date().toISOString()}] 禁用测试模式，恢复环境光模式...`);
         await adaptiveApi.disableTestMode();
 
-        console.log('✅ 测试效果已成功停止，已恢复环境光模式');
+        const endTime = Date.now();
+        const duration = endTime - startTime;
+        console.log(`✅ [${new Date().toISOString()}] 测试效果已成功停止，已恢复环境光模式 (耗时: ${duration}ms)`);
       } catch (error) {
-        console.error('❌ 停止测试效果失败:', error);
-        // 如果后台停止失败，不影响UI状态，因为用户已经看到停止了
+        console.error(`❌ [${new Date().toISOString()}] 停止测试效果失败:`, error);
+        console.error('Error details:', error);
+
+        // 如果停止失败，尝试强制禁用测试模式
+        try {
+          console.log(`🔄 [${new Date().toISOString()}] 尝试强制禁用测试模式...`);
+          await adaptiveApi.disableTestMode();
+          const endTime = Date.now();
+          const duration = endTime - startTime;
+          console.log(`✅ [${new Date().toISOString()}] 强制禁用测试模式成功 (总耗时: ${duration}ms)`);
+        } catch (forceError) {
+          const endTime = Date.now();
+          const duration = endTime - startTime;
+          console.error(`❌ [${new Date().toISOString()}] 强制禁用测试模式也失败了 (总耗时: ${duration}ms):`, forceError);
+        }
       }
     });
   };
