@@ -600,8 +600,15 @@ async fn main() {
     let _http_server_handle = {
         let config = http_config.clone();
         tokio::spawn(async move {
-            if let Err(e) = http_server::start_server(config).await {
-                error!("HTTP服务器启动失败: {}", e);
+            info!("🚀 正在启动HTTP服务器...");
+            match http_server::start_server(config).await {
+                Ok(_) => {
+                    info!("✅ HTTP服务器启动成功");
+                }
+                Err(e) => {
+                    error!("❌ HTTP服务器启动失败: {}", e);
+                    panic!("HTTP服务器启动失败: {}", e);
+                }
             }
         })
     };

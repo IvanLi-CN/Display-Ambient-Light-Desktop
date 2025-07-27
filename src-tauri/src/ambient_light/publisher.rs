@@ -827,6 +827,7 @@ impl LedColorsPublisher {
         log::info!("⏰ 等待任务完全停止");
 
         // 设置LED数据发送模式为StripConfig
+        // 设置LED数据发送模式为StripConfig
         let sender = crate::led_data_sender::LedDataSender::global().await;
         sender
             .set_mode(crate::led_data_sender::DataSendMode::StripConfig)
@@ -914,6 +915,17 @@ impl LedColorsPublisher {
             .set_mode(crate::led_data_sender::DataSendMode::AmbientLight)
             .await;
         log::info!("✅ 恢复LED数据发送模式为AmbientLight");
+
+        // 🔧 重新启动氛围光处理任务
+        log::info!("🔄 重新启动氛围光处理任务...");
+        let config_manager = ConfigManager::global().await;
+        let current_configs = config_manager.configs().await;
+        if !current_configs.strips.is_empty() {
+            log::info!("📋 重新处理LED配置以恢复氛围光处理...");
+            self.handle_config_change(current_configs).await;
+        } else {
+            log::warn!("⚠️ 当前LED配置为空，无法重新启动氛围光处理");
+        }
 
         log::info!("✅ 单屏灯带配置定位色发布模式已停止");
         Ok(())
@@ -1005,16 +1017,30 @@ impl LedColorsPublisher {
             active_strip_guard.clone()
         };
 
-        // 4. 使用采样映射函数将数据映射到完整灯带数据串缓冲区，并应用呼吸效果
-        let (complete_buffer, global_start_offset) = self
-            .map_edge_colors_to_led_buffer_with_breathing(
+        // 4. 生成RGB格式预览数据
+        let rgb_preview_buffer = self
+            .generate_rgb_colors_for_preview(
                 config_group,
                 &all_configs,
                 &edge_colors,
                 active_strip,
             )?;
 
-        // 5. 委托发布服务将数据发给硬件，使用正确的全局偏移量
+        // 5. 发布RGB预览数据到前端
+        let websocket_publisher = crate::websocket_events::WebSocketEventPublisher::global().await;
+        websocket_publisher
+            .publish_led_colors_changed(rgb_preview_buffer.clone())
+            .await;
+        websocket_publisher
+            .publish_led_sorted_colors_changed(rgb_preview_buffer.clone(), 0)
+            .await;
+        log::info!("✅ LED preview data published for StripConfig mode");
+
+        // 6. 将RGB数据转换为硬件格式
+        let (complete_buffer, global_start_offset) = self
+            .convert_rgb_to_hardware_buffer(&rgb_preview_buffer, &all_configs)?;
+
+        // 7. 委托发布服务将硬件格式数据发给硬件
         let sender = LedDataSender::global().await;
         sender
             .send_complete_led_data(global_start_offset, complete_buffer, "StripConfig")
@@ -1149,6 +1175,179 @@ impl LedColorsPublisher {
         }
 
         Ok(buffer)
+    }
+
+    /// 生成RGB格式的LED颜色数据（用于前端预览）
+    pub fn generate_rgb_colors_for_preview(
+        &self,
+        config_group: &LedStripConfigGroup,
+        all_configs: &LedStripConfigGroup,
+        edge_colors: &std::collections::HashMap<Border, [LedColor; 2]>,
+        active_strip: Option<(u32, String)>, // (display_id, border)
+    ) -> anyhow::Result<Vec<u8>> {
+        // 按序列号排序所有灯带
+        let mut all_sorted_strips = all_configs.strips.clone();
+        all_sorted_strips.sort_by_key(|s| s.index);
+
+        // 计算总LED数量
+        let total_leds: usize = all_sorted_strips.iter().map(|s| s.len).sum();
+
+        log::info!(
+            "🎨 生成RGB预览数据: 总LED数={total_leds}"
+        );
+
+        // 获取当前显示器的灯带ID集合
+        let current_display_strips: std::collections::HashSet<usize> =
+            config_group.strips.iter().map(|s| s.index).collect();
+
+        // 简单的正弦函数呼吸效果 - 1Hz频率
+        let time_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis();
+
+        let time_seconds = time_ms as f64 / 1000.0;
+
+        // 1Hz正弦波，范围从0.3到1.0 (30%到100%亮度)
+        let breathing_factor = (time_seconds * std::f64::consts::PI).sin() * 0.5 + 0.5; // 0到1
+        let breathing_brightness = (0.3 + 0.7 * breathing_factor) as f32; // 30%到100%
+
+        // 定义填充颜色：如果有活跃灯带则用白色填充，否则用黑色（保持原有行为）
+        let fill_rgb = if active_strip.is_some() {
+            [51, 51, 51] // 白色填充（20%亮度）
+        } else {
+            [0, 0, 0] // 黑色填充（关闭）
+        };
+
+        let mut rgb_buffer = Vec::new();
+
+        // 遍历所有灯带，按序列号顺序生成RGB数据
+        for strip in &all_sorted_strips {
+            let is_current_display = current_display_strips.contains(&strip.index);
+
+            if is_current_display {
+                // 当前显示器的灯带：显示定位色
+                let default_colors = [LedColor::new(0, 0, 0), LedColor::new(0, 0, 0)];
+                let colors = edge_colors.get(&strip.border).unwrap_or(&default_colors);
+
+                // 检查是否是活跃灯带
+                let is_active_strip =
+                    if let Some((active_display_id, ref active_border)) = active_strip {
+                        strip.display_id == active_display_id
+                            && format!("{:?}", strip.border).to_lowercase()
+                                == active_border.to_lowercase()
+                    } else {
+                        false
+                    };
+
+                for physical_index in 0..strip.len {
+                    let logical_index = if strip.reversed {
+                        strip.len - 1 - physical_index
+                    } else {
+                        physical_index
+                    };
+
+                    let half_count = strip.len / 2;
+                    let color = if logical_index < half_count {
+                        &colors[0]
+                    } else {
+                        &colors[1]
+                    };
+                    let mut rgb = color.get_rgb();
+
+                    // 如果是活跃灯带，应用呼吸效果
+                    if is_active_strip {
+                        rgb[0] = (rgb[0] as f32 * breathing_brightness) as u8;
+                        rgb[1] = (rgb[1] as f32 * breathing_brightness) as u8;
+                        rgb[2] = (rgb[2] as f32 * breathing_brightness) as u8;
+                    }
+
+                    // 添加RGB数据（每个LED 3字节）
+                    rgb_buffer.push(rgb[0]); // R
+                    rgb_buffer.push(rgb[1]); // G
+                    rgb_buffer.push(rgb[2]); // B
+                }
+            } else {
+                // 其他显示器的灯带：填充颜色
+                for _led_index in 0..strip.len {
+                    // 添加RGB填充数据
+                    rgb_buffer.push(fill_rgb[0]); // R
+                    rgb_buffer.push(fill_rgb[1]); // G
+                    rgb_buffer.push(fill_rgb[2]); // B
+                }
+            }
+        }
+
+        log::info!(
+            "🎨 生成了RGB预览数据: {} 字节 (总LED数: {})",
+            rgb_buffer.len(),
+            total_leds
+        );
+
+        Ok(rgb_buffer)
+    }
+
+    /// 将RGB格式数据转换为硬件格式数据
+    pub fn convert_rgb_to_hardware_buffer(
+        &self,
+        rgb_buffer: &[u8],
+        all_configs: &LedStripConfigGroup,
+    ) -> anyhow::Result<(Vec<u8>, u16)> {
+        // 按序列号排序所有灯带
+        let mut all_sorted_strips = all_configs.strips.clone();
+        all_sorted_strips.sort_by_key(|s| s.index);
+
+        // 计算总字节数
+        let total_bytes: usize = all_sorted_strips
+            .iter()
+            .map(|s| {
+                let bytes_per_led = match s.led_type {
+                    LedType::WS2812B => 3,
+                    LedType::SK6812 => 4,
+                };
+                s.len * bytes_per_led
+            })
+            .sum();
+
+        let mut hardware_buffer = Vec::with_capacity(total_bytes);
+        let mut rgb_index = 0;
+
+        // 遍历所有灯带，将RGB数据转换为硬件格式
+        for strip in &all_sorted_strips {
+            for _led_index in 0..strip.len {
+                if rgb_index + 2 < rgb_buffer.len() {
+                    let r = rgb_buffer[rgb_index];
+                    let g = rgb_buffer[rgb_index + 1];
+                    let b = rgb_buffer[rgb_index + 2];
+                    rgb_index += 3;
+
+                    // 根据LED类型转换为硬件格式
+                    match strip.led_type {
+                        LedType::WS2812B => {
+                            // GRB格式
+                            hardware_buffer.push(g); // G
+                            hardware_buffer.push(r); // R
+                            hardware_buffer.push(b); // B
+                        }
+                        LedType::SK6812 => {
+                            // GRBW格式
+                            hardware_buffer.push(g); // G
+                            hardware_buffer.push(r); // R
+                            hardware_buffer.push(b); // B
+                            hardware_buffer.push(0); // W (白色通道设为0)
+                        }
+                    }
+                }
+            }
+        }
+
+        log::info!(
+            "🔄 RGB转硬件格式: {} 字节 -> {} 字节",
+            rgb_buffer.len(),
+            hardware_buffer.len()
+        );
+
+        Ok((hardware_buffer, 0))
     }
 
     /// 使用采样映射函数将边框颜色映射到完整灯带数据串缓冲区，并为活跃灯带应用呼吸效果
