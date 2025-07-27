@@ -147,7 +147,9 @@ pub async fn send_colors(
 pub async fn send_calibration_color(
     Json(request): Json<SendCalibrationColorRequest>,
 ) -> Result<Json<ApiResponse<String>>, StatusCode> {
-    match ambient_light::LedColorsPublisher::send_calibration_color(request.r, request.g, request.b).await {
+    match ambient_light::LedColorsPublisher::send_calibration_color(request.r, request.g, request.b)
+        .await
+    {
         Ok(_) => Ok(Json(ApiResponse::success(
             "Calibration color sent successfully".to_string(),
         ))),

@@ -1,5 +1,5 @@
-use log::{debug, warn};
 use anyhow::Result;
+use log::{debug, warn};
 
 use crate::{
     ambient_light::{ColorCalibration, LedStripConfig, LedType},
@@ -9,7 +9,7 @@ use crate::{
 };
 
 /// LED数据处理器
-/// 
+///
 /// 负责统一处理所有模式的LED数据：
 /// 1. 发布预览数据（不受颜色校准影响）
 /// 2. 硬件编码（应用颜色校准）
@@ -18,14 +18,14 @@ pub struct LedDataProcessor;
 
 impl LedDataProcessor {
     /// 标准流程：处理二维RGB颜色数据，发布预览，硬件编码
-    /// 
+    ///
     /// # 参数
     /// * `led_colors` - 二维颜色数组，外层按strips排序，内层为每个LED的颜色
     /// * `strips` - LED配置数组（必填）
     /// * `color_calibration` - 颜色校准配置（None时使用当前配置）
     /// * `mode` - 当前数据发送模式
     /// * `start_led_offset` - LED偏移量（必填）
-    /// 
+    ///
     /// # 返回值
     /// 返回硬件编码后的数据，可直接发送给LED硬件
     pub async fn process_and_publish(
@@ -50,7 +50,10 @@ impl LedDataProcessor {
 
         // 2. 转换为预览数据（一维RGB字节数组，无校准）
         let preview_rgb_bytes = Self::colors_2d_to_rgb_bytes(&led_colors);
-        log::info!("📊 Generated preview data: {} bytes", preview_rgb_bytes.len());
+        log::info!(
+            "📊 Generated preview data: {} bytes",
+            preview_rgb_bytes.len()
+        );
 
         // 3. 发布预览数据
         let websocket_publisher = WebSocketEventPublisher::global().await;
@@ -63,25 +66,24 @@ impl LedDataProcessor {
         log::info!("✅ LED preview data published successfully");
 
         // 4. 硬件编码（应用颜色校准）
-        let hardware_data = Self::encode_for_hardware(
-            led_colors,
-            strips,
-            &calibration,
-            start_led_offset,
-        )?;
+        let hardware_data =
+            Self::encode_for_hardware(led_colors, strips, &calibration, start_led_offset)?;
 
-        log::info!("🔧 Hardware encoding completed: {} bytes", hardware_data.len());
+        log::info!(
+            "🔧 Hardware encoding completed: {} bytes",
+            hardware_data.len()
+        );
         Ok(hardware_data)
     }
 
     /// 测试模式专用：发布预览后按指定LED类型编码
-    /// 
+    ///
     /// # 参数
     /// * `rgb_colors` - 一维测试效果RGB数据
     /// * `led_type` - 强制指定的LED类型
     /// * `led_count` - LED数量
     /// * `mode` - 当前数据发送模式
-    /// 
+    ///
     /// # 返回值
     /// 返回硬件编码后的数据，可直接发送给LED硬件
     pub async fn process_test_mode(
@@ -92,14 +94,15 @@ impl LedDataProcessor {
     ) -> Result<Vec<u8>> {
         debug!(
             "🧪 LedDataProcessor::process_test_mode - led_type: {:?}, count: {}, mode: {:?}",
-            led_type,
-            led_count,
-            mode
+            led_type, led_count, mode
         );
 
         // 1. 转换为预览数据（一维RGB字节数组）
         let preview_rgb_bytes = Self::colors_1d_to_rgb_bytes(&rgb_colors);
-        debug!("📊 Generated test preview data: {} bytes", preview_rgb_bytes.len());
+        debug!(
+            "📊 Generated test preview data: {} bytes",
+            preview_rgb_bytes.len()
+        );
 
         // 2. 发布预览数据
         let websocket_publisher = WebSocketEventPublisher::global().await;
@@ -114,12 +117,15 @@ impl LedDataProcessor {
         // 3. 测试模式编码（无校准）
         let hardware_data = Self::encode_for_test_mode(rgb_colors, led_type, led_count)?;
 
-        debug!("🧪 Test mode encoding completed: {} bytes", hardware_data.len());
+        debug!(
+            "🧪 Test mode encoding completed: {} bytes",
+            hardware_data.len()
+        );
         Ok(hardware_data)
     }
 
     /// 辅助方法：二维颜色数组转一维RGB字节数组（用于预览）
-    /// 
+    ///
     /// 将二维颜色数组按顺序展开为RGB字节序列，不应用颜色校准
     fn colors_2d_to_rgb_bytes(led_colors: &[Vec<LedColor>]) -> Vec<u8> {
         led_colors
@@ -134,7 +140,7 @@ impl LedDataProcessor {
     }
 
     /// 辅助方法：一维颜色数组转RGB字节数组（用于测试模式预览）
-    /// 
+    ///
     /// 将一维颜色数组转换为RGB字节序列，不应用颜色校准
     fn colors_1d_to_rgb_bytes(colors: &[LedColor]) -> Vec<u8> {
         colors
@@ -235,7 +241,11 @@ impl LedDataProcessor {
                         }
                         LedType::SK6812 => {
                             // GRBW格式，W通道单独校准
-                            let w_channel = Self::calculate_white_channel(calibrated_r, calibrated_g, calibrated_b);
+                            let w_channel = Self::calculate_white_channel(
+                                calibrated_r,
+                                calibrated_g,
+                                calibrated_b,
+                            );
                             let calibrated_w = (w_channel as f32 * color_calibration.w) as u8;
                             complete_led_data.extend_from_slice(&[
                                 calibrated_g, // G (Green)
@@ -289,8 +299,7 @@ impl LedDataProcessor {
     ) -> Result<Vec<u8>> {
         debug!(
             "🧪 Encoding for test mode: type={:?}, count={}",
-            led_type,
-            led_count
+            led_type, led_count
         );
 
         let mut buffer = Vec::new();

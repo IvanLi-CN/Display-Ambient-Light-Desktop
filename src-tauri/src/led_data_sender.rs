@@ -220,39 +220,12 @@ impl LedDataSender {
         // 构建并发送数据包
         let packet_data = packet.build_packet();
 
+        // 只在debug级别记录基本信息，避免频繁的详细日志
         log::debug!(
-            "Sending LED packet: mode={}, source={}, offset={}, data_len={}, packet_len={}",
+            "Sending LED packet: mode={}, offset={}, data_len={}",
             expected_mode,
-            packet.source,
             packet.offset,
-            packet.data.len(),
-            packet_data.len()
-        );
-
-        // 打印UDP数据包的十六进制内容（仅前64字节以避免日志过长）
-        let hex_data = if packet_data.len() <= 64 {
-            packet_data
-                .iter()
-                .map(|b| format!("{b:02x}"))
-                .collect::<Vec<_>>()
-                .join(" ")
-        } else {
-            let preview = &packet_data[..64];
-            let hex_preview = preview
-                .iter()
-                .map(|b| format!("{b:02x}"))
-                .collect::<Vec<_>>()
-                .join(" ");
-            format!(
-                "{} ... (truncated, total {} bytes)",
-                hex_preview,
-                packet_data.len()
-            )
-        };
-        log::info!(
-            "📦 UDP packet data (offset={}): {}",
-            packet.offset,
-            hex_data
+            packet.data.len()
         );
 
         // 写入UDP数据包到日志文件

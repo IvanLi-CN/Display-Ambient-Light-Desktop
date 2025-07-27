@@ -127,11 +127,9 @@ impl LedStatusManager {
         }
 
         self.notify_status_changed().await?;
-        info!("LED data send mode changed to: {mode}");
+        debug!("LED data send mode changed to: {mode}");
         Ok(())
     }
-
-
 
     /// 设置单屏配置模式状态
     pub async fn set_single_display_config_mode(
@@ -151,7 +149,7 @@ impl LedStatusManager {
         }
 
         self.notify_status_changed().await?;
-        info!(
+        debug!(
             "LED single display config mode changed to: {}",
             if active { "active" } else { "inactive" }
         );
@@ -176,7 +174,7 @@ impl LedStatusManager {
         self.notify_status_changed().await?;
 
         let current_status = self.get_status().await;
-        info!(
+        debug!(
             "LED active breathing strip changed to: {:?}",
             current_status.active_breathing_strip
         );
@@ -261,11 +259,7 @@ impl LedStatusManager {
         let websocket_publisher = WebSocketEventPublisher::global().await;
         websocket_publisher.publish_led_status_changed().await;
 
-        info!(
-            "🔄 LED状态变更已通知: mode={:?}, send_stats={:?}",
-            current_status.data_send_mode,
-            current_status.send_stats
-        );
+        // 移除频繁的状态变更通知日志
 
         Ok(())
     }
@@ -279,7 +273,7 @@ impl LedStatusManager {
         }
 
         self.notify_status_changed().await?;
-        info!("LED statistics reset");
+        debug!("LED statistics reset");
         Ok(())
     }
 

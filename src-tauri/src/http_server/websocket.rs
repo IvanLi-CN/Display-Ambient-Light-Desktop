@@ -180,7 +180,7 @@ pub async fn websocket_handler(ws: WebSocketUpgrade, State(state): State<AppStat
 
 /// 处理WebSocket连接
 async fn handle_socket(socket: WebSocket, state: AppState) {
-    log::info!("🔌 New WebSocket connection established for LED events");
+    log::debug!("New WebSocket connection established for LED events");
     let (mut sender, mut receiver) = socket.split();
 
     // 从AppState获取WebSocketManager
@@ -199,7 +199,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
         .await
         .is_err()
     {
-        log::warn!("❌ Failed to send connection confirmation message");
+        log::debug!("Failed to send connection confirmation message");
         return;
     }
     log::info!("✅ Connection confirmation message sent to LED events WebSocket");
@@ -283,7 +283,6 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
     let mut send_task = tokio::spawn(async move {
         // 实现从ws_receiver接收广播消息并发送给客户端
         while let Ok(msg) = ws_receiver.recv().await {
-            log::debug!("📤 Sending WebSocket message: {msg:?}");
             let text = match serde_json::to_string(&msg) {
                 Ok(text) => text,
                 Err(e) => {
@@ -295,9 +294,8 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
             if sender.send(Message::Text(text)).await.is_err() {
                 log::debug!("WebSocket发送消息失败，连接可能已断开");
                 break;
-            } else {
-                log::debug!("✅ WebSocket消息发送成功");
             }
+            // 移除成功发送的日志，减少输出
         }
     });
 
@@ -311,5 +309,5 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
         }
     }
 
-    log::info!("WebSocket连接已断开");
+    log::debug!("WebSocket连接已断开");
 }

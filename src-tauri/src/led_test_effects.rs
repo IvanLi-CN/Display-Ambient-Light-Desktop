@@ -1,6 +1,6 @@
-use crate::led_data_sender::LedDataSender;
-use crate::led_color::LedColor;
 use crate::ambient_light::LedType; // 使用统一的LedType
+use crate::led_color::LedColor;
+use crate::led_data_sender::LedDataSender;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::f64::consts::PI;
@@ -24,8 +24,6 @@ pub struct TestEffectConfig {
     pub speed: f64,  // Speed multiplier
     pub offset: u32, // LED offset
 }
-
-
 
 /// LED测试效果任务信息
 #[derive(Debug, Clone)]
@@ -298,7 +296,10 @@ impl LedTestEffects {
     }
 
     /// 将硬件数据转换为RGB颜色数组（用于预览）
-    fn hardware_data_to_rgb_colors(data: &[u8], led_type: &LedType) -> Vec<crate::led_color::LedColor> {
+    fn hardware_data_to_rgb_colors(
+        data: &[u8],
+        led_type: &LedType,
+    ) -> Vec<crate::led_color::LedColor> {
         let mut rgb_colors = Vec::new();
 
         let bytes_per_led = match led_type {
@@ -550,7 +551,8 @@ mod tests {
         assert_eq!(colors_data.len(), 30); // 10 LEDs * 3 bytes per LED = 30 bytes
 
         // Convert hardware data back to RGB colors for verification
-        let rgb_colors = LedTestEffects::hardware_data_to_rgb_colors(&colors_data, &config.led_type);
+        let rgb_colors =
+            LedTestEffects::hardware_data_to_rgb_colors(&colors_data, &config.led_type);
         assert_eq!(rgb_colors.len(), 10); // 10 LEDs
     }
 
@@ -607,7 +609,8 @@ mod tests {
         assert_eq!(colors_data.len(), 60); // 20 LEDs * 3 bytes per LED = 60 bytes
 
         // Convert hardware data back to RGB colors for testing
-        let rgb_colors = LedTestEffects::hardware_data_to_rgb_colors(&colors_data, &config.led_type);
+        let rgb_colors =
+            LedTestEffects::hardware_data_to_rgb_colors(&colors_data, &config.led_type);
         assert_eq!(rgb_colors.len(), 20); // 20 LEDs
 
         // First 10 should be red

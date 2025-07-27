@@ -66,8 +66,7 @@ pub struct LedPreviewStateManager {
 
 impl LedPreviewStateManager {
     pub async fn global() -> &'static Self {
-        static LED_PREVIEW_STATE_MANAGER: OnceCell<LedPreviewStateManager> =
-            OnceCell::const_new();
+        static LED_PREVIEW_STATE_MANAGER: OnceCell<LedPreviewStateManager> = OnceCell::const_new();
 
         LED_PREVIEW_STATE_MANAGER
             .get_or_init(|| async {

@@ -63,7 +63,11 @@ impl WebSocketEventPublisher {
     }
 
     /// 发布LED排序颜色变化事件
-    pub async fn publish_led_sorted_colors_changed(&self, sorted_colors: Vec<u8>, led_offset: usize) {
+    pub async fn publish_led_sorted_colors_changed(
+        &self,
+        sorted_colors: Vec<u8>,
+        led_offset: usize,
+    ) {
         // 获取当前模式信息
         let sender = crate::led_data_sender::LedDataSender::global().await;
         let current_mode = sender.get_mode().await;
@@ -119,8 +123,6 @@ impl WebSocketEventPublisher {
             sender.get_mode().await
         };
 
-
-
         // 获取LED配置以计算总数量和数据长度
         let configs = config_manager.configs().await;
         let total_led_count: u32 = configs.strips.iter().map(|strip| strip.len as u32).sum();
@@ -156,8 +158,8 @@ impl WebSocketEventPublisher {
             "timestamp": chrono::Utc::now().to_rfc3339()
         });
 
-        log::info!(
-            "🔄 Publishing LED status changed event: mode={:?}, frequency={}Hz",
+        log::debug!(
+            "Publishing LED status changed event: mode={:?}, frequency={}Hz",
             mode,
             frequency
         );
@@ -170,10 +172,9 @@ impl WebSocketEventPublisher {
         {
             Ok(subscriber_count) => {
                 if subscriber_count > 0 {
-                    log::info!("✅ LED状态变化事件已发送给 {} 个订阅者", subscriber_count);
-                } else {
-                    log::info!("📭 没有订阅者接收LED状态变化事件");
+                    log::debug!("LED状态变化事件已发送给 {} 个订阅者", subscriber_count);
                 }
+                // 移除无订阅者的日志，减少输出
             }
             Err(e) => {
                 log::warn!("发送LED状态变化事件失败: {}", e);

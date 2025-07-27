@@ -337,11 +337,17 @@ mod tests {
         let top_points = screenshot.get_sample_points(&top_config);
         assert!(!top_points.is_empty());
         assert_eq!(top_points.len(), 100);
-        // Print first few points for debugging
-        println!(
-            "Top border first LED points: {:?}",
-            &top_points[0][0..5.min(top_points[0].len())]
-        );
+        // Debug output only when needed
+        #[cfg(debug_assertions)]
+        if std::env::var("RUST_LOG")
+            .unwrap_or_default()
+            .contains("debug")
+        {
+            println!(
+                "Top border first LED points: {:?}",
+                &top_points[0][0..5.min(top_points[0].len())]
+            );
+        }
 
         let bottom_config = mock_led_strip_config(Border::Bottom, 100);
         let bottom_points = screenshot.get_sample_points(&bottom_config);
@@ -349,19 +355,31 @@ mod tests {
         assert_eq!(bottom_points.len(), 100);
         // Verify that bottom points are transformed correctly
         assert!(bottom_points[0][0].1 > 900);
-        println!(
-            "Bottom border first LED points: {:?}",
-            &bottom_points[0][0..5.min(bottom_points[0].len())]
-        );
+        #[cfg(debug_assertions)]
+        if std::env::var("RUST_LOG")
+            .unwrap_or_default()
+            .contains("debug")
+        {
+            println!(
+                "Bottom border first LED points: {:?}",
+                &bottom_points[0][0..5.min(bottom_points[0].len())]
+            );
+        }
 
         let left_config = mock_led_strip_config(Border::Left, 50);
         let left_points = screenshot.get_sample_points(&left_config);
         assert!(!left_points.is_empty());
         assert_eq!(left_points.len(), 50);
-        println!(
-            "Left border first LED points: {:?}",
-            &left_points[0][0..5.min(left_points[0].len())]
-        );
+        #[cfg(debug_assertions)]
+        if std::env::var("RUST_LOG")
+            .unwrap_or_default()
+            .contains("debug")
+        {
+            println!(
+                "Left border first LED points: {:?}",
+                &left_points[0][0..5.min(left_points[0].len())]
+            );
+        }
 
         let right_config = mock_led_strip_config(Border::Right, 50);
         let right_points = screenshot.get_sample_points(&right_config);
@@ -369,10 +387,16 @@ mod tests {
         assert_eq!(right_points.len(), 50);
         // Verify that right points are transformed correctly
         assert!(right_points[0][0].0 > 1800);
-        println!(
-            "Right border first LED points: {:?}",
-            &right_points[0][0..5.min(right_points[0].len())]
-        );
+        #[cfg(debug_assertions)]
+        if std::env::var("RUST_LOG")
+            .unwrap_or_default()
+            .contains("debug")
+        {
+            println!(
+                "Right border first LED points: {:?}",
+                &right_points[0][0..5.min(right_points[0].len())]
+            );
+        }
     }
 
     #[test]
@@ -382,19 +406,43 @@ mod tests {
         // Test with a single LED to see exact coordinates
         let top_config = mock_led_strip_config(Border::Top, 1);
         let top_points = screenshot.get_sample_points(&top_config);
-        println!("Top border single LED points: {:?}", top_points[0]);
+        #[cfg(debug_assertions)]
+        if std::env::var("RUST_LOG")
+            .unwrap_or_default()
+            .contains("debug")
+        {
+            println!("Top border single LED points: {:?}", top_points[0]);
+        }
 
         let bottom_config = mock_led_strip_config(Border::Bottom, 1);
         let bottom_points = screenshot.get_sample_points(&bottom_config);
-        println!("Bottom border single LED points: {:?}", bottom_points[0]);
+        #[cfg(debug_assertions)]
+        if std::env::var("RUST_LOG")
+            .unwrap_or_default()
+            .contains("debug")
+        {
+            println!("Bottom border single LED points: {:?}", bottom_points[0]);
+        }
 
         let left_config = mock_led_strip_config(Border::Left, 1);
         let left_points = screenshot.get_sample_points(&left_config);
-        println!("Left border single LED points: {:?}", left_points[0]);
+        #[cfg(debug_assertions)]
+        if std::env::var("RUST_LOG")
+            .unwrap_or_default()
+            .contains("debug")
+        {
+            println!("Left border single LED points: {:?}", left_points[0]);
+        }
 
         let right_config = mock_led_strip_config(Border::Right, 1);
         let right_points = screenshot.get_sample_points(&right_config);
-        println!("Right border single LED points: {:?}", right_points[0]);
+        #[cfg(debug_assertions)]
+        if std::env::var("RUST_LOG")
+            .unwrap_or_default()
+            .contains("debug")
+        {
+            println!("Right border single LED points: {:?}", right_points[0]);
+        }
 
         // Verify that coordinates are in expected ranges
         // Top should have small Y values (near 0)
@@ -505,8 +553,6 @@ mod tests {
 
     #[test]
     fn test_bottom_border_sampling_detailed() {
-        println!("\n=== Testing Bottom Border Sampling Logic ===");
-
         let width = 1920;
         let height = 1080;
 
@@ -531,29 +577,41 @@ mod tests {
         );
         let points = screenshot.get_sample_points(&config);
 
-        println!("Screen dimensions: {}x{}", width, height);
-        println!("Number of LEDs: {}", config.len);
-        println!("Number of LED groups generated: {}", points.len());
+        // 只在需要调试时输出详细信息
+        #[cfg(debug_assertions)]
+        if std::env::var("RUST_LOG")
+            .unwrap_or_default()
+            .contains("trace")
+        {
+            println!("Screen dimensions: {}x{}", width, height);
+            println!("Number of LEDs: {}", config.len);
+            println!("Number of LED groups generated: {}", points.len());
+        }
 
         for (i, led_points) in points.iter().enumerate() {
-            println!("LED {} has {} sample points:", i, led_points.len());
-            for (j, point) in led_points.iter().enumerate() {
-                println!("  Point {}: ({}, {})", j, point.0, point.1);
-            }
-
             // Check if points are in reasonable range for bottom border
             let min_y = led_points.iter().map(|p| p.1).min().unwrap_or(0);
             let max_y = led_points.iter().map(|p| p.1).max().unwrap_or(0);
-            let min_x = led_points.iter().map(|p| p.0).min().unwrap_or(0);
-            let max_x = led_points.iter().map(|p| p.0).max().unwrap_or(0);
+            let _min_x = led_points.iter().map(|p| p.0).min().unwrap_or(0);
+            let _max_x = led_points.iter().map(|p| p.0).max().unwrap_or(0);
 
-            println!(
-                "  Y range: {} - {} (should be near {})",
-                min_y,
-                max_y,
-                height - 1
-            );
-            println!("  X range: {} - {}", min_x, max_x);
+            #[cfg(debug_assertions)]
+            if std::env::var("RUST_LOG")
+                .unwrap_or_default()
+                .contains("trace")
+            {
+                println!("LED {} has {} sample points:", i, led_points.len());
+                for (j, point) in led_points.iter().enumerate() {
+                    println!("  Point {}: ({}, {})", j, point.0, point.1);
+                }
+                println!(
+                    "  Y range: {} - {} (should be near {})",
+                    min_y,
+                    max_y,
+                    height - 1
+                );
+                println!("  X range: {} - {}", _min_x, _max_x);
+            }
 
             // Validate bottom border coordinates
             let height_usize = height as usize;
@@ -574,8 +632,6 @@ mod tests {
 
     #[test]
     fn test_get_one_edge_sample_points_detailed() {
-        println!("\n=== Testing get_one_edge_sample_points Logic ===");
-
         // Simulate Bottom border call: get_one_edge_sample_points(height/20, width, config.len, 5)
         let width = 1920;
         let height = 1080;
@@ -584,12 +640,6 @@ mod tests {
         let leds = 4;
         let single_axis_points = 5;
 
-        println!("Parameters:");
-        println!("  edge_thickness (height/20): {}", edge_thickness);
-        println!("  edge_length (width): {}", edge_length);
-        println!("  leds: {}", leds);
-        println!("  single_axis_points: {}", single_axis_points);
-
         let points = Screenshot::get_one_edge_sample_points(
             edge_thickness,
             edge_length,
@@ -597,34 +647,39 @@ mod tests {
             single_axis_points,
         );
 
-        println!("Generated {} LED groups", points.len());
+        // 只在需要详细调试时输出
+        #[cfg(debug_assertions)]
+        if std::env::var("RUST_LOG")
+            .unwrap_or_default()
+            .contains("trace")
+        {
+            println!("Generated {} LED groups", points.len());
 
-        for (i, led_points) in points.iter().enumerate() {
-            println!("LED {} raw points (before coordinate transformation):", i);
-            for (j, point) in led_points.iter().enumerate() {
-                println!("  Point {}: ({}, {})", j, point.0, point.1);
-            }
+            for (i, led_points) in points.iter().enumerate() {
+                println!("LED {} raw points (before coordinate transformation):", i);
+                for (j, point) in led_points.iter().enumerate() {
+                    println!("  Point {}: ({}, {})", j, point.0, point.1);
+                }
 
-            // Apply Bottom border transformation: (x, height - 1 - y)
-            let transformed_points: Vec<_> = led_points
-                .iter()
-                .map(|(x, y)| (*x, height - 1 - *y))
-                .collect();
+                // Apply Bottom border transformation: (x, height - 1 - y)
+                let transformed_points: Vec<_> = led_points
+                    .iter()
+                    .map(|(x, y)| (*x, height - 1 - *y))
+                    .collect();
 
-            println!(
-                "LED {} transformed points (after Bottom border transformation):",
-                i
-            );
-            for (j, point) in transformed_points.iter().enumerate() {
-                println!("  Point {}: ({}, {})", j, point.0, point.1);
+                println!(
+                    "LED {} transformed points (after Bottom border transformation):",
+                    i
+                );
+                for (j, point) in transformed_points.iter().enumerate() {
+                    println!("  Point {}: ({}, {})", j, point.0, point.1);
+                }
             }
         }
     }
 
     #[test]
     fn test_bottom_border_color_sampling_with_mock_bitmap() {
-        println!("\n=== Testing Bottom Border Color Sampling ===");
-
         let width = 1920;
         let height = 1080;
         let bytes_per_row = width * 4;
@@ -642,11 +697,17 @@ mod tests {
             }
         }
 
-        println!(
-            "Created mock bitmap with green bottom area from Y={} to Y={}",
-            bottom_start_y,
-            height - 1
-        );
+        #[cfg(debug_assertions)]
+        if std::env::var("RUST_LOG")
+            .unwrap_or_default()
+            .contains("debug")
+        {
+            println!(
+                "Created mock bitmap with green bottom area from Y={} to Y={}",
+                bottom_start_y,
+                height - 1
+            );
+        }
 
         // Test Bottom border sampling
         let config = LedStripConfig {
@@ -670,18 +731,27 @@ mod tests {
         );
         let sample_points = screenshot.get_sample_points(&config);
 
-        println!("Generated {} LED sample point groups", sample_points.len());
-
         // Sample colors using the generated points directly from bitmap
         let colors = Screenshot::get_one_edge_colors(&sample_points, &bitmap, bytes_per_row);
 
-        println!("Sampled {} LED colors", colors.len());
+        #[cfg(debug_assertions)]
+        if std::env::var("RUST_LOG")
+            .unwrap_or_default()
+            .contains("debug")
+        {
+            println!("Generated {} LED sample point groups", sample_points.len());
+            println!("Sampled {} LED colors", colors.len());
+            for (i, color) in colors.iter().enumerate() {
+                let rgb = color.get_rgb();
+                println!(
+                    "LED {} color: R={}, G={}, B={} (should be green: R=0, G=255, B=0)",
+                    i, rgb[0], rgb[1], rgb[2]
+                );
+            }
+        }
+
         for (i, color) in colors.iter().enumerate() {
             let rgb = color.get_rgb();
-            println!(
-                "LED {} color: R={}, G={}, B={} (should be green: R=0, G=255, B=0)",
-                i, rgb[0], rgb[1], rgb[2]
-            );
 
             // Verify that we're getting green color
             assert_eq!(
@@ -693,16 +763,19 @@ mod tests {
             assert_eq!(rgb[2], 0, "LED {} should have B=0, but got B={}", i, rgb[2]);
         }
 
-        println!("✅ All LEDs correctly sampled green color!");
+        #[cfg(debug_assertions)]
+        if std::env::var("RUST_LOG")
+            .unwrap_or_default()
+            .contains("debug")
+        {
+            println!("✅ All LEDs correctly sampled green color!");
+        }
     }
 
     #[test]
     fn test_real_screenshot_bottom_border_sampling() {
-        println!("\n=== Testing REAL Screenshot Bottom Border Sampling ===");
-
         // 这个测试需要真实的屏幕截图数据
         // 注意：这个测试在CI环境中会失败，因为没有显示器
-        println!("⚠️  这个测试需要真实的屏幕截图数据，在CI环境中会跳过");
 
         // 创建一个简单的配置来测试Bottom边框
         let _config = LedStripConfig {
@@ -714,9 +787,7 @@ mod tests {
             reversed: false,
         };
 
-        println!("⚠️  这个测试需要真实的屏幕截图数据");
-        println!("请确保您的屏幕显示测试壁纸（底部绿色）");
-        println!("然后运行: cargo test test_real_screenshot_bottom_border_sampling -- --nocapture");
+        // 这个测试需要真实的屏幕截图数据，在CI环境中会跳过
 
         // 注意：这个测试在CI环境中会失败，因为没有显示器
         // 但在开发环境中可以用来验证真实的采样逻辑
@@ -890,10 +961,16 @@ mod color_sampling_tests {
         let (image_data, width, height, bytes_per_row) =
             load_test_image_as_bgra(test_image_path).expect("无法加载测试图片");
 
-        println!(
-            "📸 加载测试图片: {}x{}, 每行{}字节",
-            width, height, bytes_per_row
-        );
+        #[cfg(debug_assertions)]
+        if std::env::var("RUST_LOG")
+            .unwrap_or_default()
+            .contains("debug")
+        {
+            println!(
+                "📸 加载测试图片: {}x{}, 每行{}字节",
+                width, height, bytes_per_row
+            );
+        }
 
         // 创建LED灯带配置
         let led_configs = create_test_led_configs();
@@ -908,10 +985,20 @@ mod color_sampling_tests {
         // 验证顶部灯带（红色区域）- 严格判断中心LED
         let top_colors = &sampled_colors[0];
         assert_eq!(top_colors.len(), 10, "顶部灯带应该有10个LED颜色");
-        println!("🔴 顶部灯带颜色采样:");
+        #[cfg(debug_assertions)]
+        if std::env::var("RUST_LOG")
+            .unwrap_or_default()
+            .contains("trace")
+        {
+            println!("🔴 顶部灯带颜色采样:");
+            for (i, color) in top_colors.iter().enumerate() {
+                let [r, g, b] = color.get_rgb();
+                println!("  LED {}: RGB({}, {}, {})", i, r, g, b);
+            }
+        }
+
         for (i, color) in top_colors.iter().enumerate() {
             let [r, g, b] = color.get_rgb();
-            println!("  LED {}: RGB({}, {}, {})", i, r, g, b);
 
             // 严格判断：只验证中心区域的LED（避免角落干扰）
             if i >= 2 && i <= 7 {
@@ -923,10 +1010,16 @@ mod color_sampling_tests {
 
                 // 如果采样到灰色（中心渐变），说明采样点超出了边缘区域，这是可接受的
                 if r == g && g == b {
-                    println!(
-                        "    注意：LED {} 采样到中心渐变区域 RGB({}, {}, {})",
-                        i, r, g, b
-                    );
+                    #[cfg(debug_assertions)]
+                    if std::env::var("RUST_LOG")
+                        .unwrap_or_default()
+                        .contains("trace")
+                    {
+                        println!(
+                            "    注意：LED {} 采样到中心渐变区域 RGB({}, {}, {})",
+                            i, r, g, b
+                        );
+                    }
                 } else {
                     // 如果不是灰色，则红色分量应该占主导
                     assert!(r >= 150, "边缘LED红色分量不足: R={}", r);
@@ -1048,7 +1141,7 @@ mod color_sampling_tests {
             }
         }
 
-        println!("✅ 严格颜色判断测试通过！");
+        // 测试通过，无需输出
     }
 
     #[test]
@@ -1056,8 +1149,7 @@ mod color_sampling_tests {
         let test_image_path = "tests/assets/led-test-wallpaper-1920x1080.png";
 
         if !Path::new(test_image_path).exists() {
-            println!("⚠️  测试图片不存在，跳过测试: {}", test_image_path);
-            return;
+            return; // 跳过测试，图片不存在
         }
 
         let (image_data, width, height, bytes_per_row) =
@@ -1109,7 +1201,7 @@ mod color_sampling_tests {
             }
         }
 
-        println!("✅ 严格单边缘采样测试通过！");
+        // 测试通过，无需输出
     }
 
     #[test]
@@ -1117,8 +1209,7 @@ mod color_sampling_tests {
         let test_image_path = "tests/assets/led-test-wallpaper-1920x1080.png";
 
         if !Path::new(test_image_path).exists() {
-            println!("⚠️  测试图片不存在，跳过测试: {}", test_image_path);
-            return;
+            return; // 跳过测试，图片不存在
         }
 
         let (image_data, width, height, bytes_per_row) =
@@ -1142,7 +1233,7 @@ mod color_sampling_tests {
         let flattened_colors: Vec<LedColor> = colors_by_strips.into_iter().flatten().collect();
         assert_eq!(flattened_colors.len(), 32, "展平后应该有32个LED颜色");
 
-        println!("✅ 新API兼容性测试通过！");
+        // 测试通过，无需输出
     }
 
     #[test]
@@ -1150,8 +1241,7 @@ mod color_sampling_tests {
         let test_image_path = "tests/assets/led-test-wallpaper-1920x1080.png";
 
         if !Path::new(test_image_path).exists() {
-            println!("⚠️  测试图片不存在，跳过测试: {}", test_image_path);
-            return;
+            return; // 跳过测试，图片不存在
         }
 
         let (image_data, width, height, bytes_per_row) =
@@ -1249,16 +1339,23 @@ mod color_sampling_tests {
             assert_eq!(colors.len(), 5, "每个灯带应该有5个LED");
         }
 
-        println!("✅ 多显示器颜色采样测试通过！");
-        println!(
-            "   显示器1: {} 个灯带, {} 个LED",
-            display_1_colors.len(),
-            display_1_colors.iter().map(|c| c.len()).sum::<usize>()
-        );
-        println!(
-            "   显示器2: {} 个灯带, {} 个LED",
-            display_2_colors.len(),
-            display_2_colors.iter().map(|c| c.len()).sum::<usize>()
-        );
+        // 测试通过，无需详细输出
+        #[cfg(debug_assertions)]
+        if std::env::var("RUST_LOG")
+            .unwrap_or_default()
+            .contains("debug")
+        {
+            println!("✅ 多显示器颜色采样测试通过！");
+            println!(
+                "   显示器1: {} 个灯带, {} 个LED",
+                display_1_colors.len(),
+                display_1_colors.iter().map(|c| c.len()).sum::<usize>()
+            );
+            println!(
+                "   显示器2: {} 个灯带, {} 个LED",
+                display_2_colors.len(),
+                display_2_colors.iter().map(|c| c.len()).sum::<usize>()
+            );
+        }
     }
 }
