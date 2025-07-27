@@ -175,6 +175,7 @@ export const enUS: TranslationDict = {
     positionOffset: 'Position Offset',
     startOffset: 'Start Offset',
     endOffset: 'End Offset',
+    ledPreview: 'LED Preview',
     // Save status
     configSaved: 'Configuration saved',
     saveFailed: 'Save failed',

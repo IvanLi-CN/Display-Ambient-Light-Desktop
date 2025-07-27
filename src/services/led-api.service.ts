@@ -112,6 +112,20 @@ export class LedApiService {
     return api.get('/api/v1/led/test-mode-status');
   }
 
+  /**
+   * 获取LED预览状态
+   */
+  static async getLedPreviewState(): Promise<{ enabled: boolean }> {
+    return api.get('/api/v1/led/preview-state');
+  }
+
+  /**
+   * 设置LED预览状态
+   */
+  static async setLedPreviewState(enabled: boolean): Promise<void> {
+    return api.put('/api/v1/led/preview-state', { enabled });
+  }
+
 
 
 

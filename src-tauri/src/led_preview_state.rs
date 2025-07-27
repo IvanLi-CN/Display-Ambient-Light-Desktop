@@ -16,7 +16,7 @@ pub struct LedPreviewState {
 impl Default for LedPreviewState {
     fn default() -> Self {
         Self {
-            enabled: false, // Default to disabled
+            enabled: true, // Default to enabled
         }
     }
 }

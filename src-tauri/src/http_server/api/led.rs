@@ -11,6 +11,7 @@ use crate::{
     ambient_light::{self, BorderColors, LedStripConfig},
     http_server::{ApiResponse, AppState},
     led_data_sender::{DataSendMode, LedDataSender},
+    led_preview_state::{LedPreviewState, LedPreviewStateManager},
     led_status_manager::{LedStatusManager, LedStatusStats},
 };
 
@@ -510,6 +511,57 @@ pub async fn test_led_data_sender() -> Result<Json<ApiResponse<String>>, StatusC
     )))
 }
 
+/// LED预览状态设置请求
+#[derive(Deserialize, ToSchema)]
+pub struct SetLedPreviewStateRequest {
+    /// 是否启用LED预览
+    pub enabled: bool,
+}
+
+/// 获取LED预览状态
+#[utoipa::path(
+    get,
+    path = "/api/v1/led/preview-state",
+    responses(
+        (status = 200, description = "获取LED预览状态成功", body = ApiResponse<LedPreviewState>),
+    ),
+    tag = "led"
+)]
+pub async fn get_led_preview_state() -> Result<Json<ApiResponse<LedPreviewState>>, StatusCode> {
+    let state_manager = LedPreviewStateManager::global().await;
+    let state = state_manager.get_state().await;
+    Ok(Json(ApiResponse::success(state)))
+}
+
+/// 设置LED预览状态
+#[utoipa::path(
+    put,
+    path = "/api/v1/led/preview-state",
+    request_body = SetLedPreviewStateRequest,
+    responses(
+        (status = 200, description = "设置LED预览状态成功", body = ApiResponse<String>),
+        (status = 500, description = "设置失败", body = ApiResponse<String>),
+    ),
+    tag = "led"
+)]
+pub async fn set_led_preview_state(
+    Json(request): Json<SetLedPreviewStateRequest>,
+) -> Result<Json<ApiResponse<String>>, StatusCode> {
+    let state_manager = LedPreviewStateManager::global().await;
+    match state_manager.set_enabled(request.enabled).await {
+        Ok(_) => {
+            log::info!("LED preview state set to: {}", request.enabled);
+            Ok(Json(ApiResponse::success(
+                "LED preview state set successfully".to_string(),
+            )))
+        }
+        Err(e) => {
+            log::error!("Failed to set LED preview state: {e}");
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
 /// 创建LED控制相关路由
 pub fn create_routes() -> Router<AppState> {
     Router::new()
@@ -541,4 +593,6 @@ pub fn create_routes() -> Router<AppState> {
             post(test_single_display_config),
         )
         .route("/test-data-sender", post(test_led_data_sender))
+        .route("/preview-state", get(get_led_preview_state))
+        .route("/preview-state", put(set_led_preview_state))
 }

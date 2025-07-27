@@ -179,6 +179,7 @@ export interface TranslationDict {
     positionOffset: string;
     startOffset: string;
     endOffset: string;
+    ledPreview: string;
     // Save status
     configSaved: string;
     saveFailed: string;

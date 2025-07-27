@@ -94,6 +94,17 @@ export function StatusBar(props: StatusBarProps) {
         }
       );
 
+      // 初始化LED预览状态
+      try {
+        const previewState = await adaptiveApi.getLedPreviewState();
+        setLedPreviewEnabled(previewState.enabled);
+        console.log('🎨 Initial LED preview state loaded:', previewState.enabled);
+      } catch (error) {
+        console.error('❌ Failed to load initial LED preview state:', error);
+        // 如果获取失败，使用默认值true（因为后端默认已改为true）
+        setLedPreviewEnabled(true);
+      }
+
       // 订阅LED状态变化事件
       console.log('📤 Subscribing to events...');
       try {
@@ -192,11 +203,6 @@ export function StatusBar(props: StatusBarProps) {
           </button>
         </div>
       </div>
-
-      {/* LED预览 */}
-      <Show when={ledPreviewEnabled()}>
-        <LedPreview maxLeds={100} />
-      </Show>
     </div>
   );
 
@@ -204,14 +210,19 @@ export function StatusBar(props: StatusBarProps) {
   const toggleLedPreview = async () => {
     try {
       const newState = !ledPreviewEnabled();
-      setLedPreviewEnabled(newState);
 
-      // 这里可以调用API来保存状态到后端
-      // await adaptiveApi.setLedPreviewEnabled(newState);
+      // 调用API来保存状态到后端
+      await adaptiveApi.setLedPreviewState(newState);
+
+      // 只有在API调用成功后才更新本地状态
+      // 实际状态会通过WebSocket事件更新，但为了即时响应也在这里更新
+      setLedPreviewEnabled(newState);
 
       console.log('LED preview toggled to:', newState);
     } catch (error) {
       console.error('Failed to toggle LED preview:', error);
+      // 如果API调用失败，恢复原状态
+      // setLedPreviewEnabled(!newState); // 不需要，因为上面没有更新状态
     }
   };
 

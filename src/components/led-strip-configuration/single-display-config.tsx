@@ -3,7 +3,6 @@ import { useParams, useNavigate } from '@solidjs/router';
 import { useLanguage } from '../../i18n/index';
 import { LedColorService } from '../../services/led-color-service';
 import { adaptiveApi } from '../../services/api-adapter';
-import { StatusBar } from '../status-bar/status-bar';
 import { WebSocketListener } from '../websocket-listener';
 
 // LED灯带配置类型
@@ -1116,11 +1115,6 @@ export function SingleDisplayConfig() {
       {/* WebSocket监听器 */}
       <WebSocketListener />
 
-      {/* LED状态栏 */}
-      <div class="mb-4">
-        <StatusBar compact={true} />
-      </div>
-
       <div class="flex justify-between items-center mb-6">
         <h1 class="text-2xl font-bold">{t('singleDisplayConfig.title')}</h1>
         <div class="flex gap-2 items-center">
@@ -1253,7 +1247,7 @@ export function SingleDisplayConfig() {
         </div>
 
         {/* 右侧配置面板 */}
-        <div class="lg:col-span-1">
+        <div class="lg:col-span-1 space-y-4">
           <Show
             when={selectedStrip()}
             fallback={

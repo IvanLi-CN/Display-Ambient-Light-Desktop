@@ -175,6 +175,7 @@ export const zhCN: TranslationDict = {
     positionOffset: '位置偏移',
     startOffset: '起始偏移',
     endOffset: '结束偏移',
+    ledPreview: 'LED预览',
     // 保存状态
     configSaved: '配置已保存',
     saveFailed: '保存失败',

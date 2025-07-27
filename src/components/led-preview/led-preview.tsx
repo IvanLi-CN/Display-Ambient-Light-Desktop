@@ -114,8 +114,8 @@ export function LedPreview(props: LedPreviewProps) {
               // 检查模式，只在特定模式下更新预览
               const mode = event.mode || 'AmbientLight'; // 默认为氛围光模式以保持向后兼容
 
-              // 只在氛围光模式或测试模式下更新LED预览
-              if (mode === 'AmbientLight' || mode === 'TestEffect') {
+              // 只在氛围光模式、测试模式或灯带配置模式下更新LED预览
+              if (mode === 'AmbientLight' || mode === 'TestEffect' || mode === 'StripConfig') {
                 const currentDataSize = event.sorted_colors.length;
 
                 // 检查数据大小稳定性
@@ -199,18 +199,17 @@ export function LedPreview(props: LedPreviewProps) {
   const getLedColors = () => {
     const colors = sortedColors();
     const ledColors: string[] = [];
-    
-    // 每3个字节为一个RGB LED，每4个字节为一个RGBW LED
-    // 这里假设是RGB格式，如果需要支持RGBW可以根据配置调整
+
+    // 后端发送的数据已经是RGB格式，直接解析
     for (let i = 0; i < colors.length; i += 3) {
       if (i + 2 < colors.length) {
-        const r = colors[i];
-        const g = colors[i + 1];
-        const b = colors[i + 2];
+        const r = colors[i];     // Red
+        const g = colors[i + 1]; // Green
+        const b = colors[i + 2]; // Blue
         ledColors.push(`rgb(${r}, ${g}, ${b})`);
       }
     }
-    
+
     return ledColors;
   };
 

@@ -219,6 +219,21 @@ export class ApiAdapter {
     );
   }
 
+  public async getLedPreviewState(): Promise<{ enabled: boolean }> {
+    return this.call(
+      'get_led_preview_state',
+      () => LedApiService.getLedPreviewState()
+    );
+  }
+
+  public async setLedPreviewState(enabled: boolean): Promise<void> {
+    return this.call(
+      'set_led_preview_state',
+      () => LedApiService.setLedPreviewState(enabled),
+      { enabled }
+    );
+  }
+
   // ===== 配置相关API =====
 
   public async readLedStripConfigs(): Promise<any> {
@@ -529,6 +544,8 @@ export const adaptiveApi = {
   disableTestMode: () => apiAdapter.disableTestMode(),
   setDataSendMode: (mode: DataSendMode) => apiAdapter.setDataSendMode(mode),
   getDataSendMode: () => apiAdapter.getDataSendMode(),
+  getLedPreviewState: () => apiAdapter.getLedPreviewState(),
+  setLedPreviewState: (enabled: boolean) => apiAdapter.setLedPreviewState(enabled),
   startLedTestEffect: (params: any) => apiAdapter.startLedTestEffect(params),
   stopLedTestEffect: (params: any) => apiAdapter.stopLedTestEffect(params),
   startSingleDisplayConfigPublisher: (strips: any[], borderColors: any) =>
