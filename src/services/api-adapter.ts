@@ -190,6 +190,14 @@ export class ApiAdapter {
     );
   }
 
+  public async restartAmbientLightPublisher(): Promise<void> {
+    return this.call(
+      'restart_ambient_light_publisher',
+      () => LedApiService.restartAmbientLightPublisher(),
+      {}
+    );
+  }
+
   public async sendTestColorsToBoard(boardAddress: string, offset: number, buffer: number[]): Promise<void> {
     return this.call(
       'send_test_colors_to_board',
@@ -554,6 +562,7 @@ export const adaptiveApi = {
   // LED API
   sendColors: (offset: number, buffer: number[]) => apiAdapter.sendColors(offset, buffer),
   sendCalibrationColor: (r: number, g: number, b: number) => apiAdapter.sendCalibrationColor(r, g, b),
+  restartAmbientLightPublisher: () => apiAdapter.restartAmbientLightPublisher(),
   sendTestColorsToBoard: (params: { boardAddress: string, offset: number, buffer: number[] }) =>
     apiAdapter.sendTestColorsToBoard(params.boardAddress, params.offset, params.buffer),
   enableTestMode: () => apiAdapter.enableTestMode(),

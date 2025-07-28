@@ -184,6 +184,13 @@ export class LedApiService {
   }
 
   /**
+   * 重新启动环境光发布器
+   */
+  static async restartAmbientLightPublisher(): Promise<void> {
+    await api.post('/api/v1/led/restart-ambient-light-publisher');
+  }
+
+  /**
    * 设置活跃灯带用于呼吸效果
    */
   static async setActiveStripForBreathing(displayId: number, border: string | null): Promise<void> {

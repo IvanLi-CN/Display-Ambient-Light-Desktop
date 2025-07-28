@@ -361,6 +361,32 @@ pub async fn stop_single_display_config() -> Result<Json<ApiResponse<String>>, S
     }
 }
 
+/// 重新启动环境光发布器
+#[utoipa::path(
+    post,
+    path = "/api/v1/led/restart-ambient-light-publisher",
+    responses(
+        (status = 200, description = "环境光发布器重启成功", body = ApiResponse<String>),
+        (status = 500, description = "重启失败", body = ApiResponse<String>),
+    ),
+    tag = "led"
+)]
+pub async fn restart_ambient_light_publisher() -> Result<Json<ApiResponse<String>>, StatusCode> {
+    let publisher = ambient_light::LedColorsPublisher::global().await;
+    match publisher.restart_ambient_light_publisher().await {
+        Ok(_) => {
+            log::info!("Ambient light publisher restarted successfully");
+            Ok(Json(ApiResponse::success(
+                "Ambient light publisher restarted successfully".to_string(),
+            )))
+        }
+        Err(e) => {
+            log::error!("Failed to restart ambient light publisher: {e}");
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
 /// 设置活跃灯带用于呼吸效果
 #[utoipa::path(
     post,
@@ -588,6 +614,10 @@ pub fn create_routes() -> Router<AppState> {
         .route(
             "/stop-single-display-config",
             post(stop_single_display_config),
+        )
+        .route(
+            "/restart-ambient-light-publisher",
+            post(restart_ambient_light_publisher),
         )
         .route(
             "/set-active-strip-breathing",

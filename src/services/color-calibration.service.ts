@@ -73,6 +73,8 @@ export class ColorCalibrationService {
           const ambientLightState = await adaptiveApi.getAmbientLightState();
           if (ambientLightState.enabled) {
             await adaptiveApi.setDataSendMode('AmbientLight');
+            // 重新启动环境光发布器以确保立即开始发送数据
+            await adaptiveApi.restartAmbientLightPublisher();
           } else {
             await adaptiveApi.setDataSendMode('None');
           }
@@ -84,6 +86,8 @@ export class ColorCalibrationService {
         const ambientLightState = await adaptiveApi.getAmbientLightState();
         if (ambientLightState.enabled) {
           await adaptiveApi.setDataSendMode('AmbientLight');
+          // 重新启动环境光发布器以确保立即开始发送数据
+          await adaptiveApi.restartAmbientLightPublisher();
         } else {
           await adaptiveApi.setDataSendMode('None');
         }

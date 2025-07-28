@@ -824,6 +824,41 @@ impl LedColorsPublisher {
         log::info!("Test mode disabled - data send mode restored to: {restore_mode:?}");
     }
 
+    /// 重新启动环境光发布器
+    /// 用于从其他模式（如颜色校准）切换回环境光模式时重新初始化发布任务
+    pub async fn restart_ambient_light_publisher(&self) -> anyhow::Result<()> {
+        log::info!("🔄 重新启动环境光发布器...");
+
+        // 检查环境光是否启用
+        let ambient_light_state_manager =
+            crate::ambient_light_state::AmbientLightStateManager::global().await;
+        let ambient_light_enabled = ambient_light_state_manager.is_enabled().await;
+
+        if !ambient_light_enabled {
+            log::info!("⚠️ 环境光未启用，跳过重启");
+            return Ok(());
+        }
+
+        // 设置LED数据发送模式为环境光
+        let sender = LedDataSender::global().await;
+        sender.set_mode(DataSendMode::AmbientLight).await;
+        log::info!("✅ 恢复LED数据发送模式为: AmbientLight");
+
+        // 重新启动氛围光处理任务
+        log::info!("🔄 重新启动氛围光处理任务...");
+        let config_manager = ConfigManager::global().await;
+        let current_configs = config_manager.configs().await;
+        if !current_configs.strips.is_empty() {
+            log::info!("📋 重新处理LED配置以恢复氛围光处理...");
+            self.handle_config_change(current_configs).await;
+        } else {
+            log::warn!("⚠️ 当前LED配置为空，无法重新启动氛围光处理");
+        }
+
+        log::info!("✅ 环境光发布器重启完成");
+        Ok(())
+    }
+
     /// Check if test mode is currently active
     pub async fn is_test_mode_active(&self) -> bool {
         let sender = LedDataSender::global().await;
