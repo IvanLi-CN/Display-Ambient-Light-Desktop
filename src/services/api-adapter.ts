@@ -182,6 +182,14 @@ export class ApiAdapter {
     );
   }
 
+  public async sendCalibrationColor(r: number, g: number, b: number): Promise<void> {
+    return this.call(
+      'send_calibration_color',
+      () => LedApiService.sendCalibrationColor(r, g, b),
+      { r, g, b }
+    );
+  }
+
   public async sendTestColorsToBoard(boardAddress: string, offset: number, buffer: number[]): Promise<void> {
     return this.call(
       'send_test_colors_to_board',
@@ -273,6 +281,13 @@ export class ApiAdapter {
     return this.call(
       'get_boards',
       () => DeviceApiService.getBoards()
+    );
+  }
+
+  public async getAmbientLightState(): Promise<any> {
+    return this.call(
+      'get_ambient_light_state',
+      () => DeviceApiService.getAmbientLightState()
     );
   }
 
@@ -538,6 +553,7 @@ export const adaptiveApi = {
   
   // LED API
   sendColors: (offset: number, buffer: number[]) => apiAdapter.sendColors(offset, buffer),
+  sendCalibrationColor: (r: number, g: number, b: number) => apiAdapter.sendCalibrationColor(r, g, b),
   sendTestColorsToBoard: (params: { boardAddress: string, offset: number, buffer: number[] }) =>
     apiAdapter.sendTestColorsToBoard(params.boardAddress, params.offset, params.buffer),
   enableTestMode: () => apiAdapter.enableTestMode(),
@@ -589,6 +605,7 @@ export const adaptiveApi = {
   
   // 设备API
   getBoards: () => apiAdapter.getBoards(),
+  getAmbientLightState: () => apiAdapter.getAmbientLightState(),
   
   // 应用信息API
   getAppVersion: () => apiAdapter.getAppVersion(),

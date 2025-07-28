@@ -22,6 +22,8 @@ export function LedPreview(props: LedPreviewProps) {
 
   // 用于组装分片数据的缓冲区
   const [colorBuffer, setColorBuffer] = createSignal<Map<number, Uint8ClampedArray>>(new Map());
+  // 记录当前模式，用于检测模式切换
+  const [currentMode, setCurrentMode] = createSignal<string>('');
 
   let unsubscribeSortedColors: (() => void) | null = null;
   let unsubscribeConnection: (() => void) | null = null;
@@ -71,6 +73,7 @@ export function LedPreview(props: LedPreviewProps) {
   const updateColors = (event: LedSortedColorsChangedEvent) => {
     const colorsArray = new Uint8ClampedArray(event.sorted_colors);
     const ledOffset = event.led_offset || 0; // 向后兼容，默认偏移量为0
+    const mode = event.mode || 'AmbientLight';
 
     // 将LED偏移量转换为字节偏移量（每个LED占3字节RGB）
     const byteOffset = ledOffset * 3;
@@ -79,8 +82,15 @@ export function LedPreview(props: LedPreviewProps) {
       bytes: colorsArray.length,
       ledOffset: ledOffset,
       byteOffset: byteOffset,
-      mode: event.mode
+      mode: mode
     });
+
+    // 检测模式切换，如果模式改变则清理缓冲区
+    if (currentMode() !== mode) {
+      console.log('🔄 LED Preview mode changed from', currentMode(), 'to', mode, '- clearing buffer');
+      setColorBuffer(new Map());
+      setCurrentMode(mode);
+    }
 
     // 更新缓冲区中的分片数据（使用字节偏移量作为key）
     const currentBuffer = new Map(colorBuffer());
@@ -114,8 +124,8 @@ export function LedPreview(props: LedPreviewProps) {
               // 检查模式，只在特定模式下更新预览
               const mode = event.mode || 'AmbientLight'; // 默认为氛围光模式以保持向后兼容
 
-              // 只在氛围光模式、测试模式或灯带配置模式下更新LED预览
-              if (mode === 'AmbientLight' || mode === 'TestEffect' || mode === 'StripConfig') {
+              // 只在氛围光模式、测试模式、灯带配置模式或颜色校准模式下更新LED预览
+              if (mode === 'AmbientLight' || mode === 'TestEffect' || mode === 'StripConfig' || mode === 'ColorCalibration') {
                 const currentDataSize = event.sorted_colors.length;
 
                 // 检查数据大小稳定性

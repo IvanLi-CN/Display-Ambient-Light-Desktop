@@ -48,6 +48,14 @@ export class LedApiService {
   }
 
   /**
+   * 发送校准颜色数据（推荐用于校准模式）
+   * 使用专用的校准API，支持预览数据发布
+   */
+  static async sendCalibrationColor(r: number, g: number, b: number): Promise<void> {
+    return api.post('/api/v1/led/calibration-color', { r, g, b });
+  }
+
+  /**
    * 发送测试颜色到指定设备
    * 替代: invoke('send_test_colors_to_board', { boardAddress, offset, buffer })
    */

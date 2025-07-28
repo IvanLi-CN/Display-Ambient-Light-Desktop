@@ -422,13 +422,25 @@ impl LedColorsPublisher {
     pub async fn send_calibration_color(r: u8, g: u8, b: u8) -> anyhow::Result<()> {
         log::info!("🎨 Sending calibration color: RGB({r}, {g}, {b})");
 
+        // 首先设置LED数据发送模式为颜色校准
+        log::info!("🔧 Setting LED data send mode to ColorCalibration...");
+        let sender = LedDataSender::global().await;
+        sender.set_mode(crate::led_data_sender::DataSendMode::ColorCalibration).await;
+        log::info!("✅ LED data send mode set to ColorCalibration");
+
         // 获取当前配置
         let config_manager = crate::ambient_light::ConfigManager::global().await;
         let configs = config_manager.configs().await;
         let strips = &configs.strips;
 
+        log::info!("🔧 Retrieved {} LED strips from config", strips.len());
+        for (i, strip) in strips.iter().enumerate() {
+            log::info!("  Strip {}: len={}, display_id={}, border={:?}", i, strip.len, strip.display_id, strip.border);
+        }
+
         // 检查是否有LED配置
         if strips.is_empty() {
+            log::error!("❌ No LED strips configured");
             return Err(anyhow::anyhow!("No LED strips configured"));
         }
 
@@ -446,23 +458,40 @@ impl LedColorsPublisher {
         );
 
         // 使用新的LED数据处理器
-        let hardware_data = crate::led_data_processor::LedDataProcessor::process_and_publish(
+        log::info!("🔧 Calling LedDataProcessor::process_and_publish...");
+        let hardware_data = match crate::led_data_processor::LedDataProcessor::process_and_publish(
             led_colors_2d,
             strips,
             Some(&configs.color_calibration),
             crate::led_data_sender::DataSendMode::ColorCalibration,
             0, // 校准模式偏移量为0
         )
-        .await?;
+        .await {
+            Ok(data) => {
+                log::info!("✅ LedDataProcessor::process_and_publish succeeded, {} bytes", data.len());
+                data
+            }
+            Err(e) => {
+                log::error!("❌ LedDataProcessor::process_and_publish failed: {}", e);
+                return Err(e);
+            }
+        };
 
         // 发送到硬件
+        log::info!("🔧 Sending to hardware...");
         let sender = LedDataSender::global().await;
-        sender
+        match sender
             .send_complete_led_data(0, hardware_data, "ColorCalibration")
-            .await?;
-
-        log::info!("✅ 校准颜色发送成功");
-        Ok(())
+            .await {
+            Ok(_) => {
+                log::info!("✅ 校准颜色发送成功");
+                Ok(())
+            }
+            Err(e) => {
+                log::error!("❌ 发送到硬件失败: {}", e);
+                Err(e)
+            }
+        }
     }
 
     /// Get updated configs with proper display IDs assigned
