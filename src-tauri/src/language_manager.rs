@@ -87,7 +87,7 @@ impl LanguageManager {
     /// Get current language
     pub async fn get_language(&self) -> String {
         let language = self.config.read().await.language.clone();
-        log::info!("🌐 LanguageManager::get_language() returning: {}", language);
+        log::info!("🌐 LanguageManager::get_language() returning: {language}");
         language
     }
 

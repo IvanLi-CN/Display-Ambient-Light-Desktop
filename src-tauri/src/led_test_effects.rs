@@ -1,6 +1,4 @@
 use crate::ambient_light::LedType; // 使用统一的LedType
-use crate::led_color::LedColor;
-use crate::led_data_sender::LedDataSender;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::f64::consts::PI;
@@ -183,13 +181,26 @@ impl LedTestEffectManager {
             }
 
             // 等待下一次更新，或者被取消
-            tokio::select! {
-                _ = tokio::time::sleep(Duration::from_millis(task.update_interval_ms as u64)) => {
-                    // 正常等待完成，继续下一次循环
-                }
-                _ = task.cancellation_token.cancelled() => {
-                    log::info!("🚫 Test effect cancelled for board: {board_address}");
-                    break;
+            // 使用较小的时间片来提高取消响应速度
+            let sleep_duration = Duration::from_millis(task.update_interval_ms as u64);
+            let chunk_size = Duration::from_millis(10); // 10ms时间片
+
+            let mut remaining = sleep_duration;
+            while remaining > Duration::ZERO {
+                let current_sleep = if remaining > chunk_size {
+                    chunk_size
+                } else {
+                    remaining
+                };
+
+                tokio::select! {
+                    _ = tokio::time::sleep(current_sleep) => {
+                        remaining = remaining.saturating_sub(current_sleep);
+                    }
+                    _ = task.cancellation_token.cancelled() => {
+                        log::info!("🚫 Test effect cancelled for board: {board_address}");
+                        return Ok(()); // 立即返回，不继续循环
+                    }
                 }
             }
         }
@@ -252,12 +263,14 @@ impl LedTestEffectManager {
         Ok(())
     }
 
-    /// 发送清除数据（全黑）
+    /// 发送清除数据（全黑）- 直接发送，不改变模式
     async fn send_clear_data(
         &self,
         board_address: &str,
         config: &TestEffectConfig,
     ) -> anyhow::Result<()> {
+        log::info!("🧹 Sending clear data to {board_address} without changing mode");
+
         let bytes_per_led = if LedTestEffects::is_rgbw_type(&config.led_type) {
             4
         } else {
@@ -266,8 +279,21 @@ impl LedTestEffectManager {
         let clear_data = vec![0u8; (config.led_count * bytes_per_led) as usize];
         let byte_offset = LedTestEffects::calculate_byte_offset(config);
 
-        self.send_test_data(board_address, byte_offset, clear_data)
-            .await
+        // 直接发送清除数据，不通过send_test_data避免模式冲突
+        let sender = crate::led_data_sender::LedDataSender::global().await;
+
+        // 设置目标设备
+        sender
+            .set_test_target(Some(board_address.to_string()))
+            .await;
+
+        // 直接发送硬件数据，不改变当前模式
+        sender
+            .send_complete_led_data(byte_offset, clear_data, "ClearData")
+            .await?;
+
+        log::info!("✅ Clear data sent to {board_address} without changing mode");
+        Ok(())
     }
 }
 
@@ -352,22 +378,22 @@ impl LedTestEffects {
         let mut buffer = match config.effect_type {
             TestEffectType::FlowingRainbow => Self::flowing_rainbow(
                 config.led_count,
-                config.led_type.clone(),
+                config.led_type,
                 time_seconds,
                 config.speed,
             ),
             TestEffectType::GroupCounting => {
-                Self::group_counting(config.led_count, config.led_type.clone())
+                Self::group_counting(config.led_count, config.led_type)
             }
             TestEffectType::SingleScan => Self::single_scan(
                 config.led_count,
-                config.led_type.clone(),
+                config.led_type,
                 time_seconds,
                 config.speed,
             ),
             TestEffectType::Breathing => Self::breathing(
                 config.led_count,
-                config.led_type.clone(),
+                config.led_type,
                 time_seconds,
                 config.speed,
             ),

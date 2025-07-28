@@ -153,11 +153,11 @@ export class ApiAdapter {
 
     if (this.environmentInfo!.preferredMode === 'http' && this.environmentInfo!.isHttpApiAvailable) {
       // 使用WebSocket订阅 - 发送正确格式的消息
-      // 后端期望的格式是 { "Subscribe": { "event_types": [...] } }
+      // 后端期望的格式是 { type: "Subscribe", data: [...] }
+      // 因为后端使用了 #[serde(tag = "type", content = "data")]
       const subscribeMessage = {
-        Subscribe: {
-          event_types: eventTypes
-        }
+        type: 'Subscribe',
+        data: eventTypes
       };
 
       // 使用apiClient的sendWebSocketMessage方法

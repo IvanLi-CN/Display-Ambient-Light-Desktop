@@ -205,9 +205,11 @@ export function convertToStatusBarData(
     mode: modeDisplayName,
     raw_mode: mode,
     frequency: safeStatus.frequency || frequency,
+    // 兼容后端新格式：data_length 字段名
     data_length: safeStatus.data_length || safeStatus.current_colors_bytes || 0,
     total_led_count: safeStatus.total_led_count || totalLedCount,
     test_mode_active: safeStatus.test_mode_active || false,
+    // 兼容后端新格式：timestamp 字段名
     last_update: formatTime(safeStatus.timestamp || safeStatus.last_updated || new Date().toISOString()),
     connected
   };

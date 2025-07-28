@@ -325,13 +325,13 @@ export const LedStripTest = () => {
     // 使用Promise.resolve().then()来确保异步执行，不阻塞UI
     Promise.resolve().then(async () => {
       try {
-        // 1. 停止测试效果
-        console.log(`🛑 [${new Date().toISOString()}] 停止测试效果...`);
-        await adaptiveApi.stopLedTestEffect(stopParams);
-
-        // 2. 禁用测试模式，恢复环境光模式
+        // 1. 先禁用测试模式，立即切换到环境光模式
         console.log(`🌈 [${new Date().toISOString()}] 禁用测试模式，恢复环境光模式...`);
         await adaptiveApi.disableTestMode();
+
+        // 2. 然后停止测试效果（发送清除数据）
+        console.log(`🛑 [${new Date().toISOString()}] 停止测试效果...`);
+        await adaptiveApi.stopLedTestEffect(stopParams);
 
         const endTime = Date.now();
         const duration = endTime - startTime;

@@ -432,7 +432,7 @@ fn handle_ambient_light_protocol<R: Runtime>(
                 if let Some(rx) = channels.get(&display_id) {
                     let rx = rx.read().await;
                     let screenshot = rx.borrow().clone();
-                    let bytes = screenshot.bytes.read().await.to_owned();
+                    let bytes = screenshot.bytes.clone();
 
                     // Use much smaller intermediate resolution for performance
                     let intermediate_width = 800; // Much smaller than original 5120
@@ -607,7 +607,7 @@ async fn main() {
                 }
                 Err(e) => {
                     error!("❌ HTTP服务器启动失败: {}", e);
-                    panic!("HTTP服务器启动失败: {}", e);
+                    panic!("HTTP服务器启动失败: {e}");
                 }
             }
         })

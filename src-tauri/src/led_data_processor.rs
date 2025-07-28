@@ -44,7 +44,7 @@ impl LedDataProcessor {
 
         // 1. 获取颜色校准配置
         let calibration = match color_calibration {
-            Some(cal) => cal.clone(),
+            Some(cal) => *cal,
             None => Self::get_current_color_calibration().await?,
         };
 
@@ -55,13 +55,13 @@ impl LedDataProcessor {
             preview_rgb_bytes.len()
         );
 
-        // 3. 发布预览数据
+        // 3. 发布预览数据（避免不必要的clone）
         let websocket_publisher = WebSocketEventPublisher::global().await;
         websocket_publisher
-            .publish_led_colors_changed(preview_rgb_bytes.clone())
+            .publish_led_colors_changed(&preview_rgb_bytes)
             .await;
         websocket_publisher
-            .publish_led_sorted_colors_changed(preview_rgb_bytes, start_led_offset)
+            .publish_led_sorted_colors_changed(&preview_rgb_bytes, start_led_offset)
             .await;
         log::info!("✅ LED preview data published successfully");
 
@@ -93,8 +93,7 @@ impl LedDataProcessor {
         mode: DataSendMode,
     ) -> Result<Vec<u8>> {
         debug!(
-            "🧪 LedDataProcessor::process_test_mode - led_type: {:?}, count: {}, mode: {:?}",
-            led_type, led_count, mode
+            "🧪 LedDataProcessor::process_test_mode - led_type: {led_type:?}, count: {led_count}, mode: {mode:?}"
         );
 
         // 1. 转换为预览数据（一维RGB字节数组）
@@ -107,10 +106,10 @@ impl LedDataProcessor {
         // 2. 发布预览数据
         let websocket_publisher = WebSocketEventPublisher::global().await;
         websocket_publisher
-            .publish_led_colors_changed(preview_rgb_bytes.clone())
+            .publish_led_colors_changed(&preview_rgb_bytes)
             .await;
         websocket_publisher
-            .publish_led_sorted_colors_changed(preview_rgb_bytes, 0) // 测试模式偏移量为0
+            .publish_led_sorted_colors_changed(&preview_rgb_bytes, 0) // 测试模式偏移量为0
             .await;
         debug!("✅ Test LED preview data published successfully");
 
@@ -188,7 +187,19 @@ impl LedDataProcessor {
                 .collect::<Vec<_>>()
         );
 
-        let mut complete_led_data = Vec::<u8>::new();
+        // 预计算总字节数以预分配缓冲区，减少内存重分配
+        let total_bytes: usize = sorted_strips
+            .iter()
+            .map(|(_, strip)| {
+                let bytes_per_led = match strip.led_type {
+                    LedType::WS2812B => 3,
+                    LedType::SK6812 => 4,
+                };
+                strip.len * bytes_per_led
+            })
+            .sum();
+
+        let mut complete_led_data = Vec::<u8>::with_capacity(total_bytes);
         let mut total_leds = 0;
 
         for (strip_index, strip) in sorted_strips {
@@ -297,12 +308,14 @@ impl LedDataProcessor {
         led_type: LedType,
         led_count: usize,
     ) -> Result<Vec<u8>> {
-        debug!(
-            "🧪 Encoding for test mode: type={:?}, count={}",
-            led_type, led_count
-        );
+        debug!("🧪 Encoding for test mode: type={led_type:?}, count={led_count}");
 
-        let mut buffer = Vec::new();
+        // 预分配缓冲区大小，减少内存重分配
+        let bytes_per_led = match led_type {
+            LedType::WS2812B => 3,
+            LedType::SK6812 => 4,
+        };
+        let mut buffer = Vec::with_capacity(led_count * bytes_per_led);
 
         let default_color = LedColor::new(0, 0, 0);
         for i in 0..led_count {

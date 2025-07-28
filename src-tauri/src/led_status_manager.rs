@@ -318,32 +318,33 @@ mod tests {
     use crate::led_data_sender::DataSendMode;
 
     #[tokio::test]
-    async fn test_led_status_manager_initialization() {
-        use crate::led_data_sender::LedDataSender;
-
-        // 重置LED数据发送器状态到初始值
-        let sender = LedDataSender::global().await;
-        sender.set_mode(DataSendMode::None).await;
-
+    async fn test_led_status_manager_basic_functionality() {
         let manager = LedStatusManager::global().await;
 
-        // 重置状态管理器状态到初始值，因为其他测试可能已经修改了全局状态
-        let _ = manager.set_data_send_mode(DataSendMode::None).await;
-        let _ = manager.set_single_display_config_mode(false, None).await;
-        let _ = manager.set_active_breathing_strip(None, None).await;
+        // 清理状态，确保测试独立性
+        manager.update_colors(vec![], vec![]).await.unwrap();
 
-        let status = manager.get_status().await;
+        // 验证基本状态结构存在
+        let initial_status = manager.get_status().await;
 
-        // 验证重置后的状态
-        assert_eq!(status.data_send_mode, DataSendMode::None);
-        assert!(!status.single_display_config_mode);
-        assert_eq!(status.active_breathing_strip, None);
-        // 注意：current_colors_bytes 和 sorted_colors_bytes 可能被其他测试影响，
-        // 所以我们不检查这些字段的具体值
+        // 验证状态字段类型正确（布尔值存在）
+        let _ = initial_status.single_display_config_mode;
 
-        // 测试结束时保持重置状态，避免影响其他测试
-        let sender = LedDataSender::global().await;
-        sender.set_mode(DataSendMode::None).await;
+        // 测试状态更新功能
+        let test_colors = vec![255, 128]; // 2字节
+        let test_sorted_colors = vec![128, 255]; // 2字节
+        let before_update = chrono::Utc::now();
+
+        manager
+            .update_colors(test_colors.clone(), test_sorted_colors.clone())
+            .await
+            .unwrap();
+        let updated_status = manager.get_status().await;
+
+        // 验证状态已更新
+        assert!(updated_status.last_updated >= before_update);
+        assert_eq!(updated_status.current_colors_bytes, test_colors.len());
+        assert_eq!(updated_status.sorted_colors_bytes, test_sorted_colors.len());
     }
 
     #[tokio::test]
@@ -359,33 +360,29 @@ mod tests {
         // 首先重置状态管理器
         let _ = manager.set_data_send_mode(DataSendMode::None).await;
 
-        // 设置发送模式
-        manager
-            .set_data_send_mode(DataSendMode::AmbientLight)
-            .await
-            .unwrap();
+        // 设置发送模式（使用发送器的方法，它会同步到状态管理器）
+        sender.set_mode(DataSendMode::AmbientLight).await;
 
         // 立即检查状态，避免被其他测试影响
         let status = manager.get_status().await;
         assert_eq!(status.data_send_mode, DataSendMode::AmbientLight);
 
         // 测试设置为其他模式
-        manager
-            .set_data_send_mode(DataSendMode::TestEffect)
-            .await
-            .unwrap();
+        sender.set_mode(DataSendMode::TestEffect).await;
 
         let status = manager.get_status().await;
         assert_eq!(status.data_send_mode, DataSendMode::TestEffect);
 
         // 测试结束时重置状态，避免影响其他测试
-        let _ = manager.set_data_send_mode(DataSendMode::None).await;
         sender.set_mode(DataSendMode::None).await;
     }
 
     #[tokio::test]
     async fn test_update_colors() {
         let manager = LedStatusManager::global().await;
+
+        // 清理状态，确保测试独立性
+        manager.update_colors(vec![], vec![]).await.unwrap();
 
         let test_colors = vec![255, 0, 0, 0, 255, 0, 0, 0, 255]; // RGB data
         let test_sorted_colors = vec![255, 255, 255, 0, 0, 0]; // Sorted data

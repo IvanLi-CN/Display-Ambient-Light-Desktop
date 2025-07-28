@@ -49,7 +49,7 @@ export function StatusBar(props: StatusBarProps) {
       // 初始化时主动获取一次状态
       try {
         console.log('🔄 Fetching initial LED status...');
-        const initialMode = await adaptiveApi.getLedDataMode();
+        const initialMode = await adaptiveApi.getDataSendMode();
         console.log('📊 Initial LED mode:', initialMode);
 
         // 创建一个模拟的WebSocket事件来初始化状态
@@ -74,12 +74,13 @@ export function StatusBar(props: StatusBarProps) {
       }
 
       // 监听LED状态变化事件
-      unsubscribeStatus = await adaptiveApi.onEvent<LedStatusChangedEvent>(
+      unsubscribeStatus = await adaptiveApi.onEvent<any>(
         'LedStatusChanged',
-        (event) => {
-          if (event && event.status) {
+        (statusData) => {
+          // api-adapter.ts 已经提取了 message.data，所以这里直接使用 statusData
+          if (statusData && typeof statusData === 'object') {
             try {
-              const statusBarData = convertToStatusBarData(event.status, connected(), t);
+              const statusBarData = convertToStatusBarData(statusData, connected(), t);
               console.log(`📊 [${new Date().toISOString()}] Status bar received mode: ${statusBarData.raw_mode}, test_mode_active: ${statusBarData.test_mode_active}`);
               setStatusData(statusBarData);
               setLastMessageTime(new Date());
@@ -87,11 +88,11 @@ export function StatusBar(props: StatusBarProps) {
             } catch (error) {
               console.error('Error converting status data:', error);
               if (import.meta.env.DEV) {
-                console.log('Raw status data:', event.status);
+                console.log('Raw status data:', statusData);
               }
             }
           } else {
-            console.warn('Invalid LED status event received:', event);
+            console.warn('Invalid LED status event received:', statusData);
           }
         }
       );

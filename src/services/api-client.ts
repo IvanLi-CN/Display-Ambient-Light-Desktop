@@ -212,18 +212,21 @@ export class ApiClient {
    */
   private subscribeToEvents(eventTypes: string[]): void {
     if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+      // 后端期望的格式：{ type: 'Subscribe', data: event_types }
+      // 因为后端使用了 #[serde(tag = "type", content = "data")]
       const message = {
         type: 'Subscribe',
-        data: { event_types: eventTypes }
+        data: eventTypes
       };
-      this.websocket.send(JSON.stringify(message));
+      const messageJson = JSON.stringify(message);
+      console.log('📤 发送订阅请求:', eventTypes);
+      console.log('📤 发送的JSON消息:', messageJson);
+      this.websocket.send(messageJson);
 
       // 标记为待确认的订阅
       eventTypes.forEach(eventType => {
         this.pendingSubscriptions.add(eventType);
       });
-
-      console.log('📤 发送订阅请求:', eventTypes);
     } else {
       console.warn('WebSocket未连接，无法发送订阅请求');
     }

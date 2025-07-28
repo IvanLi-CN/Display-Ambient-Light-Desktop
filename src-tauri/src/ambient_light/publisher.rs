@@ -420,7 +420,7 @@ impl LedColorsPublisher {
     /// * `g` - 绿色分量 (0-255)
     /// * `b` - 蓝色分量 (0-255)
     pub async fn send_calibration_color(r: u8, g: u8, b: u8) -> anyhow::Result<()> {
-        log::info!("🎨 Sending calibration color: RGB({}, {}, {})", r, g, b);
+        log::info!("🎨 Sending calibration color: RGB({r}, {g}, {b})");
 
         // 获取当前配置
         let config_manager = crate::ambient_light::ConfigManager::global().await;
@@ -780,7 +780,8 @@ impl LedColorsPublisher {
         let sender = LedDataSender::global().await;
 
         // Check if ambient light is enabled to determine the correct mode to restore
-        let ambient_light_state_manager = crate::ambient_light_state::AmbientLightStateManager::global().await;
+        let ambient_light_state_manager =
+            crate::ambient_light_state::AmbientLightStateManager::global().await;
         let ambient_light_enabled = ambient_light_state_manager.is_enabled().await;
 
         let restore_mode = if ambient_light_enabled {
@@ -791,7 +792,7 @@ impl LedColorsPublisher {
 
         sender.set_mode(restore_mode).await;
 
-        log::info!("Test mode disabled - data send mode restored to: {:?}", restore_mode);
+        log::info!("Test mode disabled - data send mode restored to: {restore_mode:?}");
     }
 
     /// Check if test mode is currently active
@@ -907,7 +908,8 @@ impl LedColorsPublisher {
         let sender = crate::led_data_sender::LedDataSender::global().await;
 
         // Check if ambient light is enabled to determine the correct mode to restore
-        let ambient_light_state_manager = crate::ambient_light_state::AmbientLightStateManager::global().await;
+        let ambient_light_state_manager =
+            crate::ambient_light_state::AmbientLightStateManager::global().await;
         let ambient_light_enabled = ambient_light_state_manager.is_enabled().await;
 
         let restore_mode = if ambient_light_enabled {
@@ -917,7 +919,7 @@ impl LedColorsPublisher {
         };
 
         sender.set_mode(restore_mode).await;
-        log::info!("✅ 恢复LED数据发送模式为: {:?}", restore_mode);
+        log::info!("✅ 恢复LED数据发送模式为: {restore_mode:?}");
 
         // 🔧 重新启动氛围光处理任务
         log::info!("🔄 重新启动氛围光处理任务...");
@@ -1031,10 +1033,10 @@ impl LedColorsPublisher {
         // 5. 发布RGB预览数据到前端
         let websocket_publisher = crate::websocket_events::WebSocketEventPublisher::global().await;
         websocket_publisher
-            .publish_led_colors_changed(rgb_preview_buffer.clone())
+            .publish_led_colors_changed(&rgb_preview_buffer)
             .await;
         websocket_publisher
-            .publish_led_sorted_colors_changed(rgb_preview_buffer.clone(), 0)
+            .publish_led_sorted_colors_changed(&rgb_preview_buffer, 0)
             .await;
         log::info!("✅ LED preview data published for StripConfig mode");
 
