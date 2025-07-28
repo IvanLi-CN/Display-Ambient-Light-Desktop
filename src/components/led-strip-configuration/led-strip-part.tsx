@@ -18,6 +18,7 @@ import { ledStripStore } from '../../stores/led-strip.store';
 
 type LedStripPartProps = {
   config?: LedStripConfig | null;
+  colors?: Uint8ClampedArray; // 从父组件接收颜色数据
 } & JSX.HTMLAttributes<HTMLElement>;
 
 type PixelProps = {
@@ -42,55 +43,53 @@ export const Pixel: Component<PixelProps> = (props) => {
 };
 
 export const LedStripPart: Component<LedStripPartProps> = (props) => {
-  const [localProps, rootProps] = splitProps(props, ['config']);
+  const [localProps, rootProps] = splitProps(props, ['config', 'colors']);
   const [stripConfiguration, { setHoveredStripPart }] = useContext(LedStripConfigurationContext);
 
   const [colors, setColors] = createSignal<string[]>([]);
 
-  // update led strip colors from global store
+  // 使用父组件传递的颜色数据
   createEffect(() => {
     if (!localProps.config) {
       return;
     }
 
-    const strip = ledStripStore.strips.find(
-      (s) =>
-        s.display_id === localProps.config!.display_id &&
-        s.border === localProps.config!.border,
-    );
+    // 默认颜色函数
+    const getDefaultColor = (border: string) => {
+      const colorMap = {
+        'Top': 'linear-gradient(70deg, rgb(100, 150, 255) 10%, rgb(200, 230, 255))',
+        'Bottom': 'linear-gradient(70deg, rgb(255, 150, 100) 10%, rgb(255, 230, 200))',
+        'Left': 'linear-gradient(70deg, rgb(150, 255, 100) 10%, rgb(230, 255, 200))',
+        'Right': 'linear-gradient(70deg, rgb(255, 100, 150) 10%, rgb(255, 200, 230))',
+      };
+      return colorMap[border] || 'linear-gradient(70deg, rgb(128, 128, 128) 10%, rgb(200, 200, 200))';
+    };
 
-    if (!strip) {
+    // 如果没有颜色数据，使用默认颜色
+    if (!localProps.colors || localProps.colors.length === 0) {
+      const defaultColor = getDefaultColor(localProps.config.border);
+      setColors(new Array(localProps.config.len).fill(defaultColor));
       return;
     }
 
-    // 基于 strip 的索引计算颜色偏移
-    // 正确的偏移计算：累加当前灯带之前所有灯带的实际长度
-    const calculateStripOffset = (targetStrip: any, allStrips: any[]) => {
-      // 按序列号排序所有灯带（与后端逻辑保持一致）
-      const sortedStrips = [...allStrips].sort((a, b) => a.index - b.index);
+    // 检查数据是否足够
+    const requiredBytes = localProps.config.len * 3;
+    if (localProps.colors.length < requiredBytes) {
+      const defaultColor = getDefaultColor(localProps.config.border);
+      setColors(new Array(localProps.config.len).fill(defaultColor));
+      return;
+    }
 
-      let offset = 0;
-      for (const strip of sortedStrips) {
-        if (strip.index < targetStrip.index) {
-          offset += strip.len;
-        } else {
-          break;
-        }
-      }
-      return offset * 3; // 每个LED占用3个字节（RGB）
-    };
-
-    const offset = calculateStripOffset(strip, ledStripStore.strips);
-
-    const colors = new Array(localProps.config.len).fill(null).map((_, i) => {
-      const index = offset + i * 3;
-      const r = ledStripStore.colors[index] || 0;
-      const g = ledStripStore.colors[index + 1] || 0;
-      const b = ledStripStore.colors[index + 2] || 0;
+    // 从颜色数据中提取RGB值
+    const newColors = new Array(localProps.config.len).fill(null).map((_, i) => {
+      const index = i * 3;
+      const r = localProps.colors![index] || 0;
+      const g = localProps.colors![index + 1] || 0;
+      const b = localProps.colors![index + 2] || 0;
       return `rgb(${r}, ${g}, ${b})`;
     });
 
-    setColors(colors);
+    setColors(newColors);
   });
 
   const [anchor, setAnchor] = createSignal<HTMLElement>();

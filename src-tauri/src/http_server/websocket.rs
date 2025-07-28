@@ -26,6 +26,8 @@ pub enum WsMessage {
     LedColorsChanged { data: LedColorsChangedData },
     /// LED排序颜色变化
     LedSortedColorsChanged { data: LedSortedColorsChangedData },
+    /// LED灯带颜色变化（按灯带分组）
+    LedStripColorsChanged { data: LedStripColorsChangedData },
     /// LED状态变化
     LedStatusChanged { data: serde_json::Value },
     /// 配置变化
@@ -65,6 +67,21 @@ pub struct LedSortedColorsChangedData {
     pub mode: crate::led_data_sender::DataSendMode,
     /// LED偏移量（用于前端组装完整预览）
     pub led_offset: usize,
+}
+
+/// LED灯带颜色变化数据（按灯带分组）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LedStripColorsChangedData {
+    /// 显示器ID
+    pub display_id: u32,
+    /// 边框位置 ("Top", "Bottom", "Left", "Right")
+    pub border: String,
+    /// 灯带索引
+    pub strip_index: usize,
+    /// 灯带颜色数据（RGB字节数组）
+    pub colors: Vec<u8>,
+    /// 数据发送模式
+    pub mode: crate::led_data_sender::DataSendMode,
 }
 
 /// 导航数据

@@ -17,6 +17,7 @@ export interface WebSocketStatus {
 export interface WebSocketEventHandlers {
   onLedColorsChanged?: (data: any) => void;
   onLedSortedColorsChanged?: (data: any) => void;
+  onLedStripColorsChanged?: (data: any) => void;
   onConfigChanged?: (data: any) => void;
   onAmbientLightStateChanged?: (data: any) => void;
   onBoardsChanged?: (data: any) => void;
@@ -80,6 +81,20 @@ export const WebSocketListener = (props: WebSocketListenerProps) => {
             messageCount: prev.messageCount + 1
           }));
           props.handlers?.onLedSortedColorsChanged?.(data);
+        });
+        unlistenFunctions.push(unlisten);
+      }
+
+      // LED灯带颜色变化事件（按灯带分组）
+      if (props.handlers?.onLedStripColorsChanged) {
+        const unlisten = await adaptiveApi.onEvent('LedStripColorsChanged', (data) => {
+          // 移除频繁的颜色变化日志
+          setStatus(prev => ({
+            ...prev,
+            lastMessage: 'LED灯带颜色更新',
+            messageCount: prev.messageCount + 1
+          }));
+          props.handlers?.onLedStripColorsChanged?.(data);
         });
         unlistenFunctions.push(unlisten);
       }

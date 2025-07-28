@@ -5,7 +5,8 @@ use crate::{
     ambient_light_state::AmbientLightState,
     display::DisplayState,
     http_server::websocket::{
-        LedColorsChangedData, LedSortedColorsChangedData, NavigateData, WebSocketManager, WsMessage,
+        LedColorsChangedData, LedSortedColorsChangedData, LedStripColorsChangedData, NavigateData,
+        WebSocketManager, WsMessage,
     },
     led_data_sender::DataSendMode,
     led_preview_state::LedPreviewState,
@@ -102,6 +103,72 @@ impl WebSocketEventPublisher {
             }
             Err(e) => {
                 log::error!("❌ 发送LED排序颜色变化事件失败: {e}");
+            }
+        }
+    }
+
+    /// 发布LED灯带颜色变化事件（按灯带分组）
+    pub async fn publish_led_strip_colors_changed(
+        &self,
+        display_id: u32,
+        border: &str,
+        strip_index: usize,
+        colors: &[u8],
+    ) {
+        let sender = crate::led_data_sender::LedDataSender::global().await;
+        let current_mode = sender.get_mode().await;
+
+        log::debug!(
+            "🎨 Publishing LED strip colors changed event: display_id={}, border={}, strip_index={}, {} bytes, mode={:?}",
+            display_id,
+            border,
+            strip_index,
+            colors.len(),
+            current_mode
+        );
+
+        let message = WsMessage::LedStripColorsChanged {
+            data: LedStripColorsChangedData {
+                display_id,
+                border: border.to_string(),
+                strip_index,
+                colors: colors.to_vec(),
+                mode: current_mode,
+            },
+        };
+
+        // 支持按显示器过滤的订阅
+        let display_event = format!("LedStripColorsChanged:display_{}", display_id);
+
+        // 发送到特定显示器订阅者
+        match self
+            .ws_manager
+            .send_to_subscribers(&display_event, message.clone())
+            .await
+        {
+            Ok(subscriber_count) => {
+                if subscriber_count > 0 {
+                    log::debug!("✅ LED灯带颜色变化事件已发送给 {subscriber_count} 个显示器 {display_id} 订阅者");
+                }
+            }
+            Err(e) => {
+                log::error!("❌ 发送LED灯带颜色变化事件到显示器 {display_id} 失败: {e}");
+            }
+        }
+
+        // 发送到通用订阅者（向后兼容）
+        match self
+            .ws_manager
+            .send_to_subscribers("LedStripColorsChanged", message)
+            .await
+        {
+            Ok(subscriber_count) => {
+                if subscriber_count > 0 {
+                    log::debug!("✅ LED灯带颜色变化事件已发送给 {subscriber_count} 个通用订阅者");
+                }
+            }
+            Err(e) => {
+                log::error!("❌ 发送LED灯带颜色变化事件失败: {e}");
             }
         }
     }

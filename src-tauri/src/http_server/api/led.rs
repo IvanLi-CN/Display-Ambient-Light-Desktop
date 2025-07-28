@@ -147,7 +147,12 @@ pub async fn send_colors(
 pub async fn send_calibration_color(
     Json(request): Json<SendCalibrationColorRequest>,
 ) -> Result<Json<ApiResponse<String>>, StatusCode> {
-    log::info!("🎨 Received calibration color request: RGB({}, {}, {})", request.r, request.g, request.b);
+    log::info!(
+        "🎨 Received calibration color request: RGB({}, {}, {})",
+        request.r,
+        request.g,
+        request.b
+    );
 
     match ambient_light::LedColorsPublisher::send_calibration_color(request.r, request.g, request.b)
         .await

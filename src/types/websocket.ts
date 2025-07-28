@@ -23,6 +23,22 @@ export interface LedSortedColorsChangedEvent {
 }
 
 /**
+ * LED灯带颜色变化事件（按灯带分组）
+ */
+export interface LedStripColorsChangedEvent {
+  /** 显示器ID */
+  display_id: number;
+  /** 边框位置 ("Top", "Bottom", "Left", "Right") */
+  border: string;
+  /** 灯带索引 */
+  strip_index: number;
+  /** 灯带颜色数据（RGB字节数组） */
+  colors: number[];
+  /** 数据发送模式 */
+  mode: DataSendMode;
+}
+
+/**
  * LED状态变化事件
  */
 export interface LedStatusChangedEvent {

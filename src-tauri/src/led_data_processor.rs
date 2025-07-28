@@ -2,7 +2,7 @@ use anyhow::Result;
 use log::{debug, warn};
 
 use crate::{
-    ambient_light::{ColorCalibration, LedStripConfig, LedType},
+    ambient_light::{Border, ColorCalibration, LedStripConfig, LedType},
     led_color::LedColor,
     led_data_sender::DataSendMode,
     websocket_events::WebSocketEventPublisher,
@@ -63,6 +63,10 @@ impl LedDataProcessor {
         websocket_publisher
             .publish_led_sorted_colors_changed(&preview_rgb_bytes, start_led_offset)
             .await;
+
+        // 3.1. 新增：按灯带分组发布
+        Self::publish_led_strip_colors(&led_colors, strips, &websocket_publisher).await;
+
         log::info!("✅ LED preview data published successfully");
 
         // 4. 硬件编码（应用颜色校准）
@@ -368,5 +372,34 @@ impl LedDataProcessor {
         let config_manager = crate::ambient_light::ConfigManager::global().await;
         let configs = config_manager.configs().await;
         Ok(configs.color_calibration)
+    }
+
+    /// 按灯带分组发布LED颜色数据
+    ///
+    /// 为每个灯带单独发布颜色数据，解决多显示器LED预览闪烁问题
+    async fn publish_led_strip_colors(
+        led_colors: &[Vec<LedColor>],
+        strips: &[LedStripConfig],
+        websocket_publisher: &WebSocketEventPublisher,
+    ) {
+        for (strip, colors) in strips.iter().zip(led_colors.iter()) {
+            let rgb_bytes: Vec<u8> = colors.iter().flat_map(|color| color.get_rgb()).collect();
+
+            let border_str = match strip.border {
+                Border::Top => "Top",
+                Border::Bottom => "Bottom",
+                Border::Left => "Left",
+                Border::Right => "Right",
+            };
+
+            websocket_publisher
+                .publish_led_strip_colors_changed(
+                    strip.display_id,
+                    border_str,
+                    strip.index,
+                    &rgb_bytes,
+                )
+                .await;
+        }
     }
 }

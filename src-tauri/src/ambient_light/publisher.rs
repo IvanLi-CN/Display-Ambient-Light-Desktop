@@ -425,7 +425,9 @@ impl LedColorsPublisher {
         // 首先设置LED数据发送模式为颜色校准
         log::info!("🔧 Setting LED data send mode to ColorCalibration...");
         let sender = LedDataSender::global().await;
-        sender.set_mode(crate::led_data_sender::DataSendMode::ColorCalibration).await;
+        sender
+            .set_mode(crate::led_data_sender::DataSendMode::ColorCalibration)
+            .await;
         log::info!("✅ LED data send mode set to ColorCalibration");
 
         // 获取当前配置
@@ -435,7 +437,13 @@ impl LedColorsPublisher {
 
         log::info!("🔧 Retrieved {} LED strips from config", strips.len());
         for (i, strip) in strips.iter().enumerate() {
-            log::info!("  Strip {}: len={}, display_id={}, border={:?}", i, strip.len, strip.display_id, strip.border);
+            log::info!(
+                "  Strip {}: len={}, display_id={}, border={:?}",
+                i,
+                strip.len,
+                strip.display_id,
+                strip.border
+            );
         }
 
         // 检查是否有LED配置
@@ -466,9 +474,13 @@ impl LedColorsPublisher {
             crate::led_data_sender::DataSendMode::ColorCalibration,
             0, // 校准模式偏移量为0
         )
-        .await {
+        .await
+        {
             Ok(data) => {
-                log::info!("✅ LedDataProcessor::process_and_publish succeeded, {} bytes", data.len());
+                log::info!(
+                    "✅ LedDataProcessor::process_and_publish succeeded, {} bytes",
+                    data.len()
+                );
                 data
             }
             Err(e) => {
@@ -482,7 +494,8 @@ impl LedColorsPublisher {
         let sender = LedDataSender::global().await;
         match sender
             .send_complete_led_data(0, hardware_data, "ColorCalibration")
-            .await {
+            .await
+        {
             Ok(_) => {
                 log::info!("✅ 校准颜色发送成功");
                 Ok(())
