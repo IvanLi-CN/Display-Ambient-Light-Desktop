@@ -3,7 +3,6 @@ import { adaptiveApi } from '../../services/api-adapter';
 import { LedApiService } from '../../services/led-api.service';
 import { DeviceApiService } from '../../services/display-api.service';
 import { useLanguage } from '../../i18n/index';
-import { LedPreview } from '../led-preview/led-preview';
 
 interface BoardInfo {
   fullname: string;
@@ -457,9 +456,6 @@ export const LedStripTest = () => {
 
   return (
     <div class="container mx-auto p-6 space-y-6">
-      {/* LED Preview */}
-      <LedPreview class="mb-4" maxLeds={200} />
-
       <div class="card bg-base-200 shadow-xl">
         <div class="card-body">
           <h2 class="card-title text-2xl mb-4">{t('ledTest.title')}</h2>
