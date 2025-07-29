@@ -89,6 +89,7 @@ dependencies = [
  "url-build-parse",
  "utoipa",
  "utoipa-swagger-ui",
+ "uuid",
 ]
 
 [[package]]

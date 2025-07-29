@@ -48,6 +48,7 @@ tokio-tungstenite = "0.20"
 futures-util = "0.3"
 sha1 = "0.10"
 tauri-plugin-opener = "2.4.0"
+uuid = { version = "1.0", features = ["v4", "serde"] }
 
 # HTTP Server dependencies
 axum = { version = "0.7", features = ["ws", "macros"] }
