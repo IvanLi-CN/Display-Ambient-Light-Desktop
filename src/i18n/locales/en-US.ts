@@ -128,7 +128,7 @@ export const enUS: TranslationDict = {
     loadConfig: 'Load Configuration',
     stripSorting: 'LED Strip Sorting',
     realtimePreview: 'Real-time Preview',
-    sortingTip: 'Tip: Drag LED strip segments to adjust order, double-click to reverse direction',
+    sortingTip: 'Tip: LED strip real-time preview',
     displayConfiguration: 'Display Configuration',
     visualEditor: 'Visual Editor',
     displayTip: 'Tip: Hover over displays for detailed information',

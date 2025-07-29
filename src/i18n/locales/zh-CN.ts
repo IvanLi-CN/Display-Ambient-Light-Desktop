@@ -127,7 +127,7 @@ export const zhCN: TranslationDict = {
     loadConfig: '加载配置',
     stripSorting: '灯条排序',
     realtimePreview: '实时预览',
-    sortingTip: '提示：拖拽灯条段落来调整顺序，双击可反转方向',
+    sortingTip: '提示：LED灯带实时预览',
     displayConfiguration: '显示器配置',
     visualEditor: '可视化编辑',
     testStrip: '测试灯带',
