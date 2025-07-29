@@ -1,4 +1,4 @@
-import { createEffect, createMemo, For } from 'solid-js';
+import { createEffect } from 'solid-js';
 import { adaptiveApi } from '../../services/api-adapter';
 import { WebSocketListener } from '../websocket-listener';
 import { DisplayView } from './display-view';
@@ -7,7 +7,6 @@ import { displayStore, setDisplayStore } from '../../stores/display.store';
 import { LedStripConfigContainer } from '../../models/led-strip-config';
 import { setLedStripStore } from '../../stores/led-strip.store';
 import { LedStripPartsSorter } from './led-strip-parts-sorter';
-import { LedCountControlPanel } from './led-count-control-panel';
 import { createStore } from 'solid-js/store';
 import {
   LedStripConfigurationContext,
@@ -215,18 +214,7 @@ export const LedStripConfiguration = () => {
             </div>
           </div>
 
-          {/* LED Count Control Panels */}
-          <div class="flex-shrink-0">
-            <div class="flex items-center gap-2 mb-2">
-              <h2 class="text-base font-semibold text-base-content">{t('ledConfig.ledCountControl')}</h2>
-              <div class="badge badge-info badge-outline text-xs">{t('ledConfig.realtimeAdjustment')}</div>
-            </div>
-            <div class="led-control-grid">
-              {displayStore.displays.map((display) => (
-                <LedCountControlPanel display={display} />
-              ))}
-            </div>
-          </div>
+
         </div>
       </LedStripConfigurationContext.Provider>
     </div>
