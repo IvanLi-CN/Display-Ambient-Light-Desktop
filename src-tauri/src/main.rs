@@ -374,9 +374,6 @@ fn handle_ambient_light_protocol<R: Runtime>(
                         "info" => "/info".to_string(),
                         "white-balance" | "color-calibration" => "/color-calibration".to_string(),
                         "led-strip-test" | "led-test" => "/led-strip-test".to_string(),
-                        "led-data-sender-test" | "data-sender-test" => {
-                            "/led-data-sender-test".to_string()
-                        }
                         "settings" => "/settings".to_string(),
                         _ => "/info".to_string(), // Default to info page
                     }
@@ -387,7 +384,6 @@ fn handle_ambient_light_protocol<R: Runtime>(
                     "led-strips-configuration" | "led-config" => "/led-strips-configuration",
                     "white-balance" | "color-calibration" => "/color-calibration",
                     "led-strip-test" | "led-test" => "/led-strip-test",
-                    "led-data-sender-test" | "data-sender-test" => "/led-data-sender-test",
                     "settings" => "/settings",
                     _ => "/info", // Default to info page
                 }
