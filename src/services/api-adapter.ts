@@ -379,7 +379,21 @@ export class ApiAdapter {
     );
   }
 
+  public async moveStripPart(displayId: number, border: string, fromIndex: number, toIndex: number): Promise<void> {
+    return this.call(
+      'move_strip_part',
+      () => ConfigApiService.moveStripPart(displayId, border as any, fromIndex, toIndex),
+      { displayId, border, fromIndex, toIndex }
+    );
+  }
 
+  public async reverseLedStripPart(displayId: number, border: string, startIndex: number, endIndex: number): Promise<void> {
+    return this.call(
+      'reverse_led_strip_part',
+      () => ConfigApiService.reverseLedStripPart(displayId, border as any, startIndex, endIndex),
+      { displayId, border, startIndex, endIndex }
+    );
+  }
 
   public async setColorCalibration(displayId: number, border: string, calibration: any): Promise<void> {
     return this.call(
@@ -573,7 +587,10 @@ export const adaptiveApi = {
     apiAdapter.patchLedStripLen(displayId, border, deltaLen),
   patchLedStripType: (displayId: number, border: string, ledType: string) =>
     apiAdapter.patchLedStripType(displayId, border, ledType),
-
+  moveStripPart: (displayId: number, border: string, fromIndex: number, toIndex: number) =>
+    apiAdapter.moveStripPart(displayId, border, fromIndex, toIndex),
+  reverseLedStripPart: (displayId: number, border: string, startIndex: number, endIndex: number) =>
+    apiAdapter.reverseLedStripPart(displayId, border, startIndex, endIndex),
   setColorCalibration: (displayId: number, border: string, calibration: any) =>
     apiAdapter.setColorCalibration(displayId, border, calibration),
   updateUserPreferences: (preferences: any) => apiAdapter.updateUserPreferences(preferences),

@@ -137,12 +137,18 @@ export interface TranslationDict {
     displayConfiguration: string;
     visualEditor: string;
     displayTip: string;
+    ledCountControl: string;
+    realtimeAdjustment: string;
+    decreaseLedCount: string;
+    increaseLedCount: string;
+    display: string;
     driver: string;
     sequence: string;
     startOffset: string;
     endOffset: string;
     testStrip: string;
     configPanel: string;
+    controlTip: string;
   };
 
   // Single Display LED Strip Configuration

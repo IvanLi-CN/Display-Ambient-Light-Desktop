@@ -461,9 +461,21 @@ const LedConfigPanel: Component<{
               type="checkbox"
               class="toggle toggle-sm"
               checked={props.strip.reverse}
-              onChange={(e) => {
+              onChange={async (e) => {
                 const newReverseState = e.currentTarget.checked;
                 updateStrip({ reverse: newReverseState });
+                try {
+                  console.log(`Calling reverse_led_strip_part for display ${props.strip.displayId} and border ${props.strip.border}`);
+                  await adaptiveApi.reverseLedStripPart(
+                    props.strip.displayId,
+                    props.strip.border,
+                    0, // startIndex - 需要根据实际情况设置
+                    props.strip.count - 1 // endIndex
+                  );
+                  console.log('Successfully called reverse_led_strip_part');
+                } catch (error) {
+                  console.error('Failed to call reverse_led_strip_part:', error);
+                }
               }}
             />
           </label>
