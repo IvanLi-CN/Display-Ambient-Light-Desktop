@@ -25,9 +25,9 @@ export const ApiTest = () => {
 
   // WebSocket事件处理器
   const wsHandlers: WebSocketEventHandlers = {
-    onLedColorsChanged: (data) => {
-      console.log('收到LED颜色变化事件:', data);
-      addTestResult('WebSocket LED颜色事件', 'success', '收到实时LED颜色更新');
+    onLedStripColorsChanged: (data) => {
+      console.log('收到LED灯带颜色变化事件:', data);
+      addTestResult('WebSocket LED灯带颜色事件', 'success', '收到实时LED灯带颜色更新');
     },
     onConfigChanged: (data) => {
       console.log('收到配置变化事件:', data);
@@ -35,7 +35,7 @@ export const ApiTest = () => {
     },
     onConnectionStatusChanged: (connected) => {
       console.log('WebSocket连接状态:', connected);
-      addTestResult('WebSocket 连接', connected ? 'success' : 'error', 
+      addTestResult('WebSocket 连接', connected ? 'success' : 'error',
         connected ? '已连接到WebSocket' : 'WebSocket连接断开');
     }
   };

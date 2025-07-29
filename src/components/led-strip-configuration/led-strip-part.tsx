@@ -62,7 +62,7 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
         'Left': 'linear-gradient(70deg, rgb(150, 255, 100) 10%, rgb(230, 255, 200))',
         'Right': 'linear-gradient(70deg, rgb(255, 100, 150) 10%, rgb(255, 200, 230))',
       };
-      return colorMap[border] || 'linear-gradient(70deg, rgb(128, 128, 128) 10%, rgb(200, 200, 200))';
+      return colorMap[border as keyof typeof colorMap] || 'linear-gradient(70deg, rgb(128, 128, 128) 10%, rgb(200, 200, 200))';
     };
 
     // 如果没有颜色数据，使用默认颜色
