@@ -47,12 +47,7 @@ export class NavigationService {
     return this.navigateToPage('led-strip-test');
   }
 
-  /**
-   * Navigate to the LED data sender test page
-   */
-  static async navigateToDataSenderTest(): Promise<void> {
-    return this.navigateToPage('led-data-sender-test');
-  }
+
 
   /**
    * Navigate to the settings page
@@ -145,5 +140,4 @@ export const navigateToInfo = NavigationService.navigateToInfo.bind(NavigationSe
 export const navigateToLedConfig = NavigationService.navigateToLedConfig.bind(NavigationService);
 export const navigateToWhiteBalance = NavigationService.navigateToWhiteBalance.bind(NavigationService);
 export const navigateToLedTest = NavigationService.navigateToLedTest.bind(NavigationService);
-export const navigateToDataSenderTest = NavigationService.navigateToDataSenderTest.bind(NavigationService);
 export const navigateToSettings = NavigationService.navigateToSettings.bind(NavigationService);

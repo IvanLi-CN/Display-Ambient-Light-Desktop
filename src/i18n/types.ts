@@ -179,6 +179,7 @@ export interface TranslationDict {
     positionOffset: string;
     startOffset: string;
     endOffset: string;
+    ledPreview: string;
     // Save status
     configSaved: string;
     saveFailed: string;
@@ -339,6 +340,9 @@ export interface TranslationDict {
     ambientLight: string;
     ambientLightEnabled: string;
     ambientLightDisabled: string;
+    ledPreview: string;
+    ledPreviewEnabled: string;
+    ledPreviewDisabled: string;
     info: string;
     ledConfiguration: string;
     colorCalibration: string;

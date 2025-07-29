@@ -20,34 +20,74 @@ use crate::http_server::AppState;
 
 /// WebSocket消息类型
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", content = "data")]
+#[serde(tag = "type")]
 pub enum WsMessage {
     /// LED颜色变化
-    LedColorsChanged { colors: Vec<u8> },
+    LedColorsChanged { data: LedColorsChangedData },
     /// LED排序颜色变化
-    LedSortedColorsChanged { sorted_colors: Vec<u8> },
+    LedSortedColorsChanged { data: LedSortedColorsChangedData },
+    /// LED灯带颜色变化（按灯带分组）
+    LedStripColorsChanged { data: LedStripColorsChangedData },
     /// LED状态变化
-    LedStatusChanged { status: serde_json::Value },
+    LedStatusChanged { data: serde_json::Value },
     /// 配置变化
-    ConfigChanged { config: serde_json::Value },
+    ConfigChanged { data: serde_json::Value },
     /// 设备列表变化
-    BoardsChanged { boards: serde_json::Value },
+    BoardsChanged { data: serde_json::Value },
     /// 显示器状态变化
-    DisplaysChanged { displays: serde_json::Value },
+    DisplaysChanged { data: serde_json::Value },
     /// 环境光状态变化
-    AmbientLightStateChanged { state: serde_json::Value },
+    AmbientLightStateChanged { data: serde_json::Value },
+    /// LED预览状态变化
+    LedPreviewStateChanged { data: serde_json::Value },
     /// 导航事件
-    Navigate { path: String },
+    Navigate { data: NavigateData },
     /// 订阅事件
-    Subscribe { event_types: Vec<String> },
+    Subscribe { data: Vec<String> },
     /// 取消订阅事件
-    Unsubscribe { event_types: Vec<String> },
+    Unsubscribe { data: Vec<String> },
     /// 订阅确认
-    SubscriptionConfirmed { event_types: Vec<String> },
+    SubscriptionConfirmed { data: Vec<String> },
     /// 心跳
     Ping,
     /// 心跳响应
     Pong,
+}
+
+/// LED颜色变化数据
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LedColorsChangedData {
+    pub colors: Vec<u8>,
+}
+
+/// LED排序颜色变化数据
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LedSortedColorsChangedData {
+    pub sorted_colors: Vec<u8>,
+    pub mode: crate::led_data_sender::DataSendMode,
+    /// LED偏移量（用于前端组装完整预览）
+    pub led_offset: usize,
+}
+
+/// LED灯带颜色变化数据（按灯带分组）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LedStripColorsChangedData {
+    /// 显示器ID
+    pub display_id: u32,
+    /// 边框位置 ("Top", "Bottom", "Left", "Right")
+    pub border: String,
+    /// 灯带索引
+    pub strip_index: usize,
+    /// 灯带颜色数据（RGB字节数组）
+    pub colors: Vec<u8>,
+    /// 数据发送模式
+    pub mode: crate::led_data_sender::DataSendMode,
+}
+
+/// 导航数据
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NavigateData {
+    pub path: String,
 }
 
 /// 连接ID类型
@@ -95,8 +135,14 @@ impl WebSocketManager {
     /// 移除连接
     pub async fn remove_connection(&self, connection_id: ConnectionId) {
         let mut subscriptions = self.subscriptions.write().await;
-        subscriptions.remove(&connection_id);
-        log::debug!("🔌 Removed connection {connection_id}");
+        if let Some(removed_subscriptions) = subscriptions.remove(&connection_id) {
+            log::debug!(
+                "🔌 Removed connection {connection_id} with {} subscriptions",
+                removed_subscriptions.len()
+            );
+        } else {
+            log::debug!("🔌 Connection {connection_id} was already removed");
+        }
     }
 
     /// 订阅事件
@@ -164,6 +210,20 @@ impl WebSocketManager {
         let subscriptions = self.subscriptions.read().await;
         subscriptions.get(&connection_id).cloned()
     }
+
+    /// 获取当前连接数量（用于监控）
+    pub async fn get_connection_count(&self) -> usize {
+        let subscriptions = self.subscriptions.read().await;
+        subscriptions.len()
+    }
+
+    /// 清理所有连接（用于关闭时清理）
+    pub async fn clear_all_connections(&self) {
+        let mut subscriptions = self.subscriptions.write().await;
+        let count = subscriptions.len();
+        subscriptions.clear();
+        log::info!("🔌 Cleared all {count} connections");
+    }
 }
 
 /// WebSocket升级处理器
@@ -173,7 +233,7 @@ pub async fn websocket_handler(ws: WebSocketUpgrade, State(state): State<AppStat
 
 /// 处理WebSocket连接
 async fn handle_socket(socket: WebSocket, state: AppState) {
-    log::info!("🔌 New WebSocket connection established for LED events");
+    log::debug!("New WebSocket connection established for LED events");
     let (mut sender, mut receiver) = socket.split();
 
     // 从AppState获取WebSocketManager
@@ -192,7 +252,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
         .await
         .is_err()
     {
-        log::warn!("❌ Failed to send connection confirmation message");
+        log::debug!("Failed to send connection confirmation message");
         return;
     }
     log::info!("✅ Connection confirmation message sent to LED events WebSocket");
@@ -204,7 +264,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
         let current_status = led_status_manager.get_status().await;
 
         let status_message = WsMessage::LedStatusChanged {
-            status: serde_json::to_value(&current_status).unwrap_or_default(),
+            data: serde_json::to_value(&current_status).unwrap_or_default(),
         };
 
         if sender
@@ -226,24 +286,26 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
         while let Some(Ok(msg)) = receiver.next().await {
             match msg {
                 Message::Text(text) => {
+                    log::debug!("收到WebSocket文本消息: {text}");
                     if let Ok(ws_msg) = serde_json::from_str::<WsMessage>(&text) {
                         match ws_msg {
                             WsMessage::Ping => {
                                 log::debug!("收到WebSocket心跳");
                             }
-                            WsMessage::Subscribe { event_types } => {
+                            WsMessage::Subscribe { data: event_types } => {
                                 log::debug!("收到订阅请求: {event_types:?}");
                                 ws_manager_for_recv
                                     .subscribe_events(connection_id, event_types.clone())
                                     .await;
 
                                 // 发送订阅确认
-                                let confirmation = WsMessage::SubscriptionConfirmed { event_types };
+                                let confirmation =
+                                    WsMessage::SubscriptionConfirmed { data: event_types };
                                 if let Err(e) = ws_manager_for_recv.broadcast(confirmation) {
                                     log::warn!("发送订阅确认失败: {e}");
                                 }
                             }
-                            WsMessage::Unsubscribe { event_types } => {
+                            WsMessage::Unsubscribe { data: event_types } => {
                                 log::debug!("收到取消订阅请求: {event_types:?}");
                                 ws_manager_for_recv
                                     .unsubscribe_events(connection_id, event_types)
@@ -254,6 +316,8 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                                 log::debug!("收到WebSocket消息: {ws_msg:?}");
                             }
                         }
+                    } else {
+                        log::warn!("无法解析WebSocket消息: {text}");
                     }
                 }
                 Message::Binary(_) => {
@@ -273,10 +337,10 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
     });
 
     // 广播消息给客户端的任务
+    let ws_manager_for_send = ws_manager.clone();
     let mut send_task = tokio::spawn(async move {
         // 实现从ws_receiver接收广播消息并发送给客户端
         while let Ok(msg) = ws_receiver.recv().await {
-            log::debug!("📤 Sending WebSocket message: {msg:?}");
             let text = match serde_json::to_string(&msg) {
                 Ok(text) => text,
                 Err(e) => {
@@ -288,10 +352,11 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
             if sender.send(Message::Text(text)).await.is_err() {
                 log::debug!("WebSocket发送消息失败，连接可能已断开");
                 break;
-            } else {
-                log::debug!("✅ WebSocket消息发送成功");
             }
+            // 移除成功发送的日志，减少输出
         }
+        // 发送任务结束时也清理连接
+        ws_manager_for_send.remove_connection(connection_id).await;
     });
 
     // 等待任一任务完成
@@ -304,5 +369,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
         }
     }
 
-    log::info!("WebSocket连接已断开");
+    // 确保连接被清理（双重保险）
+    ws_manager.remove_connection(connection_id).await;
+    log::debug!("WebSocket连接已断开，连接ID: {connection_id}");
 }

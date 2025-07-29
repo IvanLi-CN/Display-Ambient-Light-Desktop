@@ -21,9 +21,11 @@ export type LedStripConfigContainer = {
 
 export class LedStripConfig {
   constructor(
+    public readonly index: number,
     public readonly display_id: number,
     public readonly border: Borders,
     public len: number,
     public led_type: LedType = LedType.WS2812B,
+    public readonly reversed: boolean = false,
   ) {}
 }

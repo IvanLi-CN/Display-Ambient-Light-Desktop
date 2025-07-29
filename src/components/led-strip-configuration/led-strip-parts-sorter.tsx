@@ -174,7 +174,8 @@ const SorterItem: Component<{ strip: LedStripConfig; stripIndex: number }> = (
   };
 
   const setColor = (fullIndex: number, colorsIndex: number, fullLeds: string[]) => {
-    const colors = ledStripStore.colors;
+    // 使用新的 assembledColors 计算属性，它会优先使用按灯带分组的颜色数据
+    const colors = ledStripStore.assembledColors;
     let c1 = `rgb(${Math.floor(colors[colorsIndex * 3] * 0.8)}, ${Math.floor(
       colors[colorsIndex * 3 + 1] * 0.8,
     )}, ${Math.floor(colors[colorsIndex * 3 + 2] * 0.8)})`;
@@ -286,7 +287,7 @@ const SorterResult: Component = () => {
   const [fullLeds, setFullLeds] = createSignal<string[]>([]);
 
   createEffect(() => {
-    const colors = ledStripStore.sortedColors;
+    const colors = ledStripStore.assembledColors;
     const fullLeds = new Array(ledStripStore.totalLedCount)
       .fill('rgba(255,255,255,0.1)')
       .map((_, i) => {

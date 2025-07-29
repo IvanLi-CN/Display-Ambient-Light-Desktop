@@ -87,7 +87,7 @@ impl LanguageManager {
     /// Get current language
     pub async fn get_language(&self) -> String {
         let language = self.config.read().await.language.clone();
-        log::info!("🌐 LanguageManager::get_language() returning: {}", language);
+        log::info!("🌐 LanguageManager::get_language() returning: {language}");
         language
     }
 
@@ -113,6 +113,7 @@ impl TrayTranslations {
         match (language, key) {
             // Chinese translations
             ("zh-CN", "ambient_light") => "氛围灯",
+            ("zh-CN", "led_preview") => "灯带预览",
             ("zh-CN", "info") => "系统信息",
             ("zh-CN", "led_configuration") => "灯条配置",
             ("zh-CN", "white_balance") => "颜色校准",
@@ -125,6 +126,7 @@ impl TrayTranslations {
 
             // English translations
             ("en-US", "ambient_light") => "Ambient Light",
+            ("en-US", "led_preview") => "LED Preview",
             ("en-US", "info") => "System Info",
             ("en-US", "led_configuration") => "LED Configuration",
             ("en-US", "white_balance") => "White Balance",
@@ -138,6 +140,7 @@ impl TrayTranslations {
             // Default to English
             _ => match key {
                 "ambient_light" => "Ambient Light",
+                "led_preview" => "LED Preview",
                 "info" => "System Info",
                 "led_configuration" => "LED Configuration",
                 "white_balance" => "Color Calibration",

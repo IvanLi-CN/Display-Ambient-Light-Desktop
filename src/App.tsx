@@ -3,9 +3,7 @@ import { LedStripConfiguration } from './components/led-strip-configuration/led-
 import { SingleDisplayConfig } from './components/led-strip-configuration/single-display-config';
 import { WhiteBalance } from './components/white-balance/white-balance';
 import { LedStripTest } from './components/led-strip-test/led-strip-test';
-import { LedDataSenderTest } from './components/led-data-sender-test/led-data-sender-test';
 import { Settings } from './components/settings/settings';
-import { ApiTestRunner } from './components/api-test-runner/api-test-runner';
 import { StatusBar } from './components/status-bar/status-bar';
 import { createEffect, createSignal, onMount } from 'solid-js';
 import { adaptiveApi } from './services/api-adapter';
@@ -54,13 +52,13 @@ function App() {
       await adaptiveApi.initialize();
 
       const unlisten = await adaptiveApi.onEvent<string>('navigate', (targetPath) => {
-        console.log('🎯 Received navigation event from backend:', targetPath);
-        console.log('🎯 Current location before navigation:', window.location.href);
+        // 只在开发模式下记录导航日志
+        if (import.meta.env.DEV) {
+          console.log('Navigation event:', targetPath);
+        }
 
         // Use SolidJS navigate function for proper routing
         navigate(targetPath);
-
-        console.log('🎯 Navigation called, new location:', window.location.href);
 
         // Report successful navigation
         adaptiveApi.reportCurrentPage(`Navigation event processed: ${targetPath}`)
@@ -80,7 +78,7 @@ function App() {
 
 
 
-  // Monitor route changes and cleanup LED tests when leaving the test page
+  // Monitor route changes and reset LED mode to AmbientLight before entering any page
   createEffect(() => {
     const currentPath = location.pathname;
     const prevPath = previousPath();
@@ -105,14 +103,18 @@ function App() {
       console.error('Failed to report current page:', error);
     });
 
-    // Check if we're leaving the LED test page
-    const isLeavingTestPage = prevPath === '/led-strip-test' && currentPath !== '/led-strip-test';
-
-    if (isLeavingTestPage) {
-      // The LED test component will handle stopping the test effect via onCleanup
-      // We just need to ensure test mode is disabled to resume normal LED publishing
-      adaptiveApi.disableTestMode().catch((error) => {
-        console.error('Failed to disable test mode:', error);
+    // Reset LED mode to AmbientLight before entering any page (except on initial load and LED test pages)
+    if (prevPath !== '' && !currentPath.includes('/led-strip-test')) {
+      // 只在开发模式下记录路由变化日志
+      if (import.meta.env.DEV) {
+        console.log(`Route change: ${prevPath} -> ${currentPath}, resetting LED mode`);
+      }
+      adaptiveApi.setDataSendMode('AmbientLight').then(() => {
+        if (import.meta.env.DEV) {
+          console.log('LED mode reset to AmbientLight');
+        }
+      }).catch((error) => {
+        console.error('Failed to reset LED mode to AmbientLight:', error);
       });
     }
 
@@ -180,8 +182,6 @@ function App() {
               <li><A href="/led-strips-configuration" class="text-base-content hover:bg-base-200">{t('nav.ledConfiguration')}</A></li>
               <li><A href="/color-calibration" class="text-base-content hover:bg-base-200">{t('nav.colorCalibration')}</A></li>
               <li><A href="/led-strip-test" class="text-base-content hover:bg-base-200">{t('nav.ledTest')}</A></li>
-              <li><A href="/led-data-sender-test" class="text-base-content hover:bg-base-200">数据发送测试</A></li>
-              <li><A href="/api-test" class="text-base-content hover:bg-base-200">API测试</A></li>
               <li><A href="/settings" class="text-base-content hover:bg-base-200">{t('nav.settings')}</A></li>
             </ul>
           </div>
@@ -193,8 +193,6 @@ function App() {
             <li><A href="/led-strips-configuration" class="btn btn-ghost text-base-content hover:text-primary">{t('nav.ledConfiguration')}</A></li>
             <li><A href="/color-calibration" class="btn btn-ghost text-base-content hover:text-primary">{t('nav.colorCalibration')}</A></li>
             <li><A href="/led-strip-test" class="btn btn-ghost text-base-content hover:text-primary">{t('nav.ledTest')}</A></li>
-            <li><A href="/led-data-sender-test" class="btn btn-ghost text-base-content hover:text-primary">数据发送测试</A></li>
-            <li><A href="/api-test" class="btn btn-ghost text-base-content hover:text-primary">API测试</A></li>
             <li><A href="/settings" class="btn btn-ghost text-base-content hover:text-primary">{t('nav.settings')}</A></li>
           </ul>
         </div>
@@ -221,8 +219,6 @@ function App() {
           <Route path="/led-strips-configuration/display/:displayId" component={SingleDisplayConfig} />
           <Route path="/color-calibration" component={WhiteBalance} />
           <Route path="/led-strip-test" element={<LedStripTest />} />
-          <Route path="/led-data-sender-test" element={<LedDataSenderTest />} />
-          <Route path="/api-test" component={ApiTestRunner} />
           <Route path="/settings" component={Settings} />
         </Routes>
       </main>

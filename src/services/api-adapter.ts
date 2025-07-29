@@ -8,7 +8,7 @@ import { LedApiService, ConfigApiService } from './led-api.service';
 import { DisplayApiService, DeviceApiService, HealthApiService } from './display-api.service';
 import { InfoApiService } from './info-api.service';
 import { api, WebSocketEventListener } from './api-client';
-import { DataSendMode } from '../models/led-data-sender';
+import { DataSendMode } from '../types/led-status';
 
 // 环境检测结果
 export interface EnvironmentInfo {
@@ -153,11 +153,11 @@ export class ApiAdapter {
 
     if (this.environmentInfo!.preferredMode === 'http' && this.environmentInfo!.isHttpApiAvailable) {
       // 使用WebSocket订阅 - 发送正确格式的消息
-      // 后端期望的格式是 { "Subscribe": { "event_types": [...] } }
+      // 后端期望的格式是 { type: "Subscribe", data: [...] }
+      // 因为后端使用了 #[serde(tag = "type", content = "data")]
       const subscribeMessage = {
-        Subscribe: {
-          event_types: eventTypes
-        }
+        type: 'Subscribe',
+        data: eventTypes
       };
 
       // 使用apiClient的sendWebSocketMessage方法
@@ -179,6 +179,22 @@ export class ApiAdapter {
       'send_colors',
       () => LedApiService.sendColors(offset, buffer),
       { offset, buffer }
+    );
+  }
+
+  public async sendCalibrationColor(r: number, g: number, b: number): Promise<void> {
+    return this.call(
+      'send_calibration_color',
+      () => LedApiService.sendCalibrationColor(r, g, b),
+      { r, g, b }
+    );
+  }
+
+  public async restartAmbientLightPublisher(): Promise<void> {
+    return this.call(
+      'restart_ambient_light_publisher',
+      () => LedApiService.restartAmbientLightPublisher(),
+      {}
     );
   }
 
@@ -216,6 +232,21 @@ export class ApiAdapter {
     return this.call(
       'get_led_data_send_mode',
       () => LedApiService.getDataSendMode()
+    );
+  }
+
+  public async getLedPreviewState(): Promise<{ enabled: boolean }> {
+    return this.call(
+      'get_led_preview_state',
+      () => LedApiService.getLedPreviewState()
+    );
+  }
+
+  public async setLedPreviewState(enabled: boolean): Promise<void> {
+    return this.call(
+      'set_led_preview_state',
+      () => LedApiService.setLedPreviewState(enabled),
+      { enabled }
     );
   }
 
@@ -258,6 +289,13 @@ export class ApiAdapter {
     return this.call(
       'get_boards',
       () => DeviceApiService.getBoards()
+    );
+  }
+
+  public async getAmbientLightState(): Promise<any> {
+    return this.call(
+      'get_ambient_light_state',
+      () => DeviceApiService.getAmbientLightState()
     );
   }
 
@@ -523,12 +561,16 @@ export const adaptiveApi = {
   
   // LED API
   sendColors: (offset: number, buffer: number[]) => apiAdapter.sendColors(offset, buffer),
+  sendCalibrationColor: (r: number, g: number, b: number) => apiAdapter.sendCalibrationColor(r, g, b),
+  restartAmbientLightPublisher: () => apiAdapter.restartAmbientLightPublisher(),
   sendTestColorsToBoard: (params: { boardAddress: string, offset: number, buffer: number[] }) =>
     apiAdapter.sendTestColorsToBoard(params.boardAddress, params.offset, params.buffer),
   enableTestMode: () => apiAdapter.enableTestMode(),
   disableTestMode: () => apiAdapter.disableTestMode(),
   setDataSendMode: (mode: DataSendMode) => apiAdapter.setDataSendMode(mode),
   getDataSendMode: () => apiAdapter.getDataSendMode(),
+  getLedPreviewState: () => apiAdapter.getLedPreviewState(),
+  setLedPreviewState: (enabled: boolean) => apiAdapter.setLedPreviewState(enabled),
   startLedTestEffect: (params: any) => apiAdapter.startLedTestEffect(params),
   stopLedTestEffect: (params: any) => apiAdapter.stopLedTestEffect(params),
   startSingleDisplayConfigPublisher: (strips: any[], borderColors: any) =>
@@ -572,6 +614,7 @@ export const adaptiveApi = {
   
   // 设备API
   getBoards: () => apiAdapter.getBoards(),
+  getAmbientLightState: () => apiAdapter.getAmbientLightState(),
   
   // 应用信息API
   getAppVersion: () => apiAdapter.getAppVersion(),

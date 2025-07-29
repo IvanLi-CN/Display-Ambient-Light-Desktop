@@ -11,7 +11,7 @@ const translations: Record<Language, TranslationDict> = {
 };
 
 // Create locale signal
-const [locale, setLocale] = createSignal<Language>('zh-CN');
+const [locale, setLocale] = createSignal<Language>('en-US');
 
 // Translation function
 const t = (key: string): string => {

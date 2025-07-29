@@ -222,7 +222,7 @@
         }
 
         function testLedColors() {
-            messageInput.value = '{"type":"LedColorsChanged","data":{"colors":[255,0,0,0,255,0,0,0,255]}}';
+            messageInput.value = '{"type":"LedStripColorsChanged","data":{"display_id":1,"border":"Top","strip_index":0,"colors":[255,0,0,0,255,0,0,0,255],"mode":"TestEffect"}}';
             sendMessage();
         }
 

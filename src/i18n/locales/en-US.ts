@@ -175,6 +175,7 @@ export const enUS: TranslationDict = {
     positionOffset: 'Position Offset',
     startOffset: 'Start Offset',
     endOffset: 'End Offset',
+    ledPreview: 'LED Preview',
     // Save status
     configSaved: 'Configuration saved',
     saveFailed: 'Save failed',
@@ -331,6 +332,9 @@ export const enUS: TranslationDict = {
     ambientLight: 'Ambient Light',
     ambientLightEnabled: 'Ambient Light Enabled',
     ambientLightDisabled: 'Ambient Light Disabled',
+    ledPreview: 'LED Preview',
+    ledPreviewEnabled: 'LED Preview Enabled',
+    ledPreviewDisabled: 'LED Preview Disabled',
     info: 'System Info',
     ledConfiguration: 'LED Configuration',
     colorCalibration: 'Color Calibration',

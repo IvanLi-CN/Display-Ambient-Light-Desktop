@@ -175,6 +175,7 @@ export const zhCN: TranslationDict = {
     positionOffset: '位置偏移',
     startOffset: '起始偏移',
     endOffset: '结束偏移',
+    ledPreview: 'LED预览',
     // 保存状态
     configSaved: '配置已保存',
     saveFailed: '保存失败',
@@ -331,6 +332,9 @@ export const zhCN: TranslationDict = {
     ambientLight: '氛围灯',
     ambientLightEnabled: '氛围灯已启用',
     ambientLightDisabled: '氛围灯已禁用',
+    ledPreview: '灯带预览',
+    ledPreviewEnabled: '灯带预览已启用',
+    ledPreviewDisabled: '灯带预览已禁用',
     info: '系统信息',
     ledConfiguration: '灯条配置',
     colorCalibration: '颜色校准',

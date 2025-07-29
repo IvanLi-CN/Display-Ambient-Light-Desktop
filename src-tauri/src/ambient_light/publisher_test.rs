@@ -146,15 +146,15 @@ mod tests {
             let offset = bottom_start + i * 3;
             if i < 2 {
                 // 前半部分应该是红色 [255, 0, 0] -> GRB: [0, 255, 0]
-                assert_eq!(buffer[offset], 0, "LED {} G channel should be 0", i); // G
-                assert_eq!(buffer[offset + 1], 255, "LED {} R channel should be 255", i); // R
-                assert_eq!(buffer[offset + 2], 0, "LED {} B channel should be 0", i);
+                assert_eq!(buffer[offset], 0, "LED {i} G channel should be 0"); // G
+                assert_eq!(buffer[offset + 1], 255, "LED {i} R channel should be 255"); // R
+                assert_eq!(buffer[offset + 2], 0, "LED {i} B channel should be 0");
             // B
             } else {
                 // 后半部分应该是橙色 [255, 128, 0] -> GRB: [128, 255, 0]
-                assert_eq!(buffer[offset], 128, "LED {} G channel should be 128", i); // G
-                assert_eq!(buffer[offset + 1], 255, "LED {} R channel should be 255", i); // R
-                assert_eq!(buffer[offset + 2], 0, "LED {} B channel should be 0", i);
+                assert_eq!(buffer[offset], 128, "LED {i} G channel should be 128"); // G
+                assert_eq!(buffer[offset + 1], 255, "LED {i} R channel should be 255"); // R
+                assert_eq!(buffer[offset + 2], 0, "LED {i} B channel should be 0");
                 // B
             }
         }
@@ -456,16 +456,16 @@ mod tests {
             let offset = byte_index + i * 4;
             if i < 1 {
                 // LED0: 红色 [255, 0, 0] -> GRBW: [0, 255, 0, 0]
-                assert_eq!(buffer[offset], 0, "序列号0 LED{} G通道应该是0", i);
-                assert_eq!(buffer[offset + 1], 255, "序列号0 LED{} R通道应该是255", i);
-                assert_eq!(buffer[offset + 2], 0, "序列号0 LED{} B通道应该是0", i);
-                assert_eq!(buffer[offset + 3], 0, "序列号0 LED{} W通道应该是0", i);
+                assert_eq!(buffer[offset], 0, "序列号0 LED{i} G通道应该是0");
+                assert_eq!(buffer[offset + 1], 255, "序列号0 LED{i} R通道应该是255");
+                assert_eq!(buffer[offset + 2], 0, "序列号0 LED{i} B通道应该是0");
+                assert_eq!(buffer[offset + 3], 0, "序列号0 LED{i} W通道应该是0");
             } else {
                 // LED1,LED2: 橙色 [255, 128, 0] -> GRBW: [128, 255, 0, 0]
-                assert_eq!(buffer[offset], 128, "序列号0 LED{} G通道应该是128", i);
-                assert_eq!(buffer[offset + 1], 255, "序列号0 LED{} R通道应该是255", i);
-                assert_eq!(buffer[offset + 2], 0, "序列号0 LED{} B通道应该是0", i);
-                assert_eq!(buffer[offset + 3], 0, "序列号0 LED{} W通道应该是0", i);
+                assert_eq!(buffer[offset], 128, "序列号0 LED{i} G通道应该是128");
+                assert_eq!(buffer[offset + 1], 255, "序列号0 LED{i} R通道应该是255");
+                assert_eq!(buffer[offset + 2], 0, "序列号0 LED{i} B通道应该是0");
+                assert_eq!(buffer[offset + 3], 0, "序列号0 LED{i} W通道应该是0");
             }
         }
         byte_index += 12;
@@ -476,14 +476,14 @@ mod tests {
             let offset = byte_index + i * 3;
             if i < 1 {
                 // LED0: 黄色 [255, 255, 0] -> GRB: [255, 255, 0]
-                assert_eq!(buffer[offset], 255, "序列号1 LED{} G通道应该是255", i);
-                assert_eq!(buffer[offset + 1], 255, "序列号1 LED{} R通道应该是255", i);
-                assert_eq!(buffer[offset + 2], 0, "序列号1 LED{} B通道应该是0", i);
+                assert_eq!(buffer[offset], 255, "序列号1 LED{i} G通道应该是255");
+                assert_eq!(buffer[offset + 1], 255, "序列号1 LED{i} R通道应该是255");
+                assert_eq!(buffer[offset + 2], 0, "序列号1 LED{i} B通道应该是0");
             } else {
                 // LED1: 黄绿色 [128, 255, 0] -> GRB: [255, 128, 0]
-                assert_eq!(buffer[offset], 255, "序列号1 LED{} G通道应该是255", i);
-                assert_eq!(buffer[offset + 1], 128, "序列号1 LED{} R通道应该是128", i);
-                assert_eq!(buffer[offset + 2], 0, "序列号1 LED{} B通道应该是0", i);
+                assert_eq!(buffer[offset], 255, "序列号1 LED{i} G通道应该是255");
+                assert_eq!(buffer[offset + 1], 128, "序列号1 LED{i} R通道应该是128");
+                assert_eq!(buffer[offset + 2], 0, "序列号1 LED{i} B通道应该是0");
             }
         }
         byte_index += 6;
@@ -494,14 +494,14 @@ mod tests {
             let offset = byte_index + i * 3;
             if i < 1 {
                 // LED0: 青色 [0, 255, 255] -> GRB: [255, 0, 255]
-                assert_eq!(buffer[offset], 255, "序列号2 LED{} G通道应该是255", i);
-                assert_eq!(buffer[offset + 1], 0, "序列号2 LED{} R通道应该是0", i);
-                assert_eq!(buffer[offset + 2], 255, "序列号2 LED{} B通道应该是255", i);
+                assert_eq!(buffer[offset], 255, "序列号2 LED{i} G通道应该是255");
+                assert_eq!(buffer[offset + 1], 0, "序列号2 LED{i} R通道应该是0");
+                assert_eq!(buffer[offset + 2], 255, "序列号2 LED{i} B通道应该是255");
             } else {
                 // LED1,LED2: 蓝色 [0, 0, 255] -> GRB: [0, 0, 255]
-                assert_eq!(buffer[offset], 0, "序列号2 LED{} G通道应该是0", i);
-                assert_eq!(buffer[offset + 1], 0, "序列号2 LED{} R通道应该是0", i);
-                assert_eq!(buffer[offset + 2], 255, "序列号2 LED{} B通道应该是255", i);
+                assert_eq!(buffer[offset], 0, "序列号2 LED{i} G通道应该是0");
+                assert_eq!(buffer[offset + 1], 0, "序列号2 LED{i} R通道应该是0");
+                assert_eq!(buffer[offset + 2], 255, "序列号2 LED{i} B通道应该是255");
             }
         }
         byte_index += 9;
@@ -512,16 +512,16 @@ mod tests {
             let offset = byte_index + i * 4;
             if i < 2 {
                 // LED0,LED1: 青色 [0, 255, 255] -> GRBW: [255, 0, 255, 0]
-                assert_eq!(buffer[offset], 255, "序列号3 LED{} G通道应该是255", i);
-                assert_eq!(buffer[offset + 1], 0, "序列号3 LED{} R通道应该是0", i);
-                assert_eq!(buffer[offset + 2], 255, "序列号3 LED{} B通道应该是255", i);
-                assert_eq!(buffer[offset + 3], 0, "序列号3 LED{} W通道应该是0", i);
+                assert_eq!(buffer[offset], 255, "序列号3 LED{i} G通道应该是255");
+                assert_eq!(buffer[offset + 1], 0, "序列号3 LED{i} R通道应该是0");
+                assert_eq!(buffer[offset + 2], 255, "序列号3 LED{i} B通道应该是255");
+                assert_eq!(buffer[offset + 3], 0, "序列号3 LED{i} W通道应该是0");
             } else {
                 // LED2,LED3: 蓝色 [0, 0, 255] -> GRBW: [0, 0, 255, 0]
-                assert_eq!(buffer[offset], 0, "序列号3 LED{} G通道应该是0", i);
-                assert_eq!(buffer[offset + 1], 0, "序列号3 LED{} R通道应该是0", i);
-                assert_eq!(buffer[offset + 2], 255, "序列号3 LED{} B通道应该是255", i);
-                assert_eq!(buffer[offset + 3], 0, "序列号3 LED{} W通道应该是0", i);
+                assert_eq!(buffer[offset], 0, "序列号3 LED{i} G通道应该是0");
+                assert_eq!(buffer[offset + 1], 0, "序列号3 LED{i} R通道应该是0");
+                assert_eq!(buffer[offset + 2], 255, "序列号3 LED{i} B通道应该是255");
+                assert_eq!(buffer[offset + 3], 0, "序列号3 LED{i} W通道应该是0");
             }
         }
         byte_index += 16;
@@ -570,16 +570,16 @@ mod tests {
             let offset = i * 4;
             if i < 2 {
                 // LED0,LED1: 青色 [0, 255, 255] -> GRBW: [255, 0, 255, 0]
-                assert_eq!(buffer[offset], 255, "显示器1 LED{} G通道应该是255", i);
-                assert_eq!(buffer[offset + 1], 0, "显示器1 LED{} R通道应该是0", i);
-                assert_eq!(buffer[offset + 2], 255, "显示器1 LED{} B通道应该是255", i);
-                assert_eq!(buffer[offset + 3], 0, "显示器1 LED{} W通道应该是0", i);
+                assert_eq!(buffer[offset], 255, "显示器1 LED{i} G通道应该是255");
+                assert_eq!(buffer[offset + 1], 0, "显示器1 LED{i} R通道应该是0");
+                assert_eq!(buffer[offset + 2], 255, "显示器1 LED{i} B通道应该是255");
+                assert_eq!(buffer[offset + 3], 0, "显示器1 LED{i} W通道应该是0");
             } else {
                 // LED2,LED3: 蓝色 [0, 0, 255] -> GRBW: [0, 0, 255, 0]
-                assert_eq!(buffer[offset], 0, "显示器1 LED{} G通道应该是0", i);
-                assert_eq!(buffer[offset + 1], 0, "显示器1 LED{} R通道应该是0", i);
-                assert_eq!(buffer[offset + 2], 255, "显示器1 LED{} B通道应该是255", i);
-                assert_eq!(buffer[offset + 3], 0, "显示器1 LED{} W通道应该是0", i);
+                assert_eq!(buffer[offset], 0, "显示器1 LED{i} G通道应该是0");
+                assert_eq!(buffer[offset + 1], 0, "显示器1 LED{i} R通道应该是0");
+                assert_eq!(buffer[offset + 2], 255, "显示器1 LED{i} B通道应该是255");
+                assert_eq!(buffer[offset + 3], 0, "显示器1 LED{i} W通道应该是0");
             }
         }
 

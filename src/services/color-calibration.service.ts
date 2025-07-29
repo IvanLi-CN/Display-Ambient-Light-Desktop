@@ -6,7 +6,7 @@
 import { adaptiveApi } from './api-adapter';
 import { ledStripStore } from '../stores/led-strip.store';
 import { LedStripConfig, LedType } from '../models/led-strip-config';
-import { DataSendMode } from '../models/led-data-sender';
+import { DataSendMode } from '../types/led-status';
 
 /**
  * RGB颜色数据
@@ -47,7 +47,7 @@ export class ColorCalibrationService {
       this.previousMode = await adaptiveApi.getDataSendMode();
 
       // 切换到颜色校准模式
-      await adaptiveApi.setDataSendMode(DataSendMode.ColorCalibration);
+      await adaptiveApi.setDataSendMode('ColorCalibration');
 
       this.isActive = true;
       console.log('✅ 颜色校准模式已启用');
@@ -68,14 +68,34 @@ export class ColorCalibrationService {
     try {
       // 恢复之前的模式
       if (this.previousMode !== null) {
-        await adaptiveApi.setDataSendMode(this.previousMode);
+        // 如果之前的模式是氛围光，需要检查氛围光是否启用
+        if (this.previousMode === 'AmbientLight') {
+          const ambientLightState = await adaptiveApi.getAmbientLightState();
+          if (ambientLightState.enabled) {
+            await adaptiveApi.setDataSendMode('AmbientLight');
+            // 重新启动环境光发布器以确保立即开始发送数据
+            await adaptiveApi.restartAmbientLightPublisher();
+          } else {
+            await adaptiveApi.setDataSendMode('None');
+          }
+        } else {
+          await adaptiveApi.setDataSendMode(this.previousMode);
+        }
       } else {
-        await adaptiveApi.setDataSendMode(DataSendMode.None);
+        // 如果没有保存之前的模式，检查氛围光状态来决定恢复到什么模式
+        const ambientLightState = await adaptiveApi.getAmbientLightState();
+        if (ambientLightState.enabled) {
+          await adaptiveApi.setDataSendMode('AmbientLight');
+          // 重新启动环境光发布器以确保立即开始发送数据
+          await adaptiveApi.restartAmbientLightPublisher();
+        } else {
+          await adaptiveApi.setDataSendMode('None');
+        }
       }
 
       this.isActive = false;
       this.previousMode = null;
-      console.log('✅ 颜色校准模式已禁用');
+      console.log('✅ 颜色校准模式已禁用，已恢复到正确的模式');
     } catch (error) {
       console.error('❌ 禁用颜色校准模式失败:', error);
       throw error;
@@ -172,28 +192,19 @@ export class ColorCalibrationService {
    * 应用颜色到所有LED
    */
   public async applyColorToAllLeds(hexColor: string): Promise<void> {
-    if (!this.isActive) {
-      console.warn('⚠️ 颜色校准模式未启用');
-      return;
-    }
-
     try {
+      // 如果校准模式未启用，先启用它
+      if (!this.isActive) {
+        await this.enableColorCalibrationMode();
+      }
+
       // 解析颜色
       const rgbColor = this.parseHexColor(hexColor);
       console.log('🎨 解析颜色:', hexColor, '→', rgbColor);
 
-      // 生成LED数据
-      const ledData = this.generateLedColorData(rgbColor);
-      console.log('📦 生成LED数据:', ledData.length, '字节');
-
-      if (ledData.length === 0) {
-        console.warn('⚠️ 没有生成LED数据');
-        return;
-      }
-
-      // 发送到硬件 (使用偏移量0，发送完整数据流)
-      await adaptiveApi.sendColors(0, Array.from(ledData));
-      console.log('✅ 颜色已应用到所有LED');
+      // 使用专用的校准颜色API，支持预览数据发布
+      await adaptiveApi.sendCalibrationColor(rgbColor.r, rgbColor.g, rgbColor.b);
+      console.log('✅ 校准颜色已应用到所有LED');
     } catch (error) {
       console.error('❌ 应用颜色到LED失败:', error);
       throw error;
@@ -201,10 +212,37 @@ export class ColorCalibrationService {
   }
 
   /**
-   * 清除所有LED (设置为黑色)
+   * 清除所有LED (设置为黑色并禁用校准模式)
    */
   public async clearAllLeds(): Promise<void> {
-    await this.applyColorToAllLeds('#000000');
+    try {
+      // 先发送黑色
+      await this.applyColorToAllLeds('#000000');
+
+      // 然后禁用校准模式，恢复到之前的模式
+      await this.disableColorCalibrationMode();
+
+      console.log('🧹 LED颜色已清除，校准模式已禁用');
+    } catch (error) {
+      console.error('❌ 清除LED颜色失败:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 处理颜色校准参数变化
+   * 当用户调整RGB滑块时调用
+   */
+  public async handleCalibrationChange(): Promise<void> {
+    try {
+      // 如果校准模式未启用，先启用它
+      if (!this.isActive) {
+        await this.enableColorCalibrationMode();
+      }
+    } catch (error) {
+      console.error('❌ 处理校准参数变化失败:', error);
+      throw error;
+    }
   }
 
   /**

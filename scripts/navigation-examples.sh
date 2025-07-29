@@ -40,8 +40,6 @@ echo "  ./Ambient\\ Light\\ Control.app/Contents/MacOS/Ambient\\ Light\\ Control
 print_example "Open LED test page:"
 echo "  ./Ambient\\ Light\\ Control.app/Contents/MacOS/Ambient\\ Light\\ Control --page led-strip-test"
 
-print_example "Open data sender test page:"
-echo "  ./Ambient\\ Light\\ Control.app/Contents/MacOS/Ambient\\ Light\\ Control --page led-data-sender-test"
 
 print_example "Open settings page:"
 echo "  ./Ambient\\ Light\\ Control.app/Contents/MacOS/Ambient\\ Light\\ Control --page settings"
@@ -65,8 +63,7 @@ echo "  open 'ambient-light://navigate/white-balance'"
 print_example "Open LED test page via URL scheme:"
 echo "  open 'ambient-light://navigate/led-strip-test'"
 
-print_example "Open data sender test page via URL scheme:"
-echo "  open 'ambient-light://navigate/led-data-sender-test'"
+
 
 print_example "Open settings page via URL scheme:"
 echo "  open 'ambient-light://navigate/settings'"

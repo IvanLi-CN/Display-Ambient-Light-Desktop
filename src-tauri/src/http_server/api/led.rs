@@ -11,6 +11,7 @@ use crate::{
     ambient_light::{self, BorderColors, LedStripConfig},
     http_server::{ApiResponse, AppState},
     led_data_sender::{DataSendMode, LedDataSender},
+    led_preview_state::{LedPreviewState, LedPreviewStateManager},
     led_status_manager::{LedStatusManager, LedStatusStats},
 };
 
@@ -21,6 +22,17 @@ pub struct SendColorsRequest {
     pub offset: u16,
     /// 颜色数据缓冲区
     pub buffer: Vec<u8>,
+}
+
+/// 校准颜色发送请求
+#[derive(Deserialize, ToSchema)]
+pub struct SendCalibrationColorRequest {
+    /// 红色分量 (0-255)
+    pub r: u8,
+    /// 绿色分量 (0-255)
+    pub g: u8,
+    /// 蓝色分量 (0-255)
+    pub b: u8,
 }
 
 /// 测试颜色发送请求
@@ -116,6 +128,43 @@ pub async fn send_colors(
         ))),
         Err(e) => {
             log::error!("Failed to send colors: {e}");
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+/// 发送校准颜色数据（推荐用于校准模式）
+#[utoipa::path(
+    post,
+    path = "/api/v1/led/calibration-color",
+    request_body = SendCalibrationColorRequest,
+    responses(
+        (status = 200, description = "校准颜色发送成功", body = ApiResponse<String>),
+        (status = 500, description = "发送失败", body = ApiResponse<String>),
+    ),
+    tag = "led"
+)]
+pub async fn send_calibration_color(
+    Json(request): Json<SendCalibrationColorRequest>,
+) -> Result<Json<ApiResponse<String>>, StatusCode> {
+    log::info!(
+        "🎨 Received calibration color request: RGB({}, {}, {})",
+        request.r,
+        request.g,
+        request.b
+    );
+
+    match ambient_light::LedColorsPublisher::send_calibration_color(request.r, request.g, request.b)
+        .await
+    {
+        Ok(_) => {
+            log::info!("✅ Calibration color sent successfully");
+            Ok(Json(ApiResponse::success(
+                "Calibration color sent successfully".to_string(),
+            )))
+        }
+        Err(e) => {
+            log::error!("❌ Failed to send calibration color: {e}");
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -317,6 +366,32 @@ pub async fn stop_single_display_config() -> Result<Json<ApiResponse<String>>, S
     }
 }
 
+/// 重新启动环境光发布器
+#[utoipa::path(
+    post,
+    path = "/api/v1/led/restart-ambient-light-publisher",
+    responses(
+        (status = 200, description = "环境光发布器重启成功", body = ApiResponse<String>),
+        (status = 500, description = "重启失败", body = ApiResponse<String>),
+    ),
+    tag = "led"
+)]
+pub async fn restart_ambient_light_publisher() -> Result<Json<ApiResponse<String>>, StatusCode> {
+    let publisher = ambient_light::LedColorsPublisher::global().await;
+    match publisher.restart_ambient_light_publisher().await {
+        Ok(_) => {
+            log::info!("Ambient light publisher restarted successfully");
+            Ok(Json(ApiResponse::success(
+                "Ambient light publisher restarted successfully".to_string(),
+            )))
+        }
+        Err(e) => {
+            log::error!("Failed to restart ambient light publisher: {e}");
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
 /// 设置活跃灯带用于呼吸效果
 #[utoipa::path(
     post,
@@ -474,11 +549,63 @@ pub async fn test_led_data_sender() -> Result<Json<ApiResponse<String>>, StatusC
     )))
 }
 
+/// LED预览状态设置请求
+#[derive(Deserialize, ToSchema)]
+pub struct SetLedPreviewStateRequest {
+    /// 是否启用LED预览
+    pub enabled: bool,
+}
+
+/// 获取LED预览状态
+#[utoipa::path(
+    get,
+    path = "/api/v1/led/preview-state",
+    responses(
+        (status = 200, description = "获取LED预览状态成功", body = ApiResponse<LedPreviewState>),
+    ),
+    tag = "led"
+)]
+pub async fn get_led_preview_state() -> Result<Json<ApiResponse<LedPreviewState>>, StatusCode> {
+    let state_manager = LedPreviewStateManager::global().await;
+    let state = state_manager.get_state().await;
+    Ok(Json(ApiResponse::success(state)))
+}
+
+/// 设置LED预览状态
+#[utoipa::path(
+    put,
+    path = "/api/v1/led/preview-state",
+    request_body = SetLedPreviewStateRequest,
+    responses(
+        (status = 200, description = "设置LED预览状态成功", body = ApiResponse<String>),
+        (status = 500, description = "设置失败", body = ApiResponse<String>),
+    ),
+    tag = "led"
+)]
+pub async fn set_led_preview_state(
+    Json(request): Json<SetLedPreviewStateRequest>,
+) -> Result<Json<ApiResponse<String>>, StatusCode> {
+    let state_manager = LedPreviewStateManager::global().await;
+    match state_manager.set_enabled(request.enabled).await {
+        Ok(_) => {
+            log::info!("LED preview state set to: {}", request.enabled);
+            Ok(Json(ApiResponse::success(
+                "LED preview state set successfully".to_string(),
+            )))
+        }
+        Err(e) => {
+            log::error!("Failed to set LED preview state: {e}");
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
 /// 创建LED控制相关路由
 pub fn create_routes() -> Router<AppState> {
     Router::new()
         .route("/status", get(get_led_status))
         .route("/colors", post(send_colors))
+        .route("/calibration-color", post(send_calibration_color))
         .route("/test-colors", post(send_test_colors_to_board))
         .route("/mode", get(get_data_send_mode))
         .route("/mode", put(set_data_send_mode))
@@ -494,6 +621,10 @@ pub fn create_routes() -> Router<AppState> {
             post(stop_single_display_config),
         )
         .route(
+            "/restart-ambient-light-publisher",
+            post(restart_ambient_light_publisher),
+        )
+        .route(
             "/set-active-strip-breathing",
             post(set_active_strip_breathing),
         )
@@ -504,4 +635,6 @@ pub fn create_routes() -> Router<AppState> {
             post(test_single_display_config),
         )
         .route("/test-data-sender", post(test_led_data_sender))
+        .route("/preview-state", get(get_led_preview_state))
+        .route("/preview-state", put(set_led_preview_state))
 }

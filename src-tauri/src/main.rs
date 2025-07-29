@@ -8,7 +8,9 @@ mod display;
 mod http_server;
 mod language_manager;
 mod led_color;
+mod led_data_processor;
 mod led_data_sender;
+mod led_preview_state;
 mod led_status_manager;
 mod led_test_effects;
 mod rpc;
@@ -110,11 +112,13 @@ async fn update_tray_menu_internal<R: Runtime>(app_handle: &tauri::AppHandle<R>)
 async fn create_tray_menu<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<Menu<R>> {
     let state_manager = ambient_light_state::AmbientLightStateManager::global().await;
     let ambient_light_enabled = state_manager.is_enabled().await;
+    let led_preview_manager = led_preview_state::LedPreviewStateManager::global().await;
+    let led_preview_enabled = led_preview_manager.is_enabled().await;
     let auto_start_enabled = auto_start::AutoStartManager::is_enabled().unwrap_or(false);
 
     info!(
-        "Creating tray menu - Ambient light: {}, Auto start: {}",
-        ambient_light_enabled, auto_start_enabled
+        "Creating tray menu - Ambient light: {}, LED preview: {}, Auto start: {}",
+        ambient_light_enabled, led_preview_enabled, auto_start_enabled
     );
 
     // Get current language
@@ -129,6 +133,15 @@ async fn create_tray_menu<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Resul
         t("ambient_light"),
         true,
         ambient_light_enabled,
+        None::<&str>,
+    )?;
+
+    let led_preview_item = CheckMenuItem::with_id(
+        app,
+        "toggle_led_preview",
+        t("led_preview"),
+        true,
+        led_preview_enabled,
         None::<&str>,
     )?;
 
@@ -174,6 +187,7 @@ async fn create_tray_menu<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Resul
         app,
         &[
             &ambient_light_item,
+            &led_preview_item,
             &separator1,
             &info_item,
             &led_config_item,
@@ -203,6 +217,15 @@ async fn handle_menu_event<R: Runtime>(app: &tauri::AppHandle<R>, event: tauri::
                 let current_state = state_manager.get_state().await;
                 app.emit("ambient_light_state_changed", current_state)
                     .unwrap();
+
+                // Immediately update tray menu to reflect new state
+                update_tray_menu_internal(app).await;
+            }
+        }
+        "toggle_led_preview" => {
+            let led_preview_manager = led_preview_state::LedPreviewStateManager::global().await;
+            if let Ok(new_state) = led_preview_manager.toggle().await {
+                info!("LED preview toggled to: {}", new_state);
 
                 // Immediately update tray menu to reflect new state
                 update_tray_menu_internal(app).await;
@@ -351,9 +374,6 @@ fn handle_ambient_light_protocol<R: Runtime>(
                         "info" => "/info".to_string(),
                         "white-balance" | "color-calibration" => "/color-calibration".to_string(),
                         "led-strip-test" | "led-test" => "/led-strip-test".to_string(),
-                        "led-data-sender-test" | "data-sender-test" => {
-                            "/led-data-sender-test".to_string()
-                        }
                         "settings" => "/settings".to_string(),
                         _ => "/info".to_string(), // Default to info page
                     }
@@ -364,7 +384,6 @@ fn handle_ambient_light_protocol<R: Runtime>(
                     "led-strips-configuration" | "led-config" => "/led-strips-configuration",
                     "white-balance" | "color-calibration" => "/color-calibration",
                     "led-strip-test" | "led-test" => "/led-strip-test",
-                    "led-data-sender-test" | "data-sender-test" => "/led-data-sender-test",
                     "settings" => "/settings",
                     _ => "/info", // Default to info page
                 }
@@ -409,7 +428,7 @@ fn handle_ambient_light_protocol<R: Runtime>(
                 if let Some(rx) = channels.get(&display_id) {
                     let rx = rx.read().await;
                     let screenshot = rx.borrow().clone();
-                    let bytes = screenshot.bytes.read().await.to_owned();
+                    let bytes = screenshot.bytes.clone();
 
                     // Use much smaller intermediate resolution for performance
                     let intermediate_width = 800; // Much smaller than original 5120
@@ -577,8 +596,15 @@ async fn main() {
     let _http_server_handle = {
         let config = http_config.clone();
         tokio::spawn(async move {
-            if let Err(e) = http_server::start_server(config).await {
-                error!("HTTP服务器启动失败: {}", e);
+            info!("🚀 正在启动HTTP服务器...");
+            match http_server::start_server(config).await {
+                Ok(_) => {
+                    info!("✅ HTTP服务器启动成功");
+                }
+                Err(e) => {
+                    error!("❌ HTTP服务器启动失败: {}", e);
+                    panic!("HTTP服务器启动失败: {e}");
+                }
             }
         })
     };

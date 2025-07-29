@@ -251,7 +251,7 @@ impl ScreenStreamManager {
         config: &StreamConfig,
     ) -> Result<StreamFrame> {
         let total_start = Instant::now();
-        let bytes = screenshot.bytes.read().await;
+        let bytes = &screenshot.bytes;
 
         // Convert BGRA to RGBA using unsafe with optimized batch processing for maximum performance
         let mut rgba_bytes = bytes.as_ref().clone();

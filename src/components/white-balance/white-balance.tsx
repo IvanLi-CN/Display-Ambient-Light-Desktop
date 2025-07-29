@@ -35,28 +35,14 @@ export const WhiteBalance = () => {
     checkInitialFullscreenStatus();
   });
 
-  // 颜色校准模式生命周期管理
-  createEffect(() => {
-    const enableColorCalibration = async () => {
-      try {
-        await colorCalibrationService.enableColorCalibrationMode();
-        console.log('🎨 颜色校准模式已启用');
-      } catch (error) {
-        console.error('❌ 启用颜色校准模式失败:', error);
-      }
-    };
-
-    enableColorCalibration();
-
-    // 组件卸载时禁用颜色校准模式
-    onCleanup(async () => {
-      try {
-        await colorCalibrationService.disableColorCalibrationMode();
-        console.log('🎨 颜色校准模式已禁用');
-      } catch (error) {
-        console.error('❌ 禁用颜色校准模式失败:', error);
-      }
-    });
+  // 组件卸载时禁用颜色校准模式
+  onCleanup(async () => {
+    try {
+      await colorCalibrationService.disableColorCalibrationMode();
+      console.log('🎨 颜色校准模式已禁用');
+    } catch (error) {
+      console.error('❌ 禁用颜色校准模式失败:', error);
+    }
   });
 
   // 初始化面板位置到屏幕中央
@@ -167,16 +153,23 @@ export const WhiteBalance = () => {
     });
   });
 
-  const updateColorCalibration = (
+  const updateColorCalibration = async (
     key: keyof ColorCalibration,
     value: number,
   ) => {
     const calibration = { ...ledStripStore.colorCalibration };
     calibration[key] = value;
     setLedStripStore('colorCalibration', calibration);
-    adaptiveApi.updateGlobalColorCalibration(calibration).catch(() => {
-      // Silently handle error
-    });
+
+    try {
+      // 在用户调整滑块时启用校准模式
+      await colorCalibrationService.handleCalibrationChange();
+
+      // 更新全局颜色校准配置
+      await adaptiveApi.updateGlobalColorCalibration(calibration);
+    } catch (error) {
+      console.error('❌ 更新颜色校准失败:', error);
+    }
   };
 
   const toggleFullscreen = async () => {
@@ -285,8 +278,8 @@ export const WhiteBalance = () => {
                     <ColorSlider
                       class="from-cyan-500 to-red-500"
                       value={ledStripStore.colorCalibration.r}
-                      onInput={(ev) =>
-                        updateColorCalibration(
+                      onInput={async (ev) =>
+                        await updateColorCalibration(
                           'r',
                           (ev.target as HTMLInputElement).valueAsNumber ?? 1,
                         )
@@ -302,8 +295,8 @@ export const WhiteBalance = () => {
                     <ColorSlider
                       class="from-pink-500 to-green-500"
                       value={ledStripStore.colorCalibration.g}
-                      onInput={(ev) =>
-                        updateColorCalibration(
+                      onInput={async (ev) =>
+                        await updateColorCalibration(
                           'g',
                           (ev.target as HTMLInputElement).valueAsNumber ?? 1,
                         )
@@ -319,8 +312,8 @@ export const WhiteBalance = () => {
                     <ColorSlider
                       class="from-yellow-500 to-blue-500"
                       value={ledStripStore.colorCalibration.b}
-                      onInput={(ev) =>
-                        updateColorCalibration(
+                      onInput={async (ev) =>
+                        await updateColorCalibration(
                           'b',
                           (ev.target as HTMLInputElement).valueAsNumber ?? 1,
                         )
@@ -336,8 +329,8 @@ export const WhiteBalance = () => {
                     <ColorSlider
                       class="from-amber-100 to-amber-50"
                       value={ledStripStore.colorCalibration.w}
-                      onInput={(ev) =>
-                        updateColorCalibration(
+                      onInput={async (ev) =>
+                        await updateColorCalibration(
                           'w',
                           (ev.target as HTMLInputElement).valueAsNumber ?? 1,
                         )
@@ -432,8 +425,8 @@ export const WhiteBalance = () => {
                   <ColorSlider
                     class="from-cyan-500 to-red-500"
                     value={ledStripStore.colorCalibration.r}
-                    onInput={(ev) =>
-                      updateColorCalibration(
+                    onInput={async (ev) =>
+                      await updateColorCalibration(
                         'r',
                         (ev.target as HTMLInputElement).valueAsNumber ?? 1,
                       )
@@ -449,8 +442,8 @@ export const WhiteBalance = () => {
                   <ColorSlider
                     class="from-pink-500 to-green-500"
                     value={ledStripStore.colorCalibration.g}
-                    onInput={(ev) =>
-                      updateColorCalibration(
+                    onInput={async (ev) =>
+                      await updateColorCalibration(
                         'g',
                         (ev.target as HTMLInputElement).valueAsNumber ?? 1,
                       )
@@ -466,8 +459,8 @@ export const WhiteBalance = () => {
                   <ColorSlider
                     class="from-yellow-500 to-blue-500"
                     value={ledStripStore.colorCalibration.b}
-                    onInput={(ev) =>
-                      updateColorCalibration(
+                    onInput={async (ev) =>
+                      await updateColorCalibration(
                         'b',
                         (ev.target as HTMLInputElement).valueAsNumber ?? 1,
                       )
@@ -483,8 +476,8 @@ export const WhiteBalance = () => {
                   <ColorSlider
                     class="from-amber-100 to-amber-50"
                     value={ledStripStore.colorCalibration.w}
-                    onInput={(ev) =>
-                      updateColorCalibration(
+                    onInput={async (ev) =>
+                      await updateColorCalibration(
                         'w',
                         (ev.target as HTMLInputElement).valueAsNumber ?? 1,
                       )

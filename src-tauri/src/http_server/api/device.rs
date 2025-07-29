@@ -21,6 +21,13 @@ pub struct SetAutoStartRequest {
     pub enabled: bool,
 }
 
+/// 环境光状态设置请求
+#[derive(Deserialize, ToSchema)]
+pub struct SetAmbientLightStateRequest {
+    /// 是否启用环境光
+    pub enabled: bool,
+}
+
 /// 获取设备板列表
 #[utoipa::path(
     get,
@@ -112,6 +119,32 @@ pub async fn get_ambient_light_state() -> Result<Json<ApiResponse<AmbientLightSt
     Ok(Json(ApiResponse::success(state)))
 }
 
+/// 设置环境光状态
+#[utoipa::path(
+    put,
+    path = "/api/v1/device/ambient-light-state",
+    request_body = SetAmbientLightStateRequest,
+    responses(
+        (status = 200, description = "设置环境光状态成功", body = ApiResponse<String>),
+        (status = 500, description = "设置失败", body = ApiResponse<String>),
+    ),
+    tag = "device"
+)]
+pub async fn set_ambient_light_state(
+    Json(request): Json<SetAmbientLightStateRequest>,
+) -> Result<Json<ApiResponse<String>>, StatusCode> {
+    let state_manager = AmbientLightStateManager::global().await;
+    match state_manager.set_enabled(request.enabled).await {
+        Ok(_) => Ok(Json(ApiResponse::success(
+            "Ambient light state updated successfully".to_string(),
+        ))),
+        Err(e) => {
+            log::error!("Failed to set ambient light state: {e}");
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
 /// 创建设备相关路由
 pub fn create_routes() -> Router<AppState> {
     Router::new()
@@ -119,4 +152,5 @@ pub fn create_routes() -> Router<AppState> {
         .route("/auto-start", get(get_auto_start_status))
         .route("/auto-start", put(set_auto_start_status))
         .route("/ambient-light-state", get(get_ambient_light_state))
+        .route("/ambient-light-state", put(set_ambient_light_state))
 }

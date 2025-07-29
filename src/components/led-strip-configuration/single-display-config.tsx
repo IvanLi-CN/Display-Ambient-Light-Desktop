@@ -3,7 +3,6 @@ import { useParams, useNavigate } from '@solidjs/router';
 import { useLanguage } from '../../i18n/index';
 import { LedColorService } from '../../services/led-color-service';
 import { adaptiveApi } from '../../services/api-adapter';
-import { StatusBar } from '../status-bar/status-bar';
 import { WebSocketListener } from '../websocket-listener';
 
 // LED灯带配置类型
@@ -641,11 +640,15 @@ export function SingleDisplayConfig() {
           led_type: strip.ledType,
         };
       });
-      console.log('当前显示器的新后端格式配置:', currentDisplayBackendStrips);
+      if (import.meta.env.DEV) {
+        console.log('当前显示器的新后端格式配置:', currentDisplayBackendStrips);
+      }
 
       // 4. 合并新旧配置
       const finalStrips = [...otherDisplayStrips, ...currentDisplayBackendStrips];
-      console.log('合并后的最终配置:', finalStrips);
+      if (import.meta.env.DEV) {
+        console.log('合并后的最终配置:', finalStrips);
+      }
 
       // 5. 保存完整的配置
       const configGroup = {
@@ -659,7 +662,9 @@ export function SingleDisplayConfig() {
       };
       await adaptiveApi.writeLedStripConfigs(configGroup);
 
-      console.log('✅ 成功保存完整LED灯带配置到后端');
+      if (import.meta.env.DEV) {
+        console.log('成功保存完整LED灯带配置到后端');
+      }
     } catch (error) {
       console.error('❌ 保存LED灯带配置失败:', error);
       throw error; // 重新抛出错误以便上层处理
@@ -670,12 +675,15 @@ export function SingleDisplayConfig() {
 
   // 加载LED灯带数据
   onMount(async () => {
-    console.log('🔄 onMount 开始执行');
+    if (import.meta.env.DEV) {
+      console.log('onMount 开始执行');
+    }
 
     try {
       // 总是尝试加载配置，不管是否在 Tauri 环境中
-      console.log('=== 开始加载LED灯带配置 ===');
-      console.log('显示器ID:', displayId());
+      if (import.meta.env.DEV) {
+        console.log('开始加载LED灯带配置，显示器ID:', displayId());
+      }
 
       // 尝试从后端加载已保存的配置
       const allConfigs = await adaptiveApi.readLedStripConfigs();
@@ -1014,24 +1022,23 @@ export function SingleDisplayConfig() {
     console.log('📋 灯带详细信息:');
 
     let cumulativeLedOffset = 0;
-    sortedStrips.forEach((strip, index) => {
-      const bytesPerLed = strip.ledType === 'SK6812' ? 4 : 3;
-      const byteOffset = cumulativeLedOffset * bytesPerLed;
+    if (import.meta.env.DEV) {
+      sortedStrips.forEach((strip, index) => {
+        const bytesPerLed = strip.ledType === 'SK6812' ? 4 : 3;
+        const byteOffset = cumulativeLedOffset * bytesPerLed;
 
-      console.log(`${index + 1}. 灯带 ${strip.id}:`);
-      console.log(`   - 边框: ${strip.border}`);
-      console.log(`   - 序列号: ${strip.sequence}`);
-      console.log(`   - LED数量: ${strip.count}`);
-      console.log(`   - LED类型: ${strip.ledType} (${bytesPerLed}字节/LED)`);
-      console.log(`   - 反转: ${strip.reverse}`);
-      console.log(`   - 起始偏移: ${strip.startOffset}%`);
-      console.log(`   - 结束偏移: ${strip.endOffset}%`);
-      console.log(`   - 累积LED偏移: ${cumulativeLedOffset}`);
-      console.log(`   - 字节偏移: ${byteOffset}`);
-      console.log(`   - 数据长度: ${strip.count * bytesPerLed} 字节`);
+        console.log(`${index + 1}. 灯带 ${strip.id}:`);
+        console.log(`   - 边框: ${strip.border}, LED数量: ${strip.count}, 类型: ${strip.ledType}`);
+        console.log(`   - 累积LED偏移: ${cumulativeLedOffset}, 字节偏移: ${byteOffset}`);
 
-      cumulativeLedOffset += strip.count;
-    });
+        cumulativeLedOffset += strip.count;
+      });
+    } else {
+      // 在生产模式下只计算偏移量，不打印日志
+      sortedStrips.forEach((strip) => {
+        cumulativeLedOffset += strip.count;
+      });
+    }
 
     // 检查序列号重复
     const sequences = sortedStrips.map(s => s.sequence);
@@ -1115,11 +1122,6 @@ export function SingleDisplayConfig() {
     <div class="container mx-auto p-6 h-full">
       {/* WebSocket监听器 */}
       <WebSocketListener />
-
-      {/* LED状态栏 */}
-      <div class="mb-4">
-        <StatusBar compact={true} />
-      </div>
 
       <div class="flex justify-between items-center mb-6">
         <h1 class="text-2xl font-bold">{t('singleDisplayConfig.title')}</h1>
@@ -1253,7 +1255,7 @@ export function SingleDisplayConfig() {
         </div>
 
         {/* 右侧配置面板 */}
-        <div class="lg:col-span-1">
+        <div class="lg:col-span-1 space-y-4">
           <Show
             when={selectedStrip()}
             fallback={

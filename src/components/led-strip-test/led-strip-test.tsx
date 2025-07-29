@@ -133,7 +133,17 @@ export const LedStripTest = () => {
   // Load available boards on mount
   onMount(async () => {
     try {
-      // Initial load
+      // 1. 首先停止所有正在运行的测试效果并重置模式
+      console.log('🧹 Cleaning up any existing test effects...');
+      try {
+        // 禁用测试模式，这会停止所有测试效果并重置为AmbientLight模式
+        await adaptiveApi.disableTestMode();
+        console.log('✅ Test mode disabled and cleaned up');
+      } catch (error) {
+        console.warn('⚠️ Failed to disable test mode during cleanup:', error);
+      }
+
+      // 2. 加载可用的设备列表
       const boardList = await adaptiveApi.getBoards();
       setBoards(boardList);
       if (boardList.length > 0 && !selectedBoard()) {
@@ -199,11 +209,13 @@ export const LedStripTest = () => {
   // Cleanup when component is unmounted
   onCleanup(() => {
     if (isRunning() && selectedBoard()) {
-      // Stop the test effect in backend
+      // Use non-async cleanup to avoid the warning
       adaptiveApi.stopLedTestEffect({
         boardAddress: `${selectedBoard()!.address}:${selectedBoard()!.port}`,
         ledCount: ledCount(),
         ledType: ledType()
+      }).then(() => {
+        console.log('✅ Test effect stopped during cleanup');
       }).catch((error) => {
         console.error('Failed to stop test during cleanup:', error);
       });
@@ -263,7 +275,12 @@ export const LedStripTest = () => {
         offset: ledOffset()
       };
 
-      // Start the test effect in Rust backend
+      // 1. 首先启用测试模式
+      console.log('🧪 启用测试模式...');
+      await adaptiveApi.enableTestMode();
+
+      // 2. 启动测试效果
+      console.log('🚀 启动测试效果...');
       await adaptiveApi.startLedTestEffect({
         boardAddress: `${selectedBoard()!.address}:${selectedBoard()!.port}`,
         effectConfig: effectConfig,
@@ -272,35 +289,70 @@ export const LedStripTest = () => {
 
       setCurrentPattern(pattern);
       setIsRunning(true);
+      console.log('✅ 测试效果启动成功');
     } catch (error) {
       console.error('Failed to start test effect:', error);
     }
   };
 
   const stopTest = async () => {
+    const startTime = Date.now();
+    console.log(`🛑 [${new Date().toISOString()}] stopTest函数被调用`);
+    console.log('🔍 当前选中的板子:', selectedBoard());
+    console.log('🔍 当前运行状态:', isRunning());
+    console.log('🔍 当前测试模式:', currentPattern());
+
     if (!selectedBoard()) {
+      console.log('⚠️ 没有选中的板子，直接更新UI状态');
       setIsRunning(false);
       setCurrentPattern(null);
       return;
     }
 
-    try {
-      // Stop the test effect in Rust backend
-      await adaptiveApi.stopLedTestEffect({
-        boardAddress: `${selectedBoard()!.address}:${selectedBoard()!.port}`,
-        ledCount: ledCount(),
-        ledType: ledType()
-      });
+    // 立即更新UI状态，让用户感觉停止是即时的
+    setIsRunning(false);
+    setCurrentPattern(null);
+    console.log(`🛑 [${new Date().toISOString()}] UI状态已更新，正在后台停止测试效果...`);
 
-      // Only update UI state after successful backend call
-      setIsRunning(false);
-      setCurrentPattern(null);
-    } catch (error) {
-      console.error('Failed to stop test effect:', error);
-      // Still update UI state even if backend call fails
-      setIsRunning(false);
-      setCurrentPattern(null);
-    }
+    // 后台异步停止测试效果，不阻塞UI
+    const stopParams = {
+      boardAddress: `${selectedBoard()!.address}:${selectedBoard()!.port}`,
+      ledCount: ledCount(),
+      ledType: ledType()
+    };
+
+    // 使用Promise.resolve().then()来确保异步执行，不阻塞UI
+    Promise.resolve().then(async () => {
+      try {
+        // 1. 先禁用测试模式，立即切换到环境光模式
+        console.log(`🌈 [${new Date().toISOString()}] 禁用测试模式，恢复环境光模式...`);
+        await adaptiveApi.disableTestMode();
+
+        // 2. 然后停止测试效果（发送清除数据）
+        console.log(`🛑 [${new Date().toISOString()}] 停止测试效果...`);
+        await adaptiveApi.stopLedTestEffect(stopParams);
+
+        const endTime = Date.now();
+        const duration = endTime - startTime;
+        console.log(`✅ [${new Date().toISOString()}] 测试效果已成功停止，已恢复环境光模式 (耗时: ${duration}ms)`);
+      } catch (error) {
+        console.error(`❌ [${new Date().toISOString()}] 停止测试效果失败:`, error);
+        console.error('Error details:', error);
+
+        // 如果停止失败，尝试强制禁用测试模式
+        try {
+          console.log(`🔄 [${new Date().toISOString()}] 尝试强制禁用测试模式...`);
+          await adaptiveApi.disableTestMode();
+          const endTime = Date.now();
+          const duration = endTime - startTime;
+          console.log(`✅ [${new Date().toISOString()}] 强制禁用测试模式成功 (总耗时: ${duration}ms)`);
+        } catch (forceError) {
+          const endTime = Date.now();
+          const duration = endTime - startTime;
+          console.error(`❌ [${new Date().toISOString()}] 强制禁用测试模式也失败了 (总耗时: ${duration}ms):`, forceError);
+        }
+      }
+    });
   };
 
   // 测试LED配置数据发送

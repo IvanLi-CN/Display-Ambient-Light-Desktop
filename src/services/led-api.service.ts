@@ -6,7 +6,7 @@
 import { api } from './api-client';
 import { LedStripConfig, LedType } from '../models/led-strip-config';
 import { Borders } from '../constants/border';
-import { DataSendMode } from '../models/led-data-sender';
+import { DataSendMode } from '../types/led-status';
 
 // LED测试效果配置
 export interface TestEffectConfig {
@@ -45,6 +45,14 @@ export class LedApiService {
    */
   static async sendColors(offset: number, buffer: number[]): Promise<void> {
     return api.post('/api/v1/led/colors', { offset, buffer });
+  }
+
+  /**
+   * 发送校准颜色数据（推荐用于校准模式）
+   * 使用专用的校准API，支持预览数据发布
+   */
+  static async sendCalibrationColor(r: number, g: number, b: number): Promise<void> {
+    return api.post('/api/v1/led/calibration-color', { r, g, b });
   }
 
   /**
@@ -112,6 +120,20 @@ export class LedApiService {
     return api.get('/api/v1/led/test-mode-status');
   }
 
+  /**
+   * 获取LED预览状态
+   */
+  static async getLedPreviewState(): Promise<{ enabled: boolean }> {
+    return api.get('/api/v1/led/preview-state');
+  }
+
+  /**
+   * 设置LED预览状态
+   */
+  static async setLedPreviewState(enabled: boolean): Promise<void> {
+    return api.put('/api/v1/led/preview-state', { enabled });
+  }
+
 
 
 
@@ -143,7 +165,8 @@ export class LedApiService {
    * 停止LED测试效果
    */
   static async stopLedTestEffect(params: any): Promise<void> {
-    await api.post('/api/v1/led/stop-test-effect', params);
+    // 使用更短的超时时间（1秒），因为优化后应该更快
+    await api.post('/api/v1/led/stop-test-effect', params, { timeout: 1000 });
   }
 
   /**
@@ -158,6 +181,13 @@ export class LedApiService {
    */
   static async stopSingleDisplayConfigPublisher(): Promise<void> {
     await api.post('/api/v1/led/stop-single-display-config');
+  }
+
+  /**
+   * 重新启动环境光发布器
+   */
+  static async restartAmbientLightPublisher(): Promise<void> {
+    await api.post('/api/v1/led/restart-ambient-light-publisher');
   }
 
   /**

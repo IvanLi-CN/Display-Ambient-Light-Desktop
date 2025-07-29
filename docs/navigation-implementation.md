@@ -9,7 +9,7 @@
 ### 1. 命令行参数导航
 - 支持 `--page` 参数直接启动应用并跳转到指定页面
 - 支持 `--display` 参数指定显示器ID（用于单屏灯带配置）
-- 支持所有主要页面：info, led-strips-configuration, white-balance, led-strip-test, led-data-sender-test, settings
+- 支持所有主要页面：info, led-strips-configuration, white-balance, led-strip-test, settings
 - **开发环境支持**：通过 `TAURI_DEV_PAGE` 和 `TAURI_DEV_DISPLAY` 环境变量解决开发模式下的导航问题
 - 完全测试通过，日志显示正确的参数检测和页面导航
 
@@ -38,7 +38,6 @@
 ✅ --page led-strips-configuration  
 ✅ --page white-balance
 ✅ --page led-strip-test
-✅ --page led-data-sender-test
 ✅ --page settings
 
 # 日志显示正确的功能执行

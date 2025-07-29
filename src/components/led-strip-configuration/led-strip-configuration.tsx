@@ -14,6 +14,7 @@ import {
   LedStripConfigurationContextType,
 } from '../../contexts/led-strip-configuration.context';
 import { useLanguage } from '../../i18n/index';
+import { LedStripColorsChangedEvent } from '../../types/websocket';
 
 
 export const LedStripConfiguration = () => {
@@ -32,13 +33,17 @@ export const LedStripConfiguration = () => {
     });
 
     adaptiveApi.getConfig().then((configs) => {
-      console.log('🔧 获取到的配置数据:', configs);
-      console.log('🔧 配置数据类型:', typeof configs);
-      console.log('🔧 配置数据键:', Object.keys(configs || {}));
+      if (import.meta.env.DEV) {
+        console.log('获取到的配置数据:', configs);
+        console.log('配置数据类型:', typeof configs);
+        console.log('配置数据键:', Object.keys(configs || {}));
+      }
 
       // 安全检查：确保 strips 存在且是数组
       if (configs && configs.strips && Array.isArray(configs.strips)) {
-        console.log('✅ 有效的配置数据，strips数量:', configs.strips.length);
+        if (import.meta.env.DEV) {
+          console.log('有效的配置数据，strips数量:', configs.strips.length);
+        }
         setLedStripStore({
           strips: configs.strips,
           colorCalibration: configs.color_calibration || {
@@ -49,7 +54,7 @@ export const LedStripConfiguration = () => {
           }
         });
       } else {
-        console.warn('⚠️ 配置数据无效或缺少strips:', configs);
+        console.warn('配置数据无效或缺少strips:', configs);
         // 设置空的配置
         setLedStripStore({
           strips: [],
@@ -106,14 +111,20 @@ export const LedStripConfiguration = () => {
         console.error('❌ 处理配置变化事件失败:', error);
       }
     },
-    onLedColorsChanged: (data: any) => {
+    // 迁移到按灯带分组的颜色事件处理器
+    onLedStripColorsChanged: (data: LedStripColorsChangedEvent) => {
       if (!window.document.hidden) {
-        console.log('🎨 LED颜色变化事件:', data);
-        // 数据应该是 { colors: Vec<u8> } 格式
-        const colors = data.colors || data;
-        const colorsArray = new Uint8ClampedArray(colors);
-        setLedStripStore({
-          colors: colorsArray,
+        console.log('🎨 LED灯带颜色变化事件:', data);
+
+        // 生成灯带唯一键
+        const stripKey = `${data.display_id}:${data.border}:${data.strip_index}`;
+        const colorsArray = new Uint8ClampedArray(data.colors);
+
+        // 更新按灯带分组的颜色数据
+        setLedStripStore('stripColors', (prev) => {
+          const newMap = new Map(prev);
+          newMap.set(stripKey, colorsArray);
+          return newMap;
         });
       }
     },

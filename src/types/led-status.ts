@@ -84,16 +84,16 @@ export interface LedStatusChangedEvent {
 }
 
 /**
- * 模式显示名称映射
+ * 模式显示名称映射（英文回退）
  * 注意：这个映射已被国际化替代，请使用 t('ledStatus.modes.{mode}') 获取翻译
  * @deprecated 使用 t('ledStatus.modes.{mode}') 替代
  */
 export const MODE_DISPLAY_NAMES: Record<DataSendMode, string> = {
-  'None': '无',
-  'AmbientLight': '氛围光',
-  'StripConfig': '配置模式',
-  'TestEffect': '测试模式',
-  'ColorCalibration': '颜色校准'
+  'None': 'None',
+  'AmbientLight': 'Ambient Light',
+  'StripConfig': 'Configuration',
+  'TestEffect': 'Test Mode',
+  'ColorCalibration': 'Color Calibration'
 };
 
 /**
@@ -199,15 +199,17 @@ export function convertToStatusBarData(
   const mode = (safeStatus.data_send_mode || safeStatus.mode) as DataSendMode;
   const modeDisplayName = t
     ? getModeDisplayName(mode, t)
-    : MODE_DISPLAY_NAMES[mode] || '未知';
+    : MODE_DISPLAY_NAMES[mode] || 'Unknown';
 
   return {
     mode: modeDisplayName,
     raw_mode: mode,
     frequency: safeStatus.frequency || frequency,
+    // 兼容后端新格式：data_length 字段名
     data_length: safeStatus.data_length || safeStatus.current_colors_bytes || 0,
     total_led_count: safeStatus.total_led_count || totalLedCount,
     test_mode_active: safeStatus.test_mode_active || false,
+    // 兼容后端新格式：timestamp 字段名
     last_update: formatTime(safeStatus.timestamp || safeStatus.last_updated || new Date().toISOString()),
     connected
   };
