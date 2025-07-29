@@ -270,40 +270,12 @@ export function LedPreview(props: LedPreviewProps) {
   const displayInfo = () => getDisplayInfo();
 
   return (
-    <div class={`bg-base-100 border border-base-300 rounded-lg px-3 py-2 ${props.class || ''}`}>
-      <div class="flex items-center gap-2 mb-2">
-        {/* 连接状态指示器 */}
-        <div
-          class="w-2 h-2 rounded-full flex-shrink-0"
-          style={{ 'background-color': getConnectionColor() }}
-          title={getConnectionText()}
-        />
-        
-        {/* 标题 */}
-        <span class="text-sm font-medium text-base-content/80">
-          {t('tray.ledPreview')}
-        </span>
-        
-        {/* LED数量 */}
-        <Show when={displayInfo().showCount > 0}>
-          <span class="text-xs text-base-content/60">
-            ({displayInfo().showCount} LEDs)
-          </span>
-        </Show>
-        
-        {/* 最后更新时间 */}
-        <Show when={lastUpdateTime()}>
-          <span class="text-xs text-base-content/40 ml-auto">
-            {lastUpdateTime()?.toLocaleTimeString()}
-          </span>
-        </Show>
-      </div>
-      
+    <div class={`${props.class || ''}`}>
       {/* LED颜色显示 */}
       <Show
         when={displayInfo().colors.length > 0}
         fallback={
-          <div class="flex items-center justify-center h-6 text-base-content/60 text-xs">
+          <div class="flex items-center justify-center h-6 text-base-content/60 text-xs bg-base-100 border border-base-300 rounded">
             {connected() ? t('ledStatus.waitingForData') : t('ledStatus.disconnected')}
           </div>
         }
