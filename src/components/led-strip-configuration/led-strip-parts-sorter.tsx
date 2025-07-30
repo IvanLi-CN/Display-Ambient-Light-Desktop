@@ -1,5 +1,4 @@
 import {
-  batch,
   Component,
   createEffect,
   createMemo,
@@ -11,12 +10,11 @@ import {
   onCleanup,
   onMount,
   Switch,
-  untrack,
   useContext,
 } from 'solid-js';
 import { LedStripConfig } from '../../models/led-strip-config';
 import { ledStripStore } from '../../stores/led-strip.store';
-import { adaptiveApi } from '../../services/api-adapter';
+
 import { LedStripConfigurationContext } from '../../contexts/led-strip-configuration.context';
 import background from '../../assets/transparent-grid-background.svg?url';
 
@@ -24,13 +22,9 @@ const SorterItem: Component<{ strip: LedStripConfig; stripIndex: number }> = (
   props,
 ) => {
   const [leds, setLeds] = createSignal<Array<string | null>>([]);
-  const [dragging, setDragging] = createSignal<boolean>(false);
-  const [dragStart, setDragStart] = createSignal<{ x: number; y: number } | null>(null);
-  const [dragCurr, setDragCurr] = createSignal<{ x: number; y: number } | null>(null);
-  const [dragStartIndex, setDragStartIndex] = createSignal<number>(0);
-  const [cellWidth, setCellWidth] = createSignal<number>(0);
-  const [stripConfiguration, { setSelectedStripPart, setHoveredStripPart }] = useContext(LedStripConfigurationContext);
+  const [stripConfiguration, { setHoveredStripPart }] = useContext(LedStripConfigurationContext);
   const [rootWidth, setRootWidth] = createSignal<number>(0);
+  const [cellWidth, setCellWidth] = createSignal<number>(0);
 
   let root: HTMLDivElement | undefined;
 
@@ -43,124 +37,15 @@ const SorterItem: Component<{ strip: LedStripConfig; stripIndex: number }> = (
     return position;
   };
 
-  const move = (targetStart: number) => {
-    const currentStart = getStripStartPosition();
-    if (targetStart === currentStart) {
-      return;
-    }
-    adaptiveApi.moveStripPart(
-      props.strip.display_id,
-      props.strip.border,
-      currentStart,
-      targetStart
-    ).catch((err) => console.error(err));
-  };
 
-  // reset translateX on config updated
-  createEffect(() => {
-    const currentStart = getStripStartPosition();
-    const indexDiff = currentStart - dragStartIndex();
-    const start = untrack(dragStart);
-    const curr = untrack(dragCurr);
-    const _dragging = untrack(dragging);
 
-    if (start === null || curr === null) {
-      return;
-    }
-    if (_dragging && indexDiff !== 0) {
-      const compensation = indexDiff * cellWidth();
-      batch(() => {
-        setDragStartIndex(currentStart);
-        setDragStart({
-          x: start.x + compensation,
-          y: curr.y,
-        });
-      });
-    } else {
-      batch(() => {
-        setDragStartIndex(currentStart);
-        setDragStart(null);
-        setDragCurr(null);
-      });
-    }
-  });
 
-  const onPointerDown = (ev: PointerEvent) => {
-    if (ev.button !== 0) {
-      return;
-    }
-    batch(() => {
-      setDragging(true);
-      if (dragStart() === null) {
-        setDragStart({ x: ev.clientX, y: ev.clientY });
-      }
-      setDragCurr({ x: ev.clientX, y: ev.clientY });
-      setDragStartIndex(getStripStartPosition());
-    });
-  };
 
-  const onPointerUp = (ev: PointerEvent) => {
-    if (ev.button !== 0) {
-      return;
-    }
 
-    if (dragging() === false) {
-      return;
-    }
-    setDragging(false);
-    const diff = ev.clientX - dragStart()!.x;
-    const moved = Math.round(diff / cellWidth());
-    if (moved === 0) {
-      return;
-    }
-    move(getStripStartPosition() + moved);
-  };
 
-  const onPointerMove = (ev: PointerEvent) => {
-    if (dragging() === false) {
-      return;
-    }
 
-    setSelectedStripPart({
-      displayId: props.strip.display_id,
-      border: props.strip.border,
-    });
-    if (!(ev.buttons & 1)) {
-      return;
-    }
-    const draggingInfo = dragging();
-    if (!draggingInfo) {
-      return;
-    }
-    setDragCurr({ x: ev.clientX, y: ev.clientY });
-  };
 
-  const onPointerLeave = () => {
-    setSelectedStripPart(null);
-  };
 
-  createEffect(() => {
-    onMount(() => {
-      window.addEventListener('pointermove', onPointerMove);
-      window.addEventListener('pointerleave', onPointerLeave);
-      window.addEventListener('pointerup', onPointerUp);
-    });
-
-    onCleanup(() => {
-      window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerleave', onPointerLeave);
-      window.removeEventListener('pointerup', onPointerUp);
-    });
-  });
-
-  const reverse = () => {
-    adaptiveApi.reverseLedStripPart(
-      props.strip.display_id,
-      props.strip.border,
-      0, // startIndex - 整个灯带的开始
-      props.strip.len - 1 // endIndex - 整个灯带的结束
-    ).catch((err) => console.error(err));
-  };
 
   const onMouseEnter = () => {
     setHoveredStripPart({
@@ -233,36 +118,26 @@ const SorterItem: Component<{ strip: LedStripConfig; stripIndex: number }> = (
   const style = createMemo<JSX.CSSProperties>(() => {
     const stripStartPos = getStripStartPosition();
     return {
-      transform: `translateX(${
-        (dragCurr()?.x ?? 0) -
-        (dragStart()?.x ?? 0) +
-        cellWidth() * stripStartPos
-      }px)`,
+      transform: `translateX(${cellWidth() * stripStartPos}px)`,
       width: `${cellWidth() * leds().length}px`,
     };
   });
 
   return (
     <div
-      class="flex mx-2 select-none cursor-ew-resize focus:cursor-ew-resize transition-colors duration-200"
+      class="flex mx-2 select-none transition-colors duration-200"
       classList={{
         'bg-primary/20 rounded-lg':
           stripConfiguration.hoveredStripPart?.border === props.strip.border &&
           stripConfiguration.hoveredStripPart?.displayId === props.strip.display_id,
       }}
-      onPointerDown={onPointerDown}
-      ondblclick={reverse}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       ref={root!}
     >
       <div
         style={style()}
-        class="rounded-full border border-white flex h-3"
-        classList={{
-          'bg-gradient-to-b from-yellow-500/60 to-orange-300/60': dragging(),
-          'bg-gradient-to-b from-white/50 to-stone-500/40': !dragging(),
-        }}
+        class="rounded-full border border-white flex h-3 bg-gradient-to-b from-white/50 to-stone-500/40"
       >
         <For each={leds()}>
           {(it) => (

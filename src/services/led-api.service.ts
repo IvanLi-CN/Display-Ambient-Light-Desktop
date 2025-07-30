@@ -388,40 +388,6 @@ export class ConfigApiService {
     });
   }
 
-  /**
-   * 移动灯带部分
-   * 替代: invoke('move_strip_part', { displayId, border, fromIndex, toIndex })
-   */
-  static async moveStripPart(
-    displayId: number,
-    border: Borders,
-    fromIndex: number,
-    toIndex: number
-  ): Promise<void> {
-    return api.put('/api/v1/config/move-strip-part', {
-      display_id: displayId,
-      border,
-      from_index: fromIndex,
-      to_index: toIndex
-    });
-  }
 
-  /**
-   * 反转LED灯带部分
-   * 替代: invoke('reverse_led_strip_part', { displayId, border, startIndex, endIndex })
-   */
-  static async reverseLedStripPart(
-    displayId: number,
-    border: Borders,
-    startIndex: number,
-    endIndex: number
-  ): Promise<void> {
-    return api.put('/api/v1/config/reverse-strip-part', {
-      display_id: displayId,
-      border,
-      start_index: startIndex,
-      end_index: endIndex
-    });
-  }
 
 }
