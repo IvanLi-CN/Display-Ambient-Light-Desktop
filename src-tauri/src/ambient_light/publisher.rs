@@ -268,15 +268,26 @@ impl LedColorsPublisher {
     pub async fn start(&self) {
         log::info!("🚀 LED color publisher starting...");
 
-        let config_manager = ConfigManager::global().await;
+        // 使用新的ConfigManagerV2和适配器
+        let config_manager_v2 = crate::ambient_light::ConfigManagerV2::global().await;
+        let adapter =
+            crate::ambient_light::PublisherAdapter::new(config_manager_v2.get_display_registry());
 
-        let mut config_receiver = config_manager.clone_config_update_receiver();
+        let mut config_receiver = config_manager_v2.subscribe_config_updates();
 
         // Process initial configuration first
-        let initial_configs = config_receiver.borrow().clone();
-        if !initial_configs.strips.is_empty() {
+        let initial_v2_config = config_receiver.borrow().clone();
+        if !initial_v2_config.strips.is_empty() {
             log::info!("📋 Processing initial LED configuration...");
-            self.handle_config_change(initial_configs).await;
+            // 转换v2配置为v1格式
+            match adapter.convert_v2_to_v1_config(&initial_v2_config).await {
+                Ok(v1_config) => {
+                    self.handle_config_change(v1_config).await;
+                }
+                Err(e) => {
+                    log::error!("Failed to convert initial v2 config to v1: {}", e);
+                }
+            }
         } else {
             log::warn!("⚠️ Initial LED configuration is empty, waiting for updates...");
         }
@@ -287,10 +298,18 @@ impl LedColorsPublisher {
             log::info!("👂 Listening for subsequent LED configuration changes...");
             loop {
                 if config_receiver.changed().await.is_ok() {
-                    let configs = config_receiver.borrow().clone();
-                    if !configs.strips.is_empty() {
+                    let v2_config = config_receiver.borrow().clone();
+                    if !v2_config.strips.is_empty() {
                         log::info!("🔄 Subsequent LED configuration changed, reprocessing...");
-                        self_clone.handle_config_change(configs).await;
+                        // 转换v2配置为v1格式
+                        match adapter.convert_v2_to_v1_config(&v2_config).await {
+                            Ok(v1_config) => {
+                                self_clone.handle_config_change(v1_config).await;
+                            }
+                            Err(e) => {
+                                log::error!("Failed to convert subsequent v2 config to v1: {}", e);
+                            }
+                        }
                     } else {
                         log::warn!("⚠️ Received empty LED configuration, skipping...");
                     }

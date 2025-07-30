@@ -1,11 +1,11 @@
+use dirs::config_dir;
+use serde::{Deserialize, Serialize};
 use std::env::current_dir;
 use std::time::SystemTime;
-use serde::{Deserialize, Serialize};
-use dirs::config_dir;
 
 use crate::display::DisplayConfigGroup;
 
-use super::{Border, LedType, ColorCalibration, SamplePointMapper};
+use super::{Border, ColorCalibration, LedType, SamplePointMapper};
 
 const CONFIG_FILE_NAME_V2: &str = "cc.ivanli.ambient_light/config_v2.toml";
 const LEGACY_LED_CONFIG_FILE: &str = "cc.ivanli.ambient_light/led_strip_config.toml";
@@ -209,7 +209,9 @@ impl LedStripConfigGroupV2 {
                 // 如果是0，根据index分配
                 let display_index = old_strip.index / 4;
                 if display_index < new_config.display_config.displays.len() {
-                    new_config.display_config.displays[display_index].internal_id.clone()
+                    new_config.display_config.displays[display_index]
+                        .internal_id
+                        .clone()
                 } else {
                     // 如果没有足够的显示器，创建一个默认的
                     let default_display = crate::display::DisplayConfig::new(
@@ -293,7 +295,8 @@ impl LedStripConfigGroupV2 {
 
                 // 为每个检测到的显示器创建配置
                 for display_info in &displays {
-                    let display_config = crate::display::DisplayConfig::from_display_info(display_info);
+                    let display_config =
+                        crate::display::DisplayConfig::from_display_info(display_info);
                     config.display_config.add_display(display_config);
                 }
 

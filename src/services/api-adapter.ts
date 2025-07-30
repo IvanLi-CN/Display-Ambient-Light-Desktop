@@ -283,6 +283,13 @@ export class ApiAdapter {
     );
   }
 
+  public async getDisplayConfigs(): Promise<any[]> {
+    return this.call(
+      'get_display_configs',
+      () => DisplayApiService.getDisplayConfigs()
+    );
+  }
+
   // ===== 设备相关API =====
 
   public async getBoards(): Promise<any[]> {
@@ -611,6 +618,7 @@ export const adaptiveApi = {
   // 显示器API
   listDisplayInfo: () => apiAdapter.listDisplayInfo(),
   getDisplays: () => apiAdapter.getDisplays(),
+  getDisplayConfigs: () => apiAdapter.getDisplayConfigs(),
   
   // 设备API
   getBoards: () => apiAdapter.getBoards(),

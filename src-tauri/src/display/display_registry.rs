@@ -1,7 +1,7 @@
+use anyhow::Result;
 use std::sync::Arc;
 use std::time::SystemTime;
-use tokio::sync::RwLock;
-use anyhow::Result;
+use tokio::sync::{OnceCell, RwLock};
 
 use super::{DisplayConfig, DisplayConfigGroup, DisplayMatcher, MatchResult, MatchType};
 
@@ -15,6 +15,26 @@ pub struct DisplayRegistry {
 }
 
 impl DisplayRegistry {
+    /// 获取全局显示器注册管理器实例
+    pub async fn global() -> Result<&'static Self> {
+        static DISPLAY_REGISTRY: OnceCell<DisplayRegistry> = OnceCell::const_new();
+
+        DISPLAY_REGISTRY
+            .get_or_try_init(|| async {
+                // 创建默认的显示器配置组
+                let config_group = DisplayConfigGroup::new();
+                let registry = Self::new(config_group);
+
+                // 检测并注册当前显示器
+                if let Err(e) = registry.detect_and_register_displays().await {
+                    log::warn!("Failed to detect displays during initialization: {}", e);
+                }
+
+                Ok(registry)
+            })
+            .await
+    }
+
     /// 创建新的显示器注册管理器
     pub fn new(config_group: DisplayConfigGroup) -> Self {
         let matcher = DisplayMatcher::new(config_group.clone());
@@ -54,17 +74,16 @@ impl DisplayRegistry {
 
         // 处理匹配结果
         let mut config_group = self.config_group.write().await;
-        
+
         for match_result in &match_results {
             match match_result.match_type {
                 MatchType::Exact | MatchType::Partial | MatchType::Position => {
                     // 更新现有配置的检测信息
-                    if let Some(config) = config_group.find_by_internal_id_mut(&match_result.config_internal_id) {
+                    if let Some(config) =
+                        config_group.find_by_internal_id_mut(&match_result.config_internal_id)
+                    {
                         config.update_last_detected(&match_result.system_display);
-                        log::info!(
-                            "✅ 更新显示器配置 '{}' 的检测信息",
-                            config.name
-                        );
+                        log::info!("✅ 更新显示器配置 '{}' 的检测信息", config.name);
                     }
                 }
                 MatchType::New => {
@@ -112,17 +131,89 @@ impl DisplayRegistry {
         config_group.displays.clone()
     }
 
+    /// 通过系统ID获取内部ID
+    pub async fn get_internal_id_by_display_id(&self, system_id: u32) -> Result<String> {
+        // 获取当前系统显示器信息
+        let system_displays = display_info::DisplayInfo::all()
+            .map_err(|e| anyhow::anyhow!("Failed to get display info: {}", e))?;
+
+        // 找到对应的系统显示器
+        let system_display = system_displays
+            .iter()
+            .find(|d| d.id == system_id)
+            .ok_or_else(|| anyhow::anyhow!("System display with ID {} not found", system_id))?;
+
+        // 在配置中查找匹配的显示器
+        let config_group = self.config_group.read().await;
+        for display_config in &config_group.displays {
+            // 首先尝试通过last_system_id匹配
+            if let Some(last_id) = display_config.last_system_id {
+                if last_id == system_id {
+                    return Ok(display_config.internal_id.clone());
+                }
+            }
+
+            // 然后尝试精确匹配
+            if display_config.exact_match(system_display) {
+                return Ok(display_config.internal_id.clone());
+            }
+        }
+
+        Err(anyhow::anyhow!(
+            "No display config found for system ID {}",
+            system_id
+        ))
+    }
+
+    /// 通过内部ID获取系统ID
+    pub async fn get_display_id_by_internal_id(&self, internal_id: &str) -> Result<u32> {
+        // 获取当前系统显示器信息
+        let system_displays = display_info::DisplayInfo::all()
+            .map_err(|e| anyhow::anyhow!("Failed to get display info: {}", e))?;
+
+        // 找到对应的显示器配置
+        let config_group = self.config_group.read().await;
+        let display_config = config_group
+            .find_by_internal_id(internal_id)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Display config with internal ID '{}' not found",
+                    internal_id
+                )
+            })?;
+
+        // 在系统显示器中查找匹配的显示器
+        for system_display in &system_displays {
+            // 首先尝试通过last_system_id匹配
+            if let Some(last_id) = display_config.last_system_id {
+                if last_id == system_display.id {
+                    return Ok(system_display.id);
+                }
+            }
+
+            // 然后尝试精确匹配
+            if display_config.exact_match(system_display) {
+                return Ok(system_display.id);
+            }
+        }
+
+        Err(anyhow::anyhow!(
+            "No system display found for internal ID '{}'",
+            internal_id
+        ))
+    }
+
     /// 更新显示器配置
     pub async fn update_display(&self, display: DisplayConfig) -> Result<bool> {
         let mut config_group = self.config_group.write().await;
         let updated = config_group.update_display(display);
-        
+
         if updated {
             // 更新匹配器的配置组
             let mut matcher = self.matcher.write().await;
             matcher.update_config_group(config_group.clone());
         }
-        
+
         Ok(updated)
     }
 
@@ -130,11 +221,11 @@ impl DisplayRegistry {
     pub async fn add_display(&self, display: DisplayConfig) -> Result<()> {
         let mut config_group = self.config_group.write().await;
         config_group.add_display(display);
-        
+
         // 更新匹配器的配置组
         let mut matcher = self.matcher.write().await;
         matcher.update_config_group(config_group.clone());
-        
+
         Ok(())
     }
 
@@ -142,13 +233,13 @@ impl DisplayRegistry {
     pub async fn remove_display(&self, internal_id: &str) -> Result<bool> {
         let mut config_group = self.config_group.write().await;
         let removed = config_group.remove_display(internal_id);
-        
+
         if removed {
             // 更新匹配器的配置组
             let mut matcher = self.matcher.write().await;
             matcher.update_config_group(config_group.clone());
         }
-        
+
         Ok(removed)
     }
 
@@ -162,11 +253,11 @@ impl DisplayRegistry {
     pub async fn update_config_group(&self, new_config_group: DisplayConfigGroup) -> Result<()> {
         let mut config_group = self.config_group.write().await;
         *config_group = new_config_group;
-        
+
         // 更新匹配器的配置组
         let mut matcher = self.matcher.write().await;
         matcher.update_config_group(config_group.clone());
-        
+
         Ok(())
     }
 
@@ -189,10 +280,7 @@ impl DisplayRegistry {
             if system_match.is_none() {
                 // 显示器可能已断开连接
                 outdated_displays.push(config_display.internal_id.clone());
-                log::warn!(
-                    "⚠️ 显示器配置 '{}' 可能已断开连接",
-                    config_display.name
-                );
+                log::warn!("⚠️ 显示器配置 '{}' 可能已断开连接", config_display.name);
             } else if let Some(sys_display) = system_match {
                 // 检查属性是否有变化
                 if !config_display.exact_match(sys_display) {
@@ -212,7 +300,7 @@ impl DisplayRegistry {
     pub async fn get_display_stats(&self) -> DisplayStats {
         let config_group = self.config_group.read().await;
         let total_displays = config_group.displays.len();
-        
+
         let primary_displays = config_group
             .displays
             .iter()
@@ -269,7 +357,7 @@ mod tests {
     async fn test_display_registry_creation() {
         let config_group = DisplayConfigGroup::new();
         let registry = DisplayRegistry::new(config_group);
-        
+
         let stats = registry.get_display_stats().await;
         assert_eq!(stats.total_displays, 0);
     }
@@ -278,22 +366,16 @@ mod tests {
     async fn test_add_and_find_display() {
         let config_group = DisplayConfigGroup::new();
         let registry = DisplayRegistry::new(config_group);
-        
-        let display = DisplayConfig::new(
-            "Test Display".to_string(),
-            1920,
-            1080,
-            1.0,
-            true,
-        );
+
+        let display = DisplayConfig::new("Test Display".to_string(), 1920, 1080, 1.0, true);
         let internal_id = display.internal_id.clone();
-        
+
         registry.add_display(display).await.unwrap();
-        
+
         let found = registry.find_display_by_internal_id(&internal_id).await;
         assert!(found.is_some());
         assert_eq!(found.unwrap().name, "Test Display");
-        
+
         let stats = registry.get_display_stats().await;
         assert_eq!(stats.total_displays, 1);
         assert_eq!(stats.primary_displays, 1);

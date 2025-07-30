@@ -21,11 +21,15 @@ mod user_preferences;
 mod volume;
 mod websocket_events;
 
+#[cfg(test)]
+mod tests;
+
 use display::DisplayManager;
 use display_info::DisplayInfo;
 use paris::{error, info, warn};
 use rpc::UdpRpc;
 use screenshot_manager::ScreenshotManager;
+
 use tauri::{
     http::{Request, Response},
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
@@ -516,6 +520,11 @@ fn handle_ambient_light_protocol<R: Runtime>(
 async fn main() {
     env_logger::init();
 
+    // 初始化新的稳定显示器ID系统
+    log::info!("🚀 初始化稳定显示器ID系统...");
+    let _config_manager_v2 = ambient_light::ConfigManagerV2::global().await;
+    log::info!("✅ 稳定显示器ID系统初始化完成");
+
     // Parse command line arguments
     let args: Vec<String> = std::env::args().collect();
     let mut target_page: Option<String> = None;
@@ -888,8 +897,14 @@ async fn main() {
 
             let app_handle = app.handle().clone();
             tokio::spawn(async move {
-                let config_manager = ambient_light::ConfigManager::global().await;
-                let mut config_update_receiver = config_manager.clone_config_update_receiver();
+                // 使用新的ConfigManagerV2和适配器
+                let config_manager_v2 = ambient_light::ConfigManagerV2::global().await;
+                let mut config_update_receiver = config_manager_v2.subscribe_config_updates();
+
+                // 创建适配器用于转换配置格式
+                let adapter =
+                    ambient_light::PublisherAdapter::new(config_manager_v2.get_display_registry());
+
                 loop {
                     if let Err(err) = config_update_receiver.changed().await {
                         error!("config update receiver changed error: {}", err);
@@ -898,9 +913,17 @@ async fn main() {
 
                     log::info!("config changed. emit config_changed event.");
 
-                    let config = config_update_receiver.borrow().clone();
+                    let v2_config = config_update_receiver.borrow().clone();
 
-                    app_handle.emit("config_changed", config).unwrap();
+                    // 转换为v1格式以保持前端兼容性
+                    match adapter.convert_v2_to_v1_config(&v2_config).await {
+                        Ok(v1_config) => {
+                            app_handle.emit("config_changed", v1_config).unwrap();
+                        }
+                        Err(e) => {
+                            error!("Failed to convert v2 config to v1: {}", e);
+                        }
+                    }
                 }
             });
 

@@ -44,6 +44,14 @@ export class DisplayApiService {
   }
 
   /**
+   * 获取所有显示器配置（包括稳定ID信息）
+   * 新增功能，用于获取完整的显示器配置信息
+   */
+  static async getDisplayConfigs(): Promise<any[]> {
+    return api.get('/api/v1/display/configs');
+  }
+
+  /**
    * 获取指定显示器的颜色
    * 替代: invoke('get_display_colors', { displayId, ledConfigs })
    */

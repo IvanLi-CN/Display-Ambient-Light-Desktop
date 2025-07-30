@@ -1,8 +1,10 @@
-use std::collections::HashMap;
 use anyhow::Result;
+use std::collections::HashMap;
 
+use crate::ambient_light::{
+    LedStripConfig, LedStripConfigGroup, LedStripConfigGroupV2, LedStripConfigV2,
+};
 use crate::display::DisplayRegistry;
-use crate::ambient_light::{LedStripConfigGroupV2, LedStripConfigV2, LedStripConfigGroup, LedStripConfig};
 
 /// Publisher适配器，用于在新旧配置系统之间进行转换
 pub struct PublisherAdapter {
@@ -16,7 +18,10 @@ impl PublisherAdapter {
     }
 
     /// 将新版本配置转换为旧版本配置，用于兼容现有的Publisher
-    pub async fn convert_v2_to_v1_config(&self, v2_config: &LedStripConfigGroupV2) -> Result<LedStripConfigGroup> {
+    pub async fn convert_v2_to_v1_config(
+        &self,
+        v2_config: &LedStripConfigGroupV2,
+    ) -> Result<LedStripConfigGroup> {
         log::info!("🔄 转换新版本配置到旧版本格式...");
 
         // 获取当前系统显示器信息
@@ -25,7 +30,7 @@ impl PublisherAdapter {
 
         // 创建显示器内部ID到系统ID的映射
         let mut internal_id_to_system_id = HashMap::new();
-        
+
         for display_config in &v2_config.display_config.displays {
             // 尝试通过匹配找到对应的系统显示器
             let system_display = system_displays.iter().find(|sys_display| {
@@ -35,7 +40,7 @@ impl PublisherAdapter {
                         return true;
                     }
                 }
-                
+
                 // 然后尝试精确匹配
                 display_config.exact_match(sys_display)
             });
@@ -99,6 +104,99 @@ impl PublisherAdapter {
         Ok(v1_config)
     }
 
+    /// 将v1配置转换为v2配置格式
+    pub async fn convert_v1_to_v2_config(
+        &self,
+        v1_config: &LedStripConfigGroup,
+    ) -> Result<LedStripConfigGroupV2> {
+        log::info!("🔄 转换旧版本配置到新版本格式...");
+
+        // 获取当前系统显示器信息
+        let system_displays = display_info::DisplayInfo::all()
+            .map_err(|e| anyhow::anyhow!("Failed to get display info: {}", e))?;
+
+        // 创建系统ID到内部ID的映射
+        let mut system_id_to_internal_id = HashMap::new();
+
+        // 获取当前的显示器配置组
+        let display_config = self.display_registry.get_config_group().await;
+
+        for display_config_item in &display_config.displays {
+            // 尝试通过匹配找到对应的系统显示器
+            let system_display = system_displays.iter().find(|sys_display| {
+                // 首先尝试通过last_system_id匹配
+                if let Some(last_id) = display_config_item.last_system_id {
+                    if last_id == sys_display.id {
+                        return true;
+                    }
+                }
+
+                // 然后尝试精确匹配
+                display_config_item.exact_match(sys_display)
+            });
+
+            if let Some(sys_display) = system_display {
+                system_id_to_internal_id
+                    .insert(sys_display.id, display_config_item.internal_id.clone());
+                log::debug!(
+                    "映射显示器: 系统ID {} -> '{}' ({})",
+                    sys_display.id,
+                    display_config_item.name,
+                    display_config_item.internal_id
+                );
+            }
+        }
+
+        // 转换LED灯带配置
+        let mut v2_strips = Vec::new();
+        for v1_strip in &v1_config.strips {
+            let internal_id = system_id_to_internal_id
+                .get(&v1_strip.display_id)
+                .cloned()
+                .unwrap_or_else(|| {
+                    log::warn!(
+                        "⚠️ 无法找到显示器ID {} 对应的内部ID，使用默认值",
+                        v1_strip.display_id
+                    );
+                    format!("display_{}", v1_strip.display_id)
+                });
+
+            let v2_strip = LedStripConfigV2 {
+                index: v1_strip.index,
+                border: v1_strip.border,
+                display_internal_id: internal_id.clone(),
+                len: v1_strip.len,
+                led_type: v1_strip.led_type,
+                reversed: v1_strip.reversed,
+            };
+
+            v2_strips.push(v2_strip);
+            log::debug!(
+                "转换灯带 {}: display_id {} -> {}",
+                v1_strip.index,
+                v1_strip.display_id,
+                internal_id
+            );
+        }
+
+        // 创建新版本配置
+        let mut v2_config = LedStripConfigGroupV2 {
+            version: 2,
+            strips: v2_strips,
+            color_calibration: v1_config.color_calibration,
+            display_config,
+            mappers: Vec::new(),
+            created_at: std::time::SystemTime::now(),
+            updated_at: std::time::SystemTime::now(),
+        };
+
+        // 生成mappers
+        v2_config.generate_mappers();
+
+        log::info!("✅ 配置转换完成: {} 个灯带", v2_config.strips.len());
+        Ok(v2_config)
+    }
+
     /// 获取更新后的配置，确保显示器ID正确分配
     pub async fn get_updated_configs_with_stable_ids(
         &self,
@@ -151,10 +249,7 @@ impl PublisherAdapter {
                 || v2_strip.led_type != v1_strip.led_type
                 || v2_strip.reversed != v1_strip.reversed
             {
-                log::error!(
-                    "❌ 灯带 {} 属性不匹配",
-                    v2_strip.index
-                );
+                log::error!("❌ 灯带 {} 属性不匹配", v2_strip.index);
                 return Ok(false);
             }
         }
@@ -230,20 +325,14 @@ mod tests {
     async fn test_config_conversion() {
         // 创建测试用的显示器配置
         let mut display_config_group = DisplayConfigGroup::new();
-        let display = DisplayConfig::new(
-            "Test Display".to_string(),
-            1920,
-            1080,
-            1.0,
-            true,
-        );
+        let display = DisplayConfig::new("Test Display".to_string(), 1920, 1080, 1.0, true);
         let display_id = display.internal_id.clone();
         display_config_group.add_display(display);
 
         // 创建测试用的v2配置
         let mut v2_config = LedStripConfigGroupV2::new();
         v2_config.display_config = display_config_group;
-        
+
         let strip = LedStripConfigV2 {
             index: 0,
             border: crate::ambient_light::Border::Top,
@@ -255,7 +344,8 @@ mod tests {
         v2_config.strips.push(strip);
 
         // 创建适配器
-        let display_registry = std::sync::Arc::new(DisplayRegistry::new(v2_config.display_config.clone()));
+        let display_registry =
+            std::sync::Arc::new(DisplayRegistry::new(v2_config.display_config.clone()));
         let adapter = PublisherAdapter::new(display_registry);
 
         // 测试转换（注意：这个测试在没有真实显示器的环境中可能会失败）

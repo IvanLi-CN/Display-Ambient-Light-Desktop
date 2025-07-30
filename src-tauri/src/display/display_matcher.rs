@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use anyhow::Result;
+use std::collections::HashMap;
 
 use super::DisplayConfigGroup;
 
@@ -42,13 +42,19 @@ impl DisplayMatcher {
     }
 
     /// 匹配系统检测到的显示器与配置中的显示器
-    pub fn match_displays(&self, system_displays: &[display_info::DisplayInfo]) -> Result<Vec<MatchResult>> {
+    pub fn match_displays(
+        &self,
+        system_displays: &[display_info::DisplayInfo],
+    ) -> Result<Vec<MatchResult>> {
         let mut results = Vec::new();
         let mut used_configs = std::collections::HashSet::new();
         let mut used_systems = std::collections::HashSet::new();
 
-        log::info!("🔍 开始匹配 {} 个系统显示器与 {} 个配置显示器", 
-                   system_displays.len(), self.config_group.displays.len());
+        log::info!(
+            "🔍 开始匹配 {} 个系统显示器与 {} 个配置显示器",
+            system_displays.len(),
+            self.config_group.displays.len()
+        );
 
         // 第一轮：精确匹配
         for (sys_idx, system_display) in system_displays.iter().enumerate() {
@@ -65,8 +71,12 @@ impl DisplayMatcher {
                         match_type: MatchType::Exact,
                     };
 
-                    log::info!("✅ 精确匹配: 配置 '{}' <-> 系统显示器 {} (分数: {})", 
-                               config_display.name, system_display.id, match_result.match_score);
+                    log::info!(
+                        "✅ 精确匹配: 配置 '{}' <-> 系统显示器 {} (分数: {})",
+                        config_display.name,
+                        system_display.id,
+                        match_result.match_score
+                    );
 
                     results.push(match_result);
                     used_configs.insert(config_display.internal_id.clone());
@@ -106,8 +116,12 @@ impl DisplayMatcher {
                     match_type: MatchType::Partial,
                 };
 
-                log::info!("🔶 部分匹配: 配置 '{}' <-> 系统显示器 {} (分数: {})", 
-                           config_display.name, system_display.id, match_result.match_score);
+                log::info!(
+                    "🔶 部分匹配: 配置 '{}' <-> 系统显示器 {} (分数: {})",
+                    config_display.name,
+                    system_display.id,
+                    match_result.match_score
+                );
 
                 results.push(match_result);
                 used_configs.insert(config_id);
@@ -138,7 +152,10 @@ impl DisplayMatcher {
                 match_type: MatchType::New,
             };
 
-            log::info!("🆕 新显示器: 系统显示器 {} 需要创建新配置", system_display.id);
+            log::info!(
+                "🆕 新显示器: 系统显示器 {} 需要创建新配置",
+                system_display.id
+            );
             results.push(match_result);
         }
 
@@ -156,7 +173,7 @@ impl DisplayMatcher {
     ) {
         // 计算系统显示器的相对位置关系
         let system_relations = self.calculate_position_relations(system_displays);
-        
+
         // 计算配置显示器的相对位置关系
         let config_relations = self.calculate_config_position_relations();
 
@@ -181,7 +198,8 @@ impl DisplayMatcher {
                     &config_display.internal_id,
                 );
 
-                if similarity > 50 { // 至少50%的相似度
+                if similarity > 50 {
+                    // 至少50%的相似度
                     let base_score = config_display.match_score(system_display);
                     let position_bonus = (similarity as f32 * 0.3) as u8; // 位置匹配最多加30分
                     let total_score = (base_score + position_bonus).min(100);
@@ -201,8 +219,12 @@ impl DisplayMatcher {
                     match_type: MatchType::Position,
                 };
 
-                log::info!("📍 位置匹配: 配置 '{}' <-> 系统显示器 {} (分数: {})", 
-                           config_display.name, system_display.id, match_result.match_score);
+                log::info!(
+                    "📍 位置匹配: 配置 '{}' <-> 系统显示器 {} (分数: {})",
+                    config_display.name,
+                    system_display.id,
+                    match_result.match_score
+                );
 
                 results.push(match_result);
                 used_configs.insert(config_id);
@@ -212,7 +234,10 @@ impl DisplayMatcher {
     }
 
     /// 计算系统显示器的位置关系
-    pub fn calculate_position_relations(&self, displays: &[display_info::DisplayInfo]) -> HashMap<usize, Vec<String>> {
+    pub fn calculate_position_relations(
+        &self,
+        displays: &[display_info::DisplayInfo],
+    ) -> HashMap<usize, Vec<String>> {
         let mut relations = HashMap::new();
 
         for (i, display) in displays.iter().enumerate() {
@@ -339,13 +364,7 @@ mod tests {
     #[test]
     fn test_exact_matching() {
         let mut config_group = DisplayConfigGroup::new();
-        let config = DisplayConfig::new(
-            "Test Display".to_string(),
-            1920,
-            1080,
-            1.0,
-            true,
-        );
+        let config = DisplayConfig::new("Test Display".to_string(), 1920, 1080, 1.0, true);
         config_group.add_display(config);
 
         let matcher = DisplayMatcher::new(config_group);

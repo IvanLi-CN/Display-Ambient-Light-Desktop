@@ -1,5 +1,5 @@
-use std::time::SystemTime;
 use serde::{Deserialize, Serialize};
+use std::time::SystemTime;
 use uuid::Uuid;
 
 /// 显示器配置 - 包含稳定的内部ID和物理属性
@@ -32,13 +32,7 @@ pub struct DisplayPosition {
 
 impl DisplayConfig {
     /// 创建新的显示器配置
-    pub fn new(
-        name: String,
-        width: u32,
-        height: u32,
-        scale_factor: f32,
-        is_primary: bool,
-    ) -> Self {
+    pub fn new(name: String, width: u32, height: u32, scale_factor: f32, is_primary: bool) -> Self {
         Self {
             internal_id: Self::generate_internal_id(),
             name,
@@ -176,7 +170,9 @@ impl DisplayConfigGroup {
 
     /// 根据内部ID查找显示器配置（可变引用）
     pub fn find_by_internal_id_mut(&mut self, internal_id: &str) -> Option<&mut DisplayConfig> {
-        self.displays.iter_mut().find(|d| d.internal_id == internal_id)
+        self.displays
+            .iter_mut()
+            .find(|d| d.internal_id == internal_id)
     }
 
     /// 移除显示器配置
@@ -214,13 +210,7 @@ mod tests {
 
     #[test]
     fn test_display_config_creation() {
-        let config = DisplayConfig::new(
-            "Test Display".to_string(),
-            1920,
-            1080,
-            1.0,
-            true,
-        );
+        let config = DisplayConfig::new("Test Display".to_string(), 1920, 1080, 1.0, true);
 
         assert_eq!(config.name, "Test Display");
         assert_eq!(config.width, 1920);
@@ -232,13 +222,7 @@ mod tests {
 
     #[test]
     fn test_match_score() {
-        let config = DisplayConfig::new(
-            "Test Display".to_string(),
-            1920,
-            1080,
-            1.0,
-            true,
-        );
+        let config = DisplayConfig::new("Test Display".to_string(), 1920, 1080, 1.0, true);
 
         // 创建模拟的显示器信息
         let display_info = display_info::DisplayInfo {
@@ -262,13 +246,7 @@ mod tests {
     #[test]
     fn test_display_config_group() {
         let mut group = DisplayConfigGroup::new();
-        let config = DisplayConfig::new(
-            "Test Display".to_string(),
-            1920,
-            1080,
-            1.0,
-            true,
-        );
+        let config = DisplayConfig::new("Test Display".to_string(), 1920, 1080, 1.0, true);
         let internal_id = config.internal_id.clone();
 
         group.add_display(config);

@@ -1,9 +1,19 @@
 #[cfg(test)]
 mod tests {
-    use crate::display::{DisplayConfig, DisplayConfigGroup, DisplayMatcher, DisplayRegistry, ConfigMigrator, MatchType};
+    use crate::display::{
+        ConfigMigrator, DisplayConfig, DisplayConfigGroup, DisplayMatcher, DisplayRegistry,
+        MatchType,
+    };
 
     /// 创建测试用的显示器信息
-    fn create_test_display_info(id: u32, x: i32, y: i32, width: u32, height: u32, is_primary: bool) -> display_info::DisplayInfo {
+    fn create_test_display_info(
+        id: u32,
+        x: i32,
+        y: i32,
+        width: u32,
+        height: u32,
+        is_primary: bool,
+    ) -> display_info::DisplayInfo {
         display_info::DisplayInfo {
             id,
             x,
@@ -20,13 +30,7 @@ mod tests {
 
     #[test]
     fn test_display_config_creation() {
-        let config = DisplayConfig::new(
-            "Test Display".to_string(),
-            1920,
-            1080,
-            1.0,
-            true,
-        );
+        let config = DisplayConfig::new("Test Display".to_string(), 1920, 1080, 1.0, true);
 
         assert_eq!(config.name, "Test Display");
         assert_eq!(config.width, 1920);
@@ -52,13 +56,7 @@ mod tests {
 
     #[test]
     fn test_display_config_matching() {
-        let mut config = DisplayConfig::new(
-            "Test Display".to_string(),
-            1920,
-            1080,
-            1.0,
-            true,
-        );
+        let mut config = DisplayConfig::new("Test Display".to_string(), 1920, 1080, 1.0, true);
 
         let display_info = create_test_display_info(1, 0, 0, 1920, 1080, true);
 
@@ -150,7 +148,7 @@ mod tests {
     fn test_display_matcher_partial_matching() {
         let mut config_group = DisplayConfigGroup::new();
         let mut config = DisplayConfig::new("Test Display".to_string(), 1920, 1080, 1.0, true);
-        
+
         // 设置不同的主显示器状态，但尺寸相同
         config.is_primary = false;
         config_group.add_display(config);
@@ -202,14 +200,14 @@ mod tests {
     #[test]
     fn test_config_migrator_display_id_mapping() {
         let mut display_config_group = DisplayConfigGroup::new();
-        
+
         // 添加两个显示器配置
         let display1 = DisplayConfig::new("Display 1".to_string(), 1920, 1080, 1.0, true);
         let display2 = DisplayConfig::new("Display 2".to_string(), 1920, 1080, 1.0, false);
-        
+
         let id1 = display1.internal_id.clone();
         let id2 = display2.internal_id.clone();
-        
+
         display_config_group.add_display(display1);
         display_config_group.add_display(display2);
 
@@ -276,8 +274,8 @@ mod tests {
     #[test]
     fn test_position_relations_calculation() {
         let displays = vec![
-            create_test_display_info(1, 0, 0, 1920, 1080, true),      // 左显示器
-            create_test_display_info(2, 2000, 0, 1920, 1080, false),  // 右显示器（增加间距避免重叠）
+            create_test_display_info(1, 0, 0, 1920, 1080, true), // 左显示器
+            create_test_display_info(2, 2000, 0, 1920, 1080, false), // 右显示器（增加间距避免重叠）
         ];
 
         let config_group = DisplayConfigGroup::new();

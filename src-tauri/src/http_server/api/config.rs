@@ -96,9 +96,18 @@ pub struct UpdateLanguageRequest {
     tag = "config"
 )]
 pub async fn get_led_strip_configs() -> Result<Json<ApiResponse<LedStripConfigGroup>>, StatusCode> {
-    let config_manager = ambient_light::ConfigManager::global().await;
-    let config = config_manager.configs().await;
-    Ok(Json(ApiResponse::success(config)))
+    let config_manager_v2 = ambient_light::ConfigManagerV2::global().await;
+    let v2_config = config_manager_v2.get_config().await;
+
+    // 转换为v1格式以保持API兼容性
+    let adapter = ambient_light::PublisherAdapter::new(config_manager_v2.get_display_registry());
+    match adapter.convert_v2_to_v1_config(&v2_config).await {
+        Ok(v1_config) => Ok(Json(ApiResponse::success(v1_config))),
+        Err(e) => {
+            log::error!("Failed to convert v2 config to v1: {}", e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
 }
 
 /// 更新LED灯带配置
@@ -113,15 +122,24 @@ pub async fn get_led_strip_configs() -> Result<Json<ApiResponse<LedStripConfigGr
     tag = "config"
 )]
 pub async fn update_led_strip_configs(
-    Json(config): Json<LedStripConfigGroup>,
+    Json(v1_config): Json<LedStripConfigGroup>,
 ) -> Result<Json<ApiResponse<String>>, StatusCode> {
-    let config_manager = ambient_light::ConfigManager::global().await;
-    match config_manager.update(&config).await {
-        Ok(_) => Ok(Json(ApiResponse::success(
-            "LED strip configs updated successfully".to_string(),
-        ))),
+    let config_manager_v2 = ambient_light::ConfigManagerV2::global().await;
+    let adapter = ambient_light::PublisherAdapter::new(config_manager_v2.get_display_registry());
+
+    // 转换v1配置为v2格式
+    match adapter.convert_v1_to_v2_config(&v1_config).await {
+        Ok(v2_config) => match config_manager_v2.update_config(v2_config).await {
+            Ok(_) => Ok(Json(ApiResponse::success(
+                "LED strip configs updated successfully".to_string(),
+            ))),
+            Err(e) => {
+                log::error!("Failed to update LED strip configs: {e}");
+                Err(StatusCode::INTERNAL_SERVER_ERROR)
+            }
+        },
         Err(e) => {
-            log::error!("Failed to update LED strip configs: {e}");
+            log::error!("Failed to convert v1 config to v2: {e}");
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -141,11 +159,53 @@ pub async fn update_led_strip_configs(
 pub async fn update_led_strip_length(
     Json(request): Json<UpdateLedStripLenRequest>,
 ) -> Result<Json<ApiResponse<String>>, StatusCode> {
-    let config_manager = ambient_light::ConfigManager::global().await;
-    match config_manager
-        .patch_led_strip_len(request.display_id, request.border, request.delta_len)
+    let config_manager_v2 = ambient_light::ConfigManagerV2::global().await;
+
+    // 获取当前配置
+    let mut v2_config = config_manager_v2.get_config().await;
+
+    // 通过显示器注册管理器获取内部ID
+    let display_registry = config_manager_v2.get_display_registry();
+    let internal_id = match display_registry
+        .get_internal_id_by_display_id(request.display_id)
         .await
     {
+        Ok(id) => id,
+        Err(e) => {
+            log::error!(
+                "Failed to get internal ID for display {}: {}",
+                request.display_id,
+                e
+            );
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+
+    // 查找并更新对应的灯带
+    let mut found = false;
+    for strip in &mut v2_config.strips {
+        if strip.display_internal_id == internal_id && strip.border == request.border {
+            let new_len = (strip.len as i32 + request.delta_len as i32).max(0) as usize;
+            strip.len = new_len;
+            found = true;
+            break;
+        }
+    }
+
+    if !found {
+        log::error!(
+            "LED strip not found for display {} border {:?}",
+            request.display_id,
+            request.border
+        );
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    // 重新生成mappers
+    v2_config.generate_mappers();
+
+    // 保存配置
+    match config_manager_v2.update_config(v2_config).await {
         Ok(_) => Ok(Json(ApiResponse::success(
             "LED strip length updated successfully".to_string(),
         ))),
@@ -212,11 +272,52 @@ pub async fn update_theme(
 pub async fn update_led_strip_type(
     Json(request): Json<UpdateLedStripTypeRequest>,
 ) -> Result<Json<ApiResponse<String>>, StatusCode> {
-    let config_manager = ambient_light::ConfigManager::global().await;
-    match config_manager
-        .patch_led_strip_type(request.display_id, request.border, request.led_type)
+    let config_manager_v2 = ambient_light::ConfigManagerV2::global().await;
+
+    // 获取当前配置
+    let mut v2_config = config_manager_v2.get_config().await;
+
+    // 通过显示器注册管理器获取内部ID
+    let display_registry = config_manager_v2.get_display_registry();
+    let internal_id = match display_registry
+        .get_internal_id_by_display_id(request.display_id)
         .await
     {
+        Ok(id) => id,
+        Err(e) => {
+            log::error!(
+                "Failed to get internal ID for display {}: {}",
+                request.display_id,
+                e
+            );
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+
+    // 查找并更新对应的灯带
+    let mut found = false;
+    for strip in &mut v2_config.strips {
+        if strip.display_internal_id == internal_id && strip.border == request.border {
+            strip.led_type = request.led_type;
+            found = true;
+            break;
+        }
+    }
+
+    if !found {
+        log::error!(
+            "LED strip not found for display {} border {:?}",
+            request.display_id,
+            request.border
+        );
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    // 重新生成mappers
+    v2_config.generate_mappers();
+
+    // 保存配置
+    match config_manager_v2.update_config(v2_config).await {
         Ok(_) => Ok(Json(ApiResponse::success(
             "LED strip type updated successfully".to_string(),
         ))),
@@ -375,9 +476,9 @@ pub async fn update_view_scale(
 pub async fn update_global_color_calibration(
     Json(request): Json<UpdateGlobalColorCalibrationRequest>,
 ) -> Result<Json<ApiResponse<String>>, StatusCode> {
-    let config_manager = ambient_light::ConfigManager::global().await;
-    match config_manager
-        .set_color_calibration(request.calibration)
+    let config_manager_v2 = ambient_light::ConfigManagerV2::global().await;
+    match config_manager_v2
+        .update_color_calibration(request.calibration)
         .await
     {
         Ok(_) => Ok(Json(ApiResponse::success(

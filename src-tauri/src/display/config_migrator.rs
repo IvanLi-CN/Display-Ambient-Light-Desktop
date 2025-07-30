@@ -1,7 +1,7 @@
-use std::env::current_dir;
-use std::path::PathBuf;
 use anyhow::Result;
 use dirs::config_dir;
+use std::env::current_dir;
+use std::path::PathBuf;
 
 use super::{DisplayConfig, DisplayConfigGroup};
 use crate::ambient_light::{LedStripConfigGroup, LedStripConfigGroupV2, LedStripConfigV2};
@@ -77,7 +77,11 @@ impl ConfigMigrator {
                 // 创建默认显示器配置
                 for i in 0..2 {
                     let display_config = DisplayConfig::new(
-                        if i == 0 { "主显示器".to_string() } else { format!("显示器 {}", i + 1) },
+                        if i == 0 {
+                            "主显示器".to_string()
+                        } else {
+                            format!("显示器 {}", i + 1)
+                        },
                         1920,
                         1080,
                         1.0,
@@ -88,12 +92,17 @@ impl ConfigMigrator {
             }
         }
 
-        log::info!("✅ 显示器配置迁移完成，共 {} 个显示器", display_config_group.displays.len());
+        log::info!(
+            "✅ 显示器配置迁移完成，共 {} 个显示器",
+            display_config_group.displays.len()
+        );
         Ok(display_config_group)
     }
 
     /// 迁移LED灯带配置
-    async fn migrate_led_strip_config(display_config_group: DisplayConfigGroup) -> Result<LedStripConfigGroupV2> {
+    async fn migrate_led_strip_config(
+        display_config_group: DisplayConfigGroup,
+    ) -> Result<LedStripConfigGroupV2> {
         log::info!("💡 开始迁移LED灯带配置...");
 
         // 读取旧版本LED配置
@@ -135,7 +144,10 @@ impl ConfigMigrator {
         // 生成mappers
         new_config.generate_mappers();
 
-        log::info!("✅ LED灯带配置迁移完成，共 {} 个灯带", new_config.strips.len());
+        log::info!(
+            "✅ LED灯带配置迁移完成，共 {} 个灯带",
+            new_config.strips.len()
+        );
         Ok(new_config)
     }
 
@@ -149,10 +161,14 @@ impl ConfigMigrator {
             // 如果是0，根据灯带索引分配（每4个灯带对应一个显示器）
             let display_index = strip_index / 4;
             if display_index < display_config_group.displays.len() {
-                display_config_group.displays[display_index].internal_id.clone()
+                display_config_group.displays[display_index]
+                    .internal_id
+                    .clone()
             } else {
                 // 如果索引超出范围，使用第一个显示器
-                display_config_group.displays.first()
+                display_config_group
+                    .displays
+                    .first()
                     .map(|d| d.internal_id.clone())
                     .unwrap_or_else(|| "default_display".to_string())
             }
@@ -165,7 +181,9 @@ impl ConfigMigrator {
                 .map(|d| d.internal_id.clone())
                 .unwrap_or_else(|| {
                     // 如果找不到，使用第一个显示器
-                    display_config_group.displays.first()
+                    display_config_group
+                        .displays
+                        .first()
                         .map(|d| d.internal_id.clone())
                         .unwrap_or_else(|| "default_display".to_string())
                 })
@@ -269,14 +287,14 @@ mod tests {
     #[tokio::test]
     async fn test_display_id_mapping() {
         let mut display_config_group = DisplayConfigGroup::new();
-        
+
         // 添加两个显示器配置
         let display1 = DisplayConfig::new("Display 1".to_string(), 1920, 1080, 1.0, true);
         let display2 = DisplayConfig::new("Display 2".to_string(), 1920, 1080, 1.0, false);
-        
+
         let id1 = display1.internal_id.clone();
         let id2 = display2.internal_id.clone();
-        
+
         display_config_group.add_display(display1);
         display_config_group.add_display(display2);
 

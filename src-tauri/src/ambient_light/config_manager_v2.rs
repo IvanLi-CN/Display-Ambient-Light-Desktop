@@ -1,10 +1,12 @@
+use anyhow::Result;
 use std::sync::Arc;
 use tauri::async_runtime::RwLock;
 use tokio::sync::OnceCell;
-use anyhow::Result;
 
-use crate::display::{DisplayRegistry, ConfigMigrator};
-use crate::ambient_light::{LedStripConfigGroupV2, LedStripConfigV2, Border, LedType, ColorCalibration};
+use crate::ambient_light::{
+    Border, ColorCalibration, LedStripConfigGroupV2, LedStripConfigV2, LedType,
+};
+use crate::display::{ConfigMigrator, DisplayRegistry};
 
 /// 新版本的配置管理器，支持稳定的显示器ID系统
 pub struct ConfigManagerV2 {
@@ -59,7 +61,7 @@ impl ConfigManagerV2 {
     /// 从配置创建管理器
     async fn create_from_config(config: LedStripConfigGroupV2) -> Self {
         let display_registry = Arc::new(DisplayRegistry::new(config.display_config.clone()));
-        
+
         // 检测并注册当前显示器
         if let Err(e) = display_registry.detect_and_register_displays().await {
             log::warn!("⚠️ 显示器检测失败: {}", e);
@@ -107,15 +109,28 @@ impl ConfigManagerV2 {
         }
 
         // 更新显示器注册管理器
-        self.display_registry.update_config_group(new_config.display_config.clone()).await?;
+        self.display_registry
+            .update_config_group(new_config.display_config.clone())
+            .await?;
 
         // 发送更新通知
         if let Err(e) = self.config_update_sender.send(new_config.clone()) {
             log::error!("发送配置更新通知失败: {}", e);
         }
 
-        // 通过WebSocket广播配置变化
-        crate::websocket_events::publish_config_changed(&new_config.into()).await;
+        // 通过适配器转换为v1格式并广播配置变化
+        let adapter = crate::ambient_light::PublisherAdapter::new(self.display_registry.clone());
+        match adapter.convert_v2_to_v1_config(&new_config).await {
+            Ok(v1_config) => {
+                crate::websocket_events::publish_config_changed(&v1_config).await;
+            }
+            Err(e) => {
+                log::error!(
+                    "Failed to convert v2 config to v1 for WebSocket broadcast: {}",
+                    e
+                );
+            }
+        }
 
         log::info!("✅ 配置更新成功");
         Ok(())
@@ -124,14 +139,16 @@ impl ConfigManagerV2 {
     /// 重新加载配置
     pub async fn reload_config(&self) -> Result<()> {
         let new_config = LedStripConfigGroupV2::read_config().await?;
-        
+
         {
             let mut config = self.config.write().await;
             *config = new_config.clone();
         }
 
         // 更新显示器注册管理器
-        self.display_registry.update_config_group(new_config.display_config.clone()).await?;
+        self.display_registry
+            .update_config_group(new_config.display_config.clone())
+            .await?;
 
         log::info!("✅ 配置重新加载成功");
         Ok(())
@@ -158,7 +175,7 @@ impl ConfigManagerV2 {
     /// 更新LED灯带
     pub async fn update_led_strip(&self, index: usize, strip: LedStripConfigV2) -> Result<()> {
         let mut config = self.get_config().await;
-        
+
         if let Some(existing_strip) = config.strips.iter_mut().find(|s| s.index == index) {
             *existing_strip = strip;
             config.generate_mappers();
@@ -171,10 +188,10 @@ impl ConfigManagerV2 {
     /// 删除LED灯带
     pub async fn remove_led_strip(&self, index: usize) -> Result<()> {
         let mut config = self.get_config().await;
-        
+
         let initial_len = config.strips.len();
         config.strips.retain(|s| s.index != index);
-        
+
         if config.strips.len() < initial_len {
             config.generate_mappers();
             self.update_config(config).await
@@ -193,7 +210,8 @@ impl ConfigManagerV2 {
     /// 获取指定显示器的LED灯带
     pub async fn get_strips_for_display(&self, display_internal_id: &str) -> Vec<LedStripConfigV2> {
         let config = self.config.read().await;
-        config.strips
+        config
+            .strips
             .iter()
             .filter(|s| s.display_internal_id == display_internal_id)
             .cloned()
@@ -203,7 +221,7 @@ impl ConfigManagerV2 {
     /// 检查显示器变化并更新配置
     pub async fn check_and_update_displays(&self) -> Result<bool> {
         log::info!("🔍 检查显示器变化...");
-        
+
         let match_results = self.display_registry.detect_and_register_displays().await?;
         let mut config_changed = false;
 
@@ -211,9 +229,10 @@ impl ConfigManagerV2 {
         for match_result in &match_results {
             if matches!(match_result.match_type, crate::display::MatchType::New) {
                 log::info!("🆕 为新显示器创建默认灯带配置");
-                
+
                 let mut config = self.get_config().await;
-                let display_config = self.display_registry
+                let display_config = self
+                    .display_registry
                     .find_display_by_system_id(match_result.system_display.id)
                     .await;
 
@@ -237,7 +256,7 @@ impl ConfigManagerV2 {
                         };
                         config.strips.push(strip);
                     }
-                    
+
                     config.generate_mappers();
                     self.update_config(config).await?;
                     config_changed = true;
@@ -280,7 +299,8 @@ pub struct ConfigStats {
 // 为了兼容性，提供从新配置到旧配置的转换
 impl From<LedStripConfigGroupV2> for crate::ambient_light::LedStripConfigGroup {
     fn from(v2_config: LedStripConfigGroupV2) -> Self {
-        let strips = v2_config.strips
+        let strips = v2_config
+            .strips
             .into_iter()
             .map(|strip| crate::ambient_light::LedStripConfig {
                 index: strip.index,
@@ -297,7 +317,7 @@ impl From<LedStripConfigGroupV2> for crate::ambient_light::LedStripConfigGroup {
             mappers: Vec::new(),
             color_calibration: v2_config.color_calibration,
         };
-        
+
         config.generate_mappers();
         config
     }
