@@ -258,6 +258,17 @@ export class ConfigApiService {
     });
   }
 
+  /**
+   * 反转LED灯带
+   * 替代: invoke('reverse_led_strip_part', { displayId, border })
+   */
+  static async reverseLedStrip(displayId: number, border: Borders): Promise<void> {
+    return api.put('/api/v1/config/led-strips/reverse', {
+      display_id: displayId,
+      border
+    });
+  }
+
 
 
   /**

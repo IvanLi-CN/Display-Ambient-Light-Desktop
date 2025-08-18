@@ -36,6 +36,15 @@ pub struct UpdateLedStripTypeRequest {
     pub led_type: LedType,
 }
 
+/// LED灯带反转请求
+#[derive(Deserialize, ToSchema)]
+pub struct ReverseLedStripRequest {
+    /// 显示器ID
+    pub display_id: u32,
+    /// 边框
+    pub border: Border,
+}
+
 /// 主题更新请求
 #[derive(Deserialize, ToSchema)]
 pub struct UpdateThemeRequest {
@@ -211,6 +220,44 @@ pub async fn update_led_strip_length(
         ))),
         Err(e) => {
             log::error!("Failed to update LED strip length: {e}");
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+/// 反转LED灯带
+#[utoipa::path(
+    put,
+    path = "/api/v1/config/led-strips/reverse",
+    request_body = ReverseLedStripRequest,
+    responses(
+        (status = 200, description = "反转LED灯带成功", body = ApiResponse<String>),
+        (status = 404, description = "未找到指定的LED灯带", body = ApiResponse<String>),
+        (status = 500, description = "反转失败", body = ApiResponse<String>),
+    ),
+    tag = "config"
+)]
+pub async fn reverse_led_strip(
+    Json(request): Json<ReverseLedStripRequest>,
+) -> Result<Json<ApiResponse<String>>, StatusCode> {
+    let config_manager = ambient_light::ConfigManager::global().await;
+
+    match config_manager
+        .reverse_led_strip_part(request.display_id, request.border)
+        .await
+    {
+        Ok(_) => {
+            log::info!(
+                "LED strip reversed successfully: display_id={}, border={:?}",
+                request.display_id,
+                request.border
+            );
+            Ok(Json(ApiResponse::success(
+                "LED strip reversed successfully".to_string(),
+            )))
+        }
+        Err(e) => {
+            log::error!("Failed to reverse LED strip: {e}");
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -585,6 +632,7 @@ pub fn create_routes() -> Router<AppState> {
         .route("/led-strips", post(update_led_strip_configs))
         .route("/led-strips/length", put(update_led_strip_length))
         .route("/led-strips/type", put(update_led_strip_type))
+        .route("/led-strips/reverse", put(reverse_led_strip))
         .route("/user-preferences", get(get_user_preferences))
         .route("/user-preferences", put(update_user_preferences))
         .route("/window-preferences", put(update_window_preferences))

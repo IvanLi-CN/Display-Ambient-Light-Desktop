@@ -10,6 +10,7 @@ import {
   splitProps,
   useContext,
 } from 'solid-js';
+import { useNavigate } from '@solidjs/router';
 import { useTippy } from 'solid-tippy';
 import { followCursor } from 'tippy.js';
 import { LedStripConfig } from '../../models/led-strip-config';
@@ -45,6 +46,7 @@ export const Pixel: Component<PixelProps> = (props) => {
 export const LedStripPart: Component<LedStripPartProps> = (props) => {
   const [localProps, rootProps] = splitProps(props, ['config', 'colors']);
   const [stripConfiguration, { setHoveredStripPart }] = useContext(LedStripConfigurationContext);
+  const navigate = useNavigate();
 
   const [colors, setColors] = createSignal<string[]>([]);
 
@@ -140,12 +142,18 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
     setHoveredStripPart(null);
   };
 
+  const onClick = () => {
+    if (localProps.config) {
+      navigate(`/led-strips-configuration/display/${localProps.config.display_id}`);
+    }
+  };
+
   return (
     <section
       {...rootProps}
       ref={setAnchor}
       class={
-        'flex rounded-full flex-nowrap justify-around items-center overflow-hidden bg-gray-800/20 border border-gray-600/30 min-h-[12px] min-w-[12px] m-1 px-0.5 py-0.5 transition-all duration-200 ' +
+        'flex rounded-full flex-nowrap justify-around items-center overflow-hidden bg-gray-800/20 border border-gray-600/30 min-h-[12px] min-w-[12px] m-1 px-0.5 py-0.5 transition-all duration-200 cursor-pointer hover:bg-primary/10 ' +
         rootProps.class
       }
       classList={{
@@ -160,6 +168,7 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
       onWheel={onWheel}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
+      onClick={onClick}
     >
       <For each={colors()}>{(item) => <Pixel color={item} />}</For>
     </section>

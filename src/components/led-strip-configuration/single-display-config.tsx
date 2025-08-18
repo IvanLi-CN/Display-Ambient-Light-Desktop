@@ -461,9 +461,26 @@ const LedConfigPanel: Component<{
               type="checkbox"
               class="toggle toggle-sm"
               checked={props.strip.reverse}
-              onChange={(e) => {
+              onChange={async (e) => {
                 const newReverseState = e.currentTarget.checked;
-                updateStrip({ reverse: newReverseState });
+
+                try {
+                  // 立即调用API反转LED灯带
+                  await adaptiveApi.reverseLedStrip(props.strip.displayId, props.strip.border);
+
+                  // API调用成功后更新本地状态
+                  updateStrip({ reverse: newReverseState });
+
+                  console.log(`✅ LED灯带反转成功: 显示器${props.strip.displayId} ${props.strip.border}边 -> ${newReverseState}`);
+                } catch (error) {
+                  console.error('❌ LED灯带反转失败:', error);
+
+                  // 如果API调用失败，恢复开关状态
+                  e.currentTarget.checked = !newReverseState;
+
+                  // 可以在这里添加用户提示
+                  // TODO: 显示错误提示给用户
+                }
               }}
             />
           </label>
@@ -597,67 +614,7 @@ export function SingleDisplayConfig() {
   // 可用驱动器列表
   const availableDrivers = ['Driver1', 'Driver2', 'Driver3'];
 
-  // 保存LED灯带配置到后端
-  const saveLedStripsToBackend = async (stripsToSave: LedStripConfig[]) => {
-    try {
-      console.log('=== 开始保存LED灯带配置 ===');
-      const currentDisplayId = displayId();
-      console.log('当前显示器ID:', currentDisplayId);
-      console.log('要保存的灯带:', stripsToSave);
 
-      // 1. 读取完整的现有配置
-      const fullConfig = await adaptiveApi.readLedStripConfigs() as any;
-      console.log('读取到的完整配置:', fullConfig);
-
-      // 2. 移除当前显示器的旧配置
-      const otherDisplayStrips = fullConfig.strips.filter((s: any) => s.display_id !== currentDisplayId);
-      console.log('其他显示器的配置:', otherDisplayStrips);
-
-      // 3. 转换当前显示器的新配置为后端格式
-      const sortedStripsToSave = [...stripsToSave].sort((a, b) => a.sequence - b.sequence);
-      let cumulativeLedOffset = 0;
-      const currentDisplayBackendStrips = sortedStripsToSave.map((strip) => {
-        const startPos = cumulativeLedOffset;
-        cumulativeLedOffset += strip.count;
-        return {
-          index: strip.sequence,
-          border: strip.border,
-          display_id: currentDisplayId,
-          start_pos: startPos,
-          len: strip.count,
-          led_type: strip.ledType,
-        };
-      });
-      if (import.meta.env.DEV) {
-        console.log('当前显示器的新后端格式配置:', currentDisplayBackendStrips);
-      }
-
-      // 4. 合并新旧配置
-      const finalStrips = [...otherDisplayStrips, ...currentDisplayBackendStrips];
-      if (import.meta.env.DEV) {
-        console.log('合并后的最终配置:', finalStrips);
-      }
-
-      // 5. 保存完整的配置
-      const configGroup = {
-        strips: finalStrips,
-        color_calibration: fullConfig.color_calibration || {
-          r: 1.0,
-          g: 1.0,
-          b: 1.0,
-          w: 1.0
-        }
-      };
-      await adaptiveApi.writeLedStripConfigs(configGroup);
-
-      if (import.meta.env.DEV) {
-        console.log('成功保存完整LED灯带配置到后端');
-      }
-    } catch (error) {
-      console.error('❌ 保存LED灯带配置失败:', error);
-      throw error; // 重新抛出错误以便上层处理
-    }
-  };
 
 
 
@@ -704,7 +661,7 @@ export function SingleDisplayConfig() {
               sequence: config.index, // 直接使用后端的 index 作为 sequence
               startOffset: 0, // 保持用户设置的值，不要自动计算
               endOffset: 100, // 默认延伸到边缘末端
-              reverse: false // 默认不反转，新系统中通过其他方式处理
+              reverse: config.reversed || false // 使用后端的 reversed 字段
             };
           });
 
@@ -871,67 +828,7 @@ export function SingleDisplayConfig() {
     setSelectedStrip(null);
   };
 
-  // 保存配置状态
-  const [isSaving, setIsSaving] = createSignal(false);
-  const [saveStatus, setSaveStatus] = createSignal<'idle' | 'success' | 'error'>('idle');
 
-  // 保存LED灯带配置
-  const saveConfiguration = async () => {
-    setIsSaving(true);
-    setSaveStatus('idle');
-
-    try {
-      console.log('=== 开始保存配置 ===');
-      console.log('当前要保存的配置:', ledStrips());
-
-      // 保存到后端
-      await saveLedStripsToBackend(ledStrips());
-
-      // 验证保存：立即读取配置确认保存成功
-      console.log('=== 验证保存结果 ===');
-      try {
-        const verifyAllConfigs = await adaptiveApi.readLedStripConfigs();
-        console.log('保存后立即读取的完整配置:', verifyAllConfigs);
-
-        // 过滤当前显示器的配置
-        let verifyConfigs = [];
-        if (verifyAllConfigs && (verifyAllConfigs as any).strips && Array.isArray((verifyAllConfigs as any).strips)) {
-          const currentDisplayId = displayId();
-          verifyConfigs = (verifyAllConfigs as any).strips.filter((config: any) => config.display_id === currentDisplayId);
-          console.log('验证：当前显示器的配置数量:', verifyConfigs.length);
-          console.log('验证：当前显示器的配置内容:', verifyConfigs);
-        }
-
-        if (verifyConfigs && Array.isArray(verifyConfigs) && verifyConfigs.length > 0) {
-          console.log('✅ 验证成功：配置已正确保存');
-        } else {
-          console.log('⚠️ 验证警告：读取到的配置为空');
-        }
-      } catch (verifyError) {
-        console.error('❌ 验证失败：无法读取保存的配置', verifyError);
-      }
-
-      // 显示成功状态
-      setSaveStatus('success');
-      console.log('✅ LED灯带配置保存完成');
-
-      // 3秒后重置状态
-      setTimeout(() => {
-        setSaveStatus('idle');
-      }, 3000);
-
-    } catch (error) {
-      console.error('❌ 保存LED灯带配置失败:', error);
-      setSaveStatus('error');
-
-      // 5秒后重置状态
-      setTimeout(() => {
-        setSaveStatus('idle');
-      }, 5000);
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
 
 
@@ -1114,41 +1011,6 @@ export function SingleDisplayConfig() {
       <div class="flex justify-between items-center mb-6">
         <h1 class="text-2xl font-bold">{t('singleDisplayConfig.title')}</h1>
         <div class="flex gap-2 items-center">
-          {/* 保存状态提示 */}
-          <Show when={saveStatus() === 'success'}>
-            <div class="text-success text-sm flex items-center mr-2">
-              <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-              </svg>
-              {t('singleDisplayConfig.configSaved')}
-            </div>
-          </Show>
-
-          <Show when={saveStatus() === 'error'}>
-            <div class="text-error text-sm flex items-center mr-2">
-              <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-              </svg>
-              {t('singleDisplayConfig.saveFailed')}
-            </div>
-          </Show>
-
-          {/* 保存按钮 */}
-          <button
-            class="btn btn-primary"
-            onClick={saveConfiguration}
-            disabled={isSaving() || ledStrips().length === 0}
-          >
-            <Show when={isSaving()}>
-              <span class="loading loading-spinner loading-sm mr-2"></span>
-            </Show>
-            <Show when={!isSaving()}>
-              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3-3m0 0l-3 3m3-3v12"></path>
-              </svg>
-            </Show>
-            {isSaving() ? t('singleDisplayConfig.saving') : t('singleDisplayConfig.saveConfig')}
-          </button>
 
           <button
             class="btn btn-outline btn-info"

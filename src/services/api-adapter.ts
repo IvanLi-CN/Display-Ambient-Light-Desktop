@@ -9,6 +9,7 @@ import { DisplayApiService, DeviceApiService, HealthApiService } from './display
 import { InfoApiService } from './info-api.service';
 import { api, WebSocketEventListener } from './api-client';
 import { DataSendMode } from '../types/led-status';
+import { Borders } from '../constants/border';
 
 // 环境检测结果
 export interface EnvironmentInfo {
@@ -386,6 +387,14 @@ export class ApiAdapter {
     );
   }
 
+  public async reverseLedStrip(displayId: number, border: Borders): Promise<void> {
+    return this.call(
+      'reverse_led_strip_part',
+      () => ConfigApiService.reverseLedStrip(displayId, border),
+      { displayId, border }
+    );
+  }
+
 
 
   public async setColorCalibration(displayId: number, border: string, calibration: any): Promise<void> {
@@ -580,6 +589,8 @@ export const adaptiveApi = {
     apiAdapter.patchLedStripLen(displayId, border, deltaLen),
   patchLedStripType: (displayId: number, border: string, ledType: string) =>
     apiAdapter.patchLedStripType(displayId, border, ledType),
+  reverseLedStrip: (displayId: number, border: Borders) =>
+    apiAdapter.reverseLedStrip(displayId, border),
 
   setColorCalibration: (displayId: number, border: string, calibration: any) =>
     apiAdapter.setColorCalibration(displayId, border, calibration),
