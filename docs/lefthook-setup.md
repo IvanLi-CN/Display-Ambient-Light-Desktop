@@ -89,18 +89,21 @@ LEFTHOOK=0 git commit -m "skip all lefthook hooks"
 ## Troubleshooting
 
 ### Hook not running
+
 ```bash
 # Reinstall hooks
 npx lefthook install
 ```
 
 ### Permission issues
+
 ```bash
 # Make sure lefthook is executable
 chmod +x .git/hooks/*
 ```
 
 ### Update lefthook
+
 ```bash
 pnpm update lefthook
 npx lefthook install

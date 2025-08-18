@@ -34,6 +34,12 @@ pre-commit:
       run: cd src-tauri && cargo test --all-features
       stage_fixed: false
 
+    # Markdown linting and formatting
+    markdown-lint:
+      glob: "*.md"
+      run: pnpm run fmt:md
+      stage_fixed: true
+
 commit-msg:
   commands:
     # Commit message validation with commitlint

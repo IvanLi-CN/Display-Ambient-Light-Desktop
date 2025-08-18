@@ -24,6 +24,7 @@ Development builds automatically create pre-release versions for every commit pu
 ### Version Generation
 
 Development versions follow this format:
+
 ```
 {base-version}.dev.{timestamp}.{commit-hash}
 ```
@@ -31,6 +32,7 @@ Development versions follow this format:
 Example: `2.0.0-alpha.dev.202501091430.a1b2c3d`
 
 Where:
+
 - `2.0.0-alpha` - Base version from configuration
 - `dev` - Development build identifier
 - `202501091430` - Timestamp (YYYYMMDDHHMM)
@@ -83,6 +85,7 @@ To update version locally for testing:
 ```
 
 To revert version changes:
+
 ```bash
 git checkout -- package.json src-tauri/Cargo.toml src-tauri/tauri.conf.json
 ```
@@ -90,12 +93,14 @@ git checkout -- package.json src-tauri/Cargo.toml src-tauri/tauri.conf.json
 ## Release Management
 
 ### Development Releases
+
 - **Location**: GitHub Releases page
 - **Naming**: `dev-{timestamp}-{commit-hash}`
 - **Type**: Pre-release
 - **Retention**: Latest 10 builds (older ones auto-deleted)
 
 ### Production Releases
+
 - **Workflow**: `.github/workflows/release.yml`
 - **Trigger**: Manual workflow dispatch
 - **Type**: Full release
@@ -196,25 +201,32 @@ Release builds are manually triggered production builds with semantic versioning
 Release builds use semantic versioning with two input modes:
 
 #### Semantic Auto Mode (Recommended)
+
 Uses `paulhatch/semantic-version` action with commit message patterns:
+
 - **Commit with `(MAJOR)`**: Triggers major version increment
 - **Commit with `(MINOR)`**: Triggers minor version increment
 - **Default**: Patch version increment
 - **Example**: `feat: add new feature (MINOR)` → triggers minor version bump
 
 #### Manual Mode
+
 Enter complete semantic version:
+
 - **Major.Minor.Patch**: `1.0.0`, `2.1.3`
 - **Prerelease**: `1.0.0-alpha.1`, `2.0.0-beta.2`, `1.0.0-rc.1`
 - **Build metadata**: `1.0.0+build.1` (optional)
 
 #### Automatic Increment Mode
+
 Choose increment type based on latest Git tag:
+
 - **Patch**: `1.0.0` → `1.0.1` (bug fixes)
 - **Minor**: `1.0.0` → `1.1.0` (new features, backward compatible)
 - **Major**: `1.0.0` → `2.0.0` (breaking changes)
 
 #### Third-Party Actions Used
+
 - **`paulhatch/semantic-version@v5.4.0`**: Git-based semantic versioning
 - **`softprops/action-gh-release@v1`**: Reliable GitHub release creation
 - **Benefits**: Proven, maintained, and feature-rich solutions
@@ -222,6 +234,7 @@ Choose increment type based on latest Git tag:
 ### Automatic Prerelease Detection
 
 The system automatically detects prerelease versions:
+
 - Versions with `-alpha`, `-beta`, `-rc` are marked as prerelease
 - Manual prerelease option overrides automatic detection
 - Prerelease versions appear separately in GitHub releases

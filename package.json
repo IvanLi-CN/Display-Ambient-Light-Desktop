@@ -33,7 +33,9 @@
     "tauri:browser": "cd src-tauri && cargo run --no-default-features -- --browser",
     "prepare": "lefthook install",
     "lint": "tsc --noEmit",
+    "lint:md": "markdownlint-cli2 \"**/*.md\"",
     "lint:rust": "cd src-tauri && cargo clippy --all-targets --all-features -- -D clippy::correctness -D clippy::suspicious -W clippy::complexity -W clippy::perf -W clippy::style",
+    "fmt:md": "markdownlint-cli2 --fix \"**/*.md\"",
     "fmt:rust": "cd src-tauri && cargo fmt --all",
     "test:rust": "cd src-tauri && cargo test --all-features"
   },
@@ -62,6 +64,7 @@
     "concurrently": "^9.2.0",
     "daisyui": "^5.0.43",
     "lefthook": "^1.12.1",
+    "markdownlint-cli2": "^0.18.1",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.11",
     "typescript": "^4.9.5",

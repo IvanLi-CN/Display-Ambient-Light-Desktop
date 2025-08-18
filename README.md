@@ -4,7 +4,7 @@
 [![CI](https://github.com/IvanLi-CN/Display-Ambient-Light-Desktop/workflows/CI/badge.svg)](https://github.com/IvanLi-CN/Display-Ambient-Light-Desktop/actions/workflows/ci.yml)
 [![Release](https://github.com/IvanLi-CN/Display-Ambient-Light-Desktop/workflows/Release/badge.svg)](https://github.com/IvanLi-CN/Display-Ambient-Light-Desktop/actions/workflows/release.yml)
 
-A desktop application built with Tauri 2.0 for ambient light control, supporting multi-monitor screen sampling and LED strip control to create immersive ambient lighting effects.
+A desktop application built with Tauri 2.0 for ambient light control, supporting multi-monitor screen sampling and LED strip control to create immersive ambient lighting effects. ✨
 
 ## ✨ Features
 

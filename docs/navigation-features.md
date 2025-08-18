@@ -14,12 +14,15 @@ Ambient Light Control 应用支持通过命令行参数和 URL scheme 直接打�
 ## 功能概述
 
 ### 1. 命令行参数导航
+
 通过 `--page` 参数直接启动应用并跳转到指定页面。
 
 ### 2. URL Scheme 导航
+
 通过 `ambient-light://` URL scheme 从外部应用或浏览器直接打开特定页面。
 
 ### 3. 程序内导航
+
 通过前端 NavigationService 在应用内部进行页面导航。
 
 ## 支持的页面
@@ -121,17 +124,20 @@ await AmbientLightUrlScheme.openPageViaUrlScheme('settings');
 ### 手动测试
 
 1. **构建应用**：
+
    ```bash
    pnpm tauri build
    ```
 
 2. **测试命令行参数**：
+
    ```bash
    # 替换为实际的应用路径
    ./src-tauri/target/release/bundle/macos/Ambient\ Light\ Control.app/Contents/MacOS/Ambient\ Light\ Control --page info
    ```
 
 3. **测试 URL scheme**：
+
    ```bash
    open "ambient-light://navigate/settings"
    ```
@@ -206,6 +212,7 @@ open "ambient-light://navigate/info"
 ### 支持页面参数
 
 未来可以扩展支持页面参数，例如：
+
 ```
 ambient-light://navigate/led-strips-configuration?display=1
 ```
