@@ -65,6 +65,7 @@ pub struct LedStatusManager {
     /// 当前排序LED颜色数据
     sorted_colors: Arc<RwLock<Vec<u8>>>,
     /// 单屏配置数据
+    #[allow(clippy::type_complexity)]
     single_display_config_data: Arc<RwLock<Option<(Vec<LedStripConfig>, BorderColors)>>>,
     /// 状态变更通知发送器
     status_change_tx: watch::Sender<LedStatusStats>,

@@ -216,7 +216,7 @@ mod tests {
         assert_eq!(config.width, 1920);
         assert_eq!(config.height, 1080);
         assert_eq!(config.scale_factor, 1.0);
-        assert_eq!(config.is_primary, true);
+        assert!(config.is_primary);
         assert!(config.internal_id.starts_with("display_"));
     }
 

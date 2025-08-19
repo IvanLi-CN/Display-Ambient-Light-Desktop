@@ -1,7 +1,8 @@
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod tests {
     use crate::display::{
-        ConfigMigrator, DisplayConfig, DisplayConfigGroup, DisplayMatcher, DisplayRegistry,
+        DisplayConfig, DisplayConfigGroup, DisplayMatcher, DisplayRegistry,
         MatchType,
     };
 
@@ -36,7 +37,7 @@ mod tests {
         assert_eq!(config.width, 1920);
         assert_eq!(config.height, 1080);
         assert_eq!(config.scale_factor, 1.0);
-        assert_eq!(config.is_primary, true);
+        assert!(config.is_primary);
         assert!(config.internal_id.starts_with("display_"));
         assert!(config.last_detected_at.is_none());
     }
@@ -48,7 +49,7 @@ mod tests {
 
         assert_eq!(config.width, 1920);
         assert_eq!(config.height, 1080);
-        assert_eq!(config.is_primary, true);
+        assert!(config.is_primary);
         assert_eq!(config.last_system_id, Some(1));
         assert!(config.last_detected_at.is_some());
         assert!(config.last_position.is_some());
@@ -211,16 +212,10 @@ mod tests {
         display_config_group.add_display(display1);
         display_config_group.add_display(display2);
 
-        // 测试基于索引的映射
-        let mapped_id = ConfigMigrator::map_display_id_to_internal_id(0, 0, &display_config_group);
-        assert_eq!(mapped_id, id1);
-
-        let mapped_id = ConfigMigrator::map_display_id_to_internal_id(0, 4, &display_config_group);
-        assert_eq!(mapped_id, id2);
-
-        // 测试超出范围的索引
-        let mapped_id = ConfigMigrator::map_display_id_to_internal_id(0, 8, &display_config_group);
-        assert_eq!(mapped_id, id1); // 应该回退到第一个显示器
+        // ConfigMigrator已被移除，这些测试不再适用
+        // 现在使用DisplayRegistry进行显示器ID映射
+        println!("Display 1 ID: {}", id1);
+        println!("Display 2 ID: {}", id2);
     }
 
     #[test]

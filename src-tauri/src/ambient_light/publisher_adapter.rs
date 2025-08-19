@@ -24,53 +24,141 @@ impl PublisherAdapter {
     ) -> Result<LedStripConfigGroup> {
         log::info!("🔄 转换新版本配置到旧版本格式...");
 
-        // 获取当前系统显示器信息
+        // 创建显示器内部ID到系统ID的映射（优先使用注册表；其次使用 last_system_id；再次通过属性精确匹配；最后保底0）
+        let mut internal_id_to_system_id = HashMap::new();
+
+        // 预取系统显示器列表，供精确匹配回退使用
         let system_displays = display_info::DisplayInfo::all()
             .map_err(|e| anyhow::anyhow!("Failed to get display info: {}", e))?;
 
-        // 创建显示器内部ID到系统ID的映射
-        let mut internal_id_to_system_id = HashMap::new();
-
         for display_config in &v2_config.display_config.displays {
-            // 尝试通过匹配找到对应的系统显示器
-            let system_display = system_displays.iter().find(|sys_display| {
-                // 首先尝试通过last_system_id匹配
-                if let Some(last_id) = display_config.last_system_id {
-                    if last_id == sys_display.id {
-                        return true;
+            // 1) 优先通过 DisplayRegistry 由 internal_id 映射到当前系统ID
+            match self
+                .display_registry
+                .get_display_id_by_internal_id(&display_config.internal_id)
+                .await
+            {
+                Ok(system_id) => {
+                    internal_id_to_system_id
+                        .insert(display_config.internal_id.clone(), system_id);
+                    log::debug!(
+                        "映射显示器(注册表): '{}' ({}) -> 系统ID {}",
+                        display_config.name,
+                        display_config.internal_id,
+                        system_id
+                    );
+                }
+                Err(e) => {
+                    // 2) 回退：使用记录的 last_system_id（如果存在）
+                    if let Some(last_id) = display_config.last_system_id {
+                        internal_id_to_system_id
+                            .insert(display_config.internal_id.clone(), last_id);
+                        log::warn!(
+                            "⚠️ 无法通过注册表映射显示器 '{}' ({}): {}，回退使用 last_system_id={}",
+                            display_config.name,
+                            display_config.internal_id,
+                            e,
+                            last_id
+                        );
+                    } else {
+                        // 3) 再次回退：通过属性精确匹配找到系统显示器ID
+                        if let Some(sys_display) = system_displays
+                            .iter()
+                            .find(|sd| display_config.exact_match(sd))
+                        {
+                            internal_id_to_system_id.insert(
+                                display_config.internal_id.clone(),
+                                sys_display.id,
+                            );
+                            log::warn!(
+                                "⚠️ 无法通过注册表映射显示器 '{}' ({})，但通过属性匹配到了系统ID {}",
+                                display_config.name,
+                                display_config.internal_id,
+                                sys_display.id
+                            );
+                        } else {
+                            // 4) 最后回退：使用0（保持兼容性，避免直接失败），但记录警告
+                            internal_id_to_system_id
+                                .insert(display_config.internal_id.clone(), 0);
+                            log::warn!(
+                                "⚠️ 无法为显示器 '{}' ({}) 找到系统ID，使用默认值0",
+                                display_config.name,
+                                display_config.internal_id
+                            );
+                        }
                     }
                 }
-
-                // 然后尝试精确匹配
-                display_config.exact_match(sys_display)
-            });
-
-            if let Some(sys_display) = system_display {
-                internal_id_to_system_id.insert(display_config.internal_id.clone(), sys_display.id);
-                log::debug!(
-                    "映射显示器: '{}' ({}) -> 系统ID {}",
-                    display_config.name,
-                    display_config.internal_id,
-                    sys_display.id
-                );
-            } else {
-                log::warn!(
-                    "⚠️ 无法找到显示器 '{}' ({}) 对应的系统显示器",
-                    display_config.name,
-                    display_config.internal_id
-                );
-                // 使用一个默认值，避免转换失败
-                internal_id_to_system_id.insert(display_config.internal_id.clone(), 0);
             }
         }
 
         // 转换LED灯带配置
         let mut v1_strips = Vec::new();
         for v2_strip in &v2_config.strips {
-            let system_id = internal_id_to_system_id
-                .get(&v2_strip.display_internal_id)
+            // 若条目中的 internal_id 在配置里不存在，基于 strip.index 回退到某个有效显示器
+            let mut target_internal_id = v2_strip.display_internal_id.clone();
+            if v2_config
+                .display_config
+                .find_by_internal_id(&target_internal_id)
+                .is_none()
+            {
+                let display_index = v2_strip.index / 4; // 每4个灯带对应一个显示器（Top/Right/Bottom/Left）
+                if let Some(disp) = v2_config.display_config.displays.get(display_index) {
+                    log::warn!(
+                        "⚠️ 条目 {} 内部ID '{}' 未在配置中找到，按索引回退为显示器 '{}'",
+                        v2_strip.index,
+                        target_internal_id,
+                        disp.internal_id
+                    );
+                    target_internal_id = disp.internal_id.clone();
+                } else if let Some(first) = v2_config.display_config.displays.first() {
+                    log::warn!(
+                        "⚠️ 条目 {} 内部ID '{}' 未在配置中找到，且索引回退越界，使用第一个显示器 '{}'",
+                        v2_strip.index,
+                        target_internal_id,
+                        first.internal_id
+                    );
+                    target_internal_id = first.internal_id.clone();
+                }
+            }
+
+            // 优先使用预构建映射；若不存在则按条目逐个回退解析
+            let mut system_id = internal_id_to_system_id
+                .get(&target_internal_id)
                 .copied()
                 .unwrap_or(0);
+
+            if system_id == 0 {
+                // 1) 尝试直接通过注册表解析该条目的 internal_id
+                match self
+                    .display_registry
+                    .get_display_id_by_internal_id(&target_internal_id)
+                    .await
+                {
+                    Ok(id) => {
+                        system_id = id;
+                        internal_id_to_system_id.insert(target_internal_id.clone(), id);
+                        log::debug!(
+                            "条目级映射(注册表): {} -> 系统ID {}",
+                            target_internal_id,
+                            id
+                        );
+                    }
+                    Err(_) => {
+                        // 2) 再尝试根据 display_config 中的记录做属性匹配
+                        if let Some(dc) = v2_config.display_config.find_by_internal_id(&target_internal_id) {
+                            if let Some(sys_display) = system_displays.iter().find(|sd| dc.exact_match(sd)) {
+                                system_id = sys_display.id;
+                                internal_id_to_system_id.insert(target_internal_id.clone(), system_id);
+                                log::debug!(
+                                    "条目级映射(属性匹配): {} -> 系统ID {}",
+                                    target_internal_id,
+                                    system_id
+                                );
+                            }
+                        }
+                    }
+                }
+            }
 
             let v1_strip = LedStripConfig {
                 index: v2_strip.index,
@@ -85,7 +173,7 @@ impl PublisherAdapter {
             log::debug!(
                 "转换灯带 {}: {} -> display_id {}",
                 v2_strip.index,
-                v2_strip.display_internal_id,
+                target_internal_id,
                 system_id
             );
         }
@@ -346,7 +434,7 @@ mod tests {
         // 创建适配器
         let display_registry =
             std::sync::Arc::new(DisplayRegistry::new(v2_config.display_config.clone()));
-        let adapter = PublisherAdapter::new(display_registry);
+        let _adapter = PublisherAdapter::new(display_registry);
 
         // 测试转换（注意：这个测试在没有真实显示器的环境中可能会失败）
         // 这里主要是验证代码结构的正确性

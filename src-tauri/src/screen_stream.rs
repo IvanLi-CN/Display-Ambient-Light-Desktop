@@ -169,7 +169,7 @@ impl ScreenStreamManager {
             }
 
             // Wait for new screenshot
-            if let Ok(_) = screenshot_rx.changed().await {
+            if (screenshot_rx.changed().await).is_ok() {
                 let screenshot = screenshot_rx.borrow().clone();
 
                 // Rate limiting based on max_fps

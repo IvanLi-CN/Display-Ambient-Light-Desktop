@@ -251,19 +251,19 @@ export class ApiAdapter {
     );
   }
 
-  // ===== 配置相关API =====
+  // ===== 配置相关API（V2-only） =====
 
   public async readLedStripConfigs(): Promise<any> {
     return this.call(
-      'read_led_strip_configs',
-      () => ConfigApiService.readLedStripConfigs()
+      'read_led_strip_configs_v2',
+      () => ConfigApiService.readLedStripConfigsV2()
     );
   }
 
   public async writeLedStripConfigs(configs: any): Promise<void> {
     return this.call(
-      'write_led_strip_configs',
-      () => ConfigApiService.writeLedStripConfigs(configs),
+      'write_led_strip_configs_v2',
+      () => ConfigApiService.writeLedStripConfigsV2(configs),
       { configs }
     );
   }
@@ -366,8 +366,8 @@ export class ApiAdapter {
 
   public async getConfig(): Promise<any> {
     return this.call(
-      'read_config',
-      () => ConfigApiService.getConfig()
+      'read_led_strip_configs_v2',
+      () => ConfigApiService.readLedStripConfigsV2()
     );
   }
 

@@ -18,6 +18,10 @@ use crate::{
     screenshot_manager::ScreenshotManager,
 };
 
+use crate::display::DisplayRegistry;
+
+use crate::ambient_light::config_v2::LedStripConfigGroupV2;
+
 use super::{ColorCalibration, LedStripConfig, LedStripConfigGroup, LedType, SamplePointMapper};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -36,6 +40,7 @@ pub struct LedColorsPublisher {
     colors_tx: Arc<RwLock<watch::Sender<Vec<u8>>>>,
     inner_tasks_version: Arc<RwLock<usize>>,
     single_display_config_mode: Arc<RwLock<bool>>,
+    #[allow(clippy::type_complexity)]
     single_display_config_data: Arc<RwLock<Option<(Vec<LedStripConfig>, BorderColors)>>>,
     active_strip_for_breathing: Arc<RwLock<Option<(u32, String)>>>, // (display_id, border)
 }
@@ -64,6 +69,7 @@ impl LedColorsPublisher {
             .await
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn start_one_display_colors_fetcher(
         &self,
         display_id: u32,
@@ -268,48 +274,34 @@ impl LedColorsPublisher {
     pub async fn start(&self) {
         log::info!("🚀 LED color publisher starting...");
 
-        // 使用新的ConfigManagerV2和适配器
+        // 使用新的ConfigManagerV2（直接消费v2配置）
         let config_manager_v2 = crate::ambient_light::ConfigManagerV2::global().await;
-        let adapter =
-            crate::ambient_light::PublisherAdapter::new(config_manager_v2.get_display_registry());
-
+        let display_registry = config_manager_v2.get_display_registry();
         let mut config_receiver = config_manager_v2.subscribe_config_updates();
 
-        // Process initial configuration first
+        // 先处理初始配置
         let initial_v2_config = config_receiver.borrow().clone();
         if !initial_v2_config.strips.is_empty() {
-            log::info!("📋 Processing initial LED configuration...");
-            // 转换v2配置为v1格式
-            match adapter.convert_v2_to_v1_config(&initial_v2_config).await {
-                Ok(v1_config) => {
-                    self.handle_config_change(v1_config).await;
-                }
-                Err(e) => {
-                    log::error!("Failed to convert initial v2 config to v1: {}", e);
-                }
-            }
+            log::info!("📋 Processing initial LED configuration (v2)...");
+            self
+                .handle_config_change_v2(initial_v2_config, display_registry.clone())
+                .await;
         } else {
             log::warn!("⚠️ Initial LED configuration is empty, waiting for updates...");
         }
 
-        // Then, listen for subsequent configuration changes in a separate task
+        // 随后监听后续更新
         let self_clone = self.clone();
         tokio::spawn(async move {
-            log::info!("👂 Listening for subsequent LED configuration changes...");
+            log::info!("👂 Listening for subsequent LED configuration changes (v2)...");
             loop {
                 if config_receiver.changed().await.is_ok() {
                     let v2_config = config_receiver.borrow().clone();
                     if !v2_config.strips.is_empty() {
-                        log::info!("🔄 Subsequent LED configuration changed, reprocessing...");
-                        // 转换v2配置为v1格式
-                        match adapter.convert_v2_to_v1_config(&v2_config).await {
-                            Ok(v1_config) => {
-                                self_clone.handle_config_change(v1_config).await;
-                            }
-                            Err(e) => {
-                                log::error!("Failed to convert subsequent v2 config to v1: {}", e);
-                            }
-                        }
+                        log::info!("🔄 Subsequent LED configuration changed, reprocessing (v2)...");
+                        self_clone
+                            .handle_config_change_v2(v2_config, display_registry.clone())
+                            .await;
                     } else {
                         log::warn!("⚠️ Received empty LED configuration, skipping...");
                     }
@@ -319,6 +311,32 @@ impl LedColorsPublisher {
                 }
             }
         });
+    }
+
+    async fn handle_config_change_v2(&self, v2_config: LedStripConfigGroupV2, _display_registry: std::sync::Arc<DisplayRegistry>) {
+        // 将 v2 配置映射到 v1 运行路径所需的 LedStripConfigGroup（系统 display_id）
+        let mut v1_group = LedStripConfigGroup {
+            strips: Vec::new(),
+            mappers: Vec::new(),
+            color_calibration: v2_config.color_calibration,
+        };
+
+        for s in v2_config.strips.iter() {
+            v1_group.strips.push(LedStripConfig {
+                index: s.index,
+                border: s.border,
+                display_id: 0, // 先置 0，后续通过显示器检测逻辑赋值
+                len: s.len,
+                led_type: s.led_type,
+                reversed: s.reversed,
+            });
+        }
+
+        // 生成 mapper（保持与 v1 逻辑一致）
+        v1_group.generate_mappers();
+
+        // 走现有 v1 处理管线
+        self.handle_config_change(v1_group).await;
     }
 
     async fn handle_config_change(&self, mut original_configs: LedStripConfigGroup) {
@@ -335,6 +353,7 @@ impl LedColorsPublisher {
         }
 
         let configs = configs.unwrap();
+
 
         let mut inner_tasks_version = inner_tasks_version.write().await;
         *inner_tasks_version = inner_tasks_version.overflowing_add(1).0;

@@ -13,6 +13,7 @@ use tokio::time::sleep;
 use crate::{ambient_light::SamplePointMapper, screenshot::Screenshot};
 
 pub struct ScreenshotManager {
+    #[allow(clippy::type_complexity)]
     pub channels: Arc<RwLock<HashMap<u32, Arc<RwLock<watch::Sender<Screenshot>>>>>>,
     merged_screenshot_tx: Arc<RwLock<broadcast::Sender<Screenshot>>>,
 }

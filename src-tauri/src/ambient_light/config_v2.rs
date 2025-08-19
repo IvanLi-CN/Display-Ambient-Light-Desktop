@@ -8,7 +8,6 @@ use crate::display::DisplayConfigGroup;
 use super::{Border, ColorCalibration, LedType, SamplePointMapper};
 
 const CONFIG_FILE_NAME_V2: &str = "cc.ivanli.ambient_light/config_v2.toml";
-const LEGACY_LED_CONFIG_FILE: &str = "cc.ivanli.ambient_light/led_strip_config.toml";
 
 /// 新版本的LED灯带配置，使用稳定的显示器内部ID
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -147,9 +146,12 @@ impl LedStripConfigGroupV2 {
             log::info!("✅ 成功加载新版本LED灯带配置 (v{})", config.version);
             Ok(config)
         } else {
-            // 尝试从旧版本配置迁移
-            log::info!("🔄 未找到新版本配置，尝试从旧版本迁移...");
-            Self::migrate_from_legacy().await
+            // 不再进行旧版迁移，直接创建并写入默认的 v2 配置
+            log::info!("🆕 未找到 v2 配置，创建默认 v2 配置（不做迁移）");
+            let config = Self::get_default_config().await?;
+            // 立即写入以确保文件存在
+            config.write_config().await?;
+            Ok(config)
         }
     }
 
@@ -171,116 +173,9 @@ impl LedStripConfigGroupV2 {
         Ok(())
     }
 
-    /// 从旧版本配置迁移
-    pub async fn migrate_from_legacy() -> anyhow::Result<Self> {
-        use super::LedStripConfigGroup;
 
-        let legacy_path = config_dir()
-            .unwrap_or(current_dir().unwrap())
-            .join(LEGACY_LED_CONFIG_FILE);
 
-        if !legacy_path.exists() {
-            log::info!("🔧 未找到旧配置文件，创建默认配置");
-            return Self::get_default_config().await;
-        }
 
-        log::info!("📦 开始迁移旧版本配置...");
-
-        // 读取旧版本配置
-        let legacy_config = LedStripConfigGroup::read_config().await?;
-
-        // 获取当前显示器信息
-        let displays = display_info::DisplayInfo::all()
-            .map_err(|e| anyhow::anyhow!("Failed to get displays: {}", e))?;
-
-        // 创建新配置
-        let mut new_config = Self::new();
-
-        // 迁移显示器配置
-        for display_info in &displays {
-            let display_config = crate::display::DisplayConfig::from_display_info(display_info);
-            new_config.display_config.add_display(display_config);
-        }
-
-        // 迁移LED灯带配置
-        for old_strip in &legacy_config.strips {
-            // 根据旧的display_id找到对应的显示器配置
-            let display_internal_id = if old_strip.display_id == 0 {
-                // 如果是0，根据index分配
-                let display_index = old_strip.index / 4;
-                if display_index < new_config.display_config.displays.len() {
-                    new_config.display_config.displays[display_index]
-                        .internal_id
-                        .clone()
-                } else {
-                    // 如果没有足够的显示器，创建一个默认的
-                    let default_display = crate::display::DisplayConfig::new(
-                        format!("显示器 {}", display_index + 1),
-                        1920,
-                        1080,
-                        1.0,
-                        false,
-                    );
-                    let internal_id = default_display.internal_id.clone();
-                    new_config.display_config.add_display(default_display);
-                    internal_id
-                }
-            } else {
-                // 根据系统ID查找对应的显示器配置
-                new_config
-                    .display_config
-                    .displays
-                    .iter()
-                    .find(|d| d.last_system_id == Some(old_strip.display_id))
-                    .map(|d| d.internal_id.clone())
-                    .unwrap_or_else(|| {
-                        // 如果找不到，创建一个新的
-                        let default_display = crate::display::DisplayConfig::new(
-                            format!("显示器 {}", old_strip.display_id),
-                            1920,
-                            1080,
-                            1.0,
-                            false,
-                        );
-                        let internal_id = default_display.internal_id.clone();
-                        new_config.display_config.add_display(default_display);
-                        internal_id
-                    })
-            };
-
-            let new_strip = LedStripConfigV2 {
-                index: old_strip.index,
-                border: old_strip.border,
-                display_internal_id,
-                len: old_strip.len,
-                led_type: old_strip.led_type,
-                reversed: old_strip.reversed,
-            };
-
-            new_config.strips.push(new_strip);
-        }
-
-        // 迁移颜色校准配置
-        new_config.color_calibration = legacy_config.color_calibration;
-
-        // 生成mappers
-        new_config.generate_mappers();
-
-        // 保存新配置
-        new_config.write_config().await?;
-
-        log::info!("✅ 配置迁移完成，已保存新版本配置");
-
-        // 备份旧配置文件
-        let backup_path = legacy_path.with_extension("toml.backup");
-        if let Err(e) = tokio::fs::copy(&legacy_path, &backup_path).await {
-            log::warn!("⚠️ 备份旧配置文件失败: {}", e);
-        } else {
-            log::info!("📦 旧配置文件已备份到: {:?}", backup_path);
-        }
-
-        Ok(new_config)
-    }
 
     /// 获取默认配置
     pub async fn get_default_config() -> anyhow::Result<Self> {
@@ -300,26 +195,8 @@ impl LedStripConfigGroupV2 {
                     config.display_config.add_display(display_config);
                 }
 
-                // 为每个显示器创建默认的4个灯带配置
-                for (display_index, display) in config.display_config.displays.iter().enumerate() {
-                    for border_index in 0..4 {
-                        let strip = LedStripConfigV2 {
-                            index: border_index + display_index * 4,
-                            display_internal_id: display.internal_id.clone(),
-                            border: match border_index {
-                                0 => Border::Top,
-                                1 => Border::Right,
-                                2 => Border::Bottom,
-                                3 => Border::Left,
-                                _ => unreachable!(),
-                            },
-                            len: 30,
-                            led_type: LedType::WS2812B,
-                            reversed: false,
-                        };
-                        config.strips.push(strip);
-                    }
-                }
+                // 不再自动创建默认灯带配置，让用户手动添加
+                log::info!("🎯 显示器检测完成，等待用户手动配置LED灯带");
             }
             Err(e) => {
                 log::warn!("⚠️ 无法检测显示器: {}，创建最小默认配置", e);
@@ -332,27 +209,10 @@ impl LedStripConfigGroupV2 {
                     1.0,
                     true,
                 );
-                let display_id = default_display.internal_id.clone();
                 config.display_config.add_display(default_display);
 
-                // 创建默认灯带配置
-                for i in 0..4 {
-                    let strip = LedStripConfigV2 {
-                        index: i,
-                        display_internal_id: display_id.clone(),
-                        border: match i {
-                            0 => Border::Top,
-                            1 => Border::Right,
-                            2 => Border::Bottom,
-                            3 => Border::Left,
-                            _ => unreachable!(),
-                        },
-                        len: 30,
-                        led_type: LedType::WS2812B,
-                        reversed: false,
-                    };
-                    config.strips.push(strip);
-                }
+                // 不再自动创建默认灯带配置，让用户手动添加
+                log::info!("🎯 默认显示器配置已创建，等待用户手动配置LED灯带");
             }
         }
 

@@ -2,7 +2,7 @@ use crate::ambient_light::{
     Border, ColorCalibration, ConfigManagerV2, LedStripConfigGroupV2, LedStripConfigV2, LedType,
     PublisherAdapter,
 };
-use crate::display::{ConfigMigrator, DisplayConfig, DisplayConfigGroup, DisplayRegistry};
+use crate::display::{DisplayConfig, DisplayConfigGroup, DisplayRegistry};
 use std::time::SystemTime;
 
 /// 集成测试：完整的稳定显示器ID系统工作流程
@@ -153,27 +153,7 @@ async fn test_complete_stable_display_id_workflow() {
     println!("🎉 稳定显示器ID系统集成测试完成！");
 }
 
-/// 测试配置迁移功能
-#[tokio::test]
-async fn test_config_migration() {
-    println!("🔄 开始配置迁移测试...");
 
-    // 检查是否需要迁移
-    let needs_migration = ConfigMigrator::needs_migration().await;
-    println!("   需要迁移: {}", needs_migration);
-
-    // 如果需要迁移，执行迁移
-    if needs_migration {
-        match ConfigMigrator::migrate_all_configs().await {
-            Ok(_) => println!("   ✅ 配置迁移成功"),
-            Err(e) => println!("   ❌ 配置迁移失败: {}", e),
-        }
-    } else {
-        println!("   ℹ️ 无需迁移");
-    }
-
-    println!("✅ 配置迁移测试完成");
-}
 
 /// 测试ConfigManagerV2的基本功能
 #[tokio::test]

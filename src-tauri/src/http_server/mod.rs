@@ -109,8 +109,9 @@ impl ApiError {
         api::led::stop_led_test_effect,
         api::led::test_single_display_config,
         api::led::test_led_data_sender,
-        api::config::get_led_strip_configs,
-        api::config::update_led_strip_configs,
+        // v1 接口直接使用 v2 语义
+        api::config::get_led_strip_configs_v2,
+        api::config::update_led_strip_configs_v2,
         api::config::update_led_strip_length,
         api::config::update_led_strip_type,
         api::config::get_user_preferences,
@@ -194,7 +195,7 @@ pub async fn create_server(config: ServerConfig) -> Result<Router, anyhow::Error
     let mut app = Router::new()
         // 健康检查
         .route("/health", get(api::health::health_check))
-        // API v1 路由
+        // API v1 路由（兼容）
         .nest("/api/v1", create_api_routes())
         // WebSocket路由
         .route("/ws", get(websocket::websocket_handler))

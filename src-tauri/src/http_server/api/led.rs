@@ -66,6 +66,7 @@ pub struct BreathingStripRequest {
 
 /// LED测试效果请求
 #[derive(Deserialize, ToSchema)]
+#[allow(dead_code)]
 pub struct LedTestEffectRequest {
     /// 效果名称
     pub effect_name: String,
@@ -89,6 +90,7 @@ pub struct StartLedTestEffectRequest {
 
 /// 停止LED测试效果请求
 #[derive(Deserialize, ToSchema)]
+#[allow(dead_code)]
 pub struct StopLedTestEffectRequest {
     /// 目标板地址
     #[serde(alias = "boardAddress")]

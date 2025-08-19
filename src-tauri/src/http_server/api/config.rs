@@ -8,7 +8,7 @@ use serde::Deserialize;
 use utoipa::ToSchema;
 
 use crate::{
-    ambient_light::{self, Border, ColorCalibration, LedStripConfigGroup, LedType},
+    ambient_light::{self, Border, ColorCalibration, LedType, LedStripConfigGroupV2},
     http_server::{ApiResponse, AppState},
     language_manager::LanguageManager,
     user_preferences::{UIPreferences, UserPreferences, UserPreferencesManager, WindowPreferences},
@@ -94,65 +94,53 @@ pub struct UpdateLanguageRequest {
     pub language: String,
 }
 
-/// 获取LED灯带配置
+/// 获取LED灯带配置 (v1 接口，v2 语义)
 #[utoipa::path(
     get,
     path = "/api/v1/config/led-strips",
     responses(
-        (status = 200, description = "获取LED灯带配置成功", body = ApiResponse<LedStripConfigGroup>),
+        (status = 200, description = "获取LED灯带配置成功 (v2 语义)", body = ApiResponse<LedStripConfigGroupV2>),
         (status = 500, description = "获取失败", body = ApiResponse<String>),
     ),
     tag = "config"
 )]
-pub async fn get_led_strip_configs() -> Result<Json<ApiResponse<LedStripConfigGroup>>, StatusCode> {
+pub async fn get_led_strip_configs_v2() -> Result<Json<ApiResponse<LedStripConfigGroupV2>>, StatusCode> {
     let config_manager_v2 = ambient_light::ConfigManagerV2::global().await;
     let v2_config = config_manager_v2.get_config().await;
-
-    // 转换为v1格式以保持API兼容性
-    let adapter = ambient_light::PublisherAdapter::new(config_manager_v2.get_display_registry());
-    match adapter.convert_v2_to_v1_config(&v2_config).await {
-        Ok(v1_config) => Ok(Json(ApiResponse::success(v1_config))),
-        Err(e) => {
-            log::error!("Failed to convert v2 config to v1: {}", e);
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
-        }
-    }
+    Ok(Json(ApiResponse::success(v2_config)))
 }
 
-/// 更新LED灯带配置
+// （已弃用）原先的 v1 兼容层接口说明，已由 v2 语义直接替换 v1 接口
+// 旧 v1 获取接口已废弃，不再提供实现，避免误用。
+// 如需追溯，请参考 git 历史。
+
+/// 更新LED灯带配置 (v1 接口，v2 语义)
 #[utoipa::path(
     post,
     path = "/api/v1/config/led-strips",
-    request_body = LedStripConfigGroup,
+    request_body = LedStripConfigGroupV2,
     responses(
-        (status = 200, description = "更新LED灯带配置成功", body = ApiResponse<String>),
+        (status = 200, description = "更新LED灯带配置成功 (v2 语义)", body = ApiResponse<String>),
         (status = 500, description = "更新失败", body = ApiResponse<String>),
     ),
     tag = "config"
 )]
-pub async fn update_led_strip_configs(
-    Json(v1_config): Json<LedStripConfigGroup>,
+pub async fn update_led_strip_configs_v2(
+    Json(v2_config): Json<LedStripConfigGroupV2>,
 ) -> Result<Json<ApiResponse<String>>, StatusCode> {
     let config_manager_v2 = ambient_light::ConfigManagerV2::global().await;
-    let adapter = ambient_light::PublisherAdapter::new(config_manager_v2.get_display_registry());
-
-    // 转换v1配置为v2格式
-    match adapter.convert_v1_to_v2_config(&v1_config).await {
-        Ok(v2_config) => match config_manager_v2.update_config(v2_config).await {
-            Ok(_) => Ok(Json(ApiResponse::success(
-                "LED strip configs updated successfully".to_string(),
-            ))),
-            Err(e) => {
-                log::error!("Failed to update LED strip configs: {e}");
-                Err(StatusCode::INTERNAL_SERVER_ERROR)
-            }
-        },
+    match config_manager_v2.update_config(v2_config).await {
+        Ok(_) => Ok(Json(ApiResponse::success(
+            "LED strip configs updated successfully".to_string(),
+        ))),
         Err(e) => {
-            log::error!("Failed to convert v1 config to v2: {e}");
+            log::error!("Failed to update LED strip configs: {e}");
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
+
+
 
 /// 更新LED灯带长度
 #[utoipa::path(
@@ -625,11 +613,12 @@ pub async fn update_ui_preferences(
     }
 }
 
-/// 创建配置相关路由
+/// 创建配置相关路由 (v1 兼容)
 pub fn create_routes() -> Router<AppState> {
     Router::new()
-        .route("/led-strips", get(get_led_strip_configs))
-        .route("/led-strips", post(update_led_strip_configs))
+        // v1 端点但直接使用 v2 语义
+        .route("/led-strips", get(get_led_strip_configs_v2))
+        .route("/led-strips", post(update_led_strip_configs_v2))
         .route("/led-strips/length", put(update_led_strip_length))
         .route("/led-strips/type", put(update_led_strip_type))
         .route("/led-strips/reverse", put(reverse_led_strip))
@@ -655,3 +644,5 @@ pub fn create_routes() -> Router<AppState> {
             get(get_current_language).put(set_current_language),
         )
 }
+
+// 已移除 v2 路由构建函数，统一使用 v1 路径 + v2 语义的 create_routes()

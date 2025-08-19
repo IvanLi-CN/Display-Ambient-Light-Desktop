@@ -203,27 +203,17 @@ export class LedApiService {
  */
 export class ConfigApiService {
   /**
-   * 获取配置信息
-   * 替代: invoke('read_config')
+   * 读取LED灯带配置（用 v2 语义，但走 v1 路径）
    */
-  static async getConfig(): Promise<any> {
+  static async readLedStripConfigsV2(): Promise<any> {
     return api.get('/api/v1/config/led-strips');
   }
 
   /**
-   * 读取LED灯带配置
-   * 替代: invoke('read_led_strip_configs')
+   * 写入LED灯带配置（用 v2 语义，但走 v1 路径）
    */
-  static async readLedStripConfigs(): Promise<any> {
-    return api.get('/api/v1/config/led-strips');
-  }
-
-  /**
-   * 写入LED灯带配置
-   * 替代: invoke('write_led_strip_configs', { configs })
-   */
-  static async writeLedStripConfigs(configGroup: any): Promise<void> {
-    return api.post('/api/v1/config/led-strips', configGroup);
+  static async writeLedStripConfigsV2(configGroupV2: any): Promise<void> {
+    return api.post('/api/v1/config/led-strips', configGroupV2);
   }
 
   /**

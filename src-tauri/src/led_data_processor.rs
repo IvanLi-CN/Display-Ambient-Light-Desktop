@@ -63,7 +63,7 @@ impl LedDataProcessor {
             .await;
 
         // 3.1. 按灯带分组发布（替代旧的 LedColorsChanged 事件）
-        Self::publish_led_strip_colors(&led_colors, strips, &websocket_publisher).await;
+        Self::publish_led_strip_colors(&led_colors, strips, websocket_publisher).await;
 
         log::info!("✅ LED preview data published successfully");
 

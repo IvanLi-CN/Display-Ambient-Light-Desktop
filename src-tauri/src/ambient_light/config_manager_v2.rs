@@ -4,9 +4,9 @@ use tauri::async_runtime::RwLock;
 use tokio::sync::OnceCell;
 
 use crate::ambient_light::{
-    Border, ColorCalibration, LedStripConfigGroupV2, LedStripConfigV2, LedType,
+    ColorCalibration, LedStripConfigGroupV2, LedStripConfigV2,
 };
-use crate::display::{ConfigMigrator, DisplayRegistry};
+use crate::display::DisplayRegistry;
 
 /// 新版本的配置管理器，支持稳定的显示器ID系统
 pub struct ConfigManagerV2 {
@@ -26,32 +26,16 @@ impl ConfigManagerV2 {
             .get_or_init(|| async {
                 log::info!("🔧 初始化新版本配置管理器...");
 
-                // 检查是否需要迁移
-                if ConfigMigrator::needs_migration().await {
-                    log::info!("🔄 检测到需要配置迁移");
-                    match ConfigMigrator::migrate_all_configs().await {
-                        Ok(config) => {
-                            log::info!("✅ 配置迁移成功");
-                            Self::create_from_config(config).await
-                        }
-                        Err(e) => {
-                            log::error!("❌ 配置迁移失败: {}", e);
-                            log::info!("🔄 使用默认配置");
-                            Self::create_default().await
-                        }
+                // 直接尝试读取V2配置，不进行任何迁移
+                match LedStripConfigGroupV2::read_config().await {
+                    Ok(config) => {
+                        log::info!("✅ 成功加载V2配置");
+                        Self::create_from_config(config).await
                     }
-                } else {
-                    // 尝试读取现有配置
-                    match LedStripConfigGroupV2::read_config().await {
-                        Ok(config) => {
-                            log::info!("✅ 成功加载现有配置");
-                            Self::create_from_config(config).await
-                        }
-                        Err(e) => {
-                            log::warn!("⚠️ 无法加载配置: {}", e);
-                            log::info!("🔄 创建默认配置");
-                            Self::create_default().await
-                        }
+                    Err(e) => {
+                        log::warn!("⚠️ 无法加载V2配置: {}", e);
+                        log::info!("🔄 创建默认V2配置");
+                        Self::create_default().await
                     }
                 }
             })
@@ -223,44 +207,13 @@ impl ConfigManagerV2 {
         log::info!("🔍 检查显示器变化...");
 
         let match_results = self.display_registry.detect_and_register_displays().await?;
-        let mut config_changed = false;
+        let config_changed = false;
 
-        // 检查是否有新显示器需要创建默认灯带配置
+        // 检查是否有新显示器，但不再自动创建灯带配置
         for match_result in &match_results {
             if matches!(match_result.match_type, crate::display::MatchType::New) {
-                log::info!("🆕 为新显示器创建默认灯带配置");
-
-                let mut config = self.get_config().await;
-                let display_config = self
-                    .display_registry
-                    .find_display_by_system_id(match_result.system_display.id)
-                    .await;
-
-                if let Some(display) = display_config {
-                    // 为新显示器创建4个默认灯带
-                    let base_index = config.strips.len();
-                    for i in 0..4 {
-                        let strip = LedStripConfigV2 {
-                            index: base_index + i,
-                            border: match i {
-                                0 => Border::Top,
-                                1 => Border::Right,
-                                2 => Border::Bottom,
-                                3 => Border::Left,
-                                _ => unreachable!(),
-                            },
-                            display_internal_id: display.internal_id.clone(),
-                            len: 30,
-                            led_type: LedType::WS2812B,
-                            reversed: false,
-                        };
-                        config.strips.push(strip);
-                    }
-
-                    config.generate_mappers();
-                    self.update_config(config).await?;
-                    config_changed = true;
-                }
+                log::info!("🆕 检测到新显示器，等待用户手动配置LED灯带");
+                // 不再自动创建灯带配置，让用户通过前端界面手动添加
             }
         }
 

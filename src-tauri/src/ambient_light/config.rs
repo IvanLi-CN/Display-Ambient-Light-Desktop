@@ -160,43 +160,11 @@ impl LedStripConfigGroup {
 
 impl LedStripConfigGroup {
     pub async fn read_config() -> anyhow::Result<Self> {
-        log::info!("📖 Reading LED strip configuration...");
+        log::warn!("⚠️ LedStripConfigGroup::read_config() 已弃用，不再从文件读取配置");
+        log::info!("🔄 返回默认配置，请使用 ConfigManagerV2 和 LedStripConfigGroupV2");
 
-        // config path
-        let path = dirs::config_dir()
-            .unwrap_or(current_dir().unwrap())
-            .join(CONFIG_FILE_NAME);
-
-        log::info!("📁 Config file path: {path:?}");
-
-        let exists = tokio::fs::try_exists(path.clone())
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to check config file exists: {}", e))?;
-
-        if exists {
-            log::info!("📄 Config file exists, reading...");
-            let config_str = tokio::fs::read_to_string(path).await?;
-
-            let mut config: LedStripConfigGroup = toml::from_str(&config_str)
-                .map_err(|e| anyhow::anyhow!("Failed to parse config file: {}", e))?;
-
-            // 生成 mappers
-            config.generate_mappers();
-
-            // Defer display detection to avoid blocking during initialization
-            log::info!("⏳ Deferring display ID assignment to avoid blocking...");
-
-            log::info!(
-                "✅ Successfully loaded config with {} strips and {} mappers",
-                config.strips.len(),
-                config.mappers.len()
-            );
-
-            Ok(config)
-        } else {
-            log::info!("📄 Config file not exist, fallback to default config");
-            Ok(Self::get_default_config().await?)
-        }
+        // 直接返回默认配置，不再尝试读取旧配置文件
+        Self::get_default_config().await
     }
 
     pub async fn write_config(configs: &Self) -> anyhow::Result<()> {
@@ -218,32 +186,11 @@ impl LedStripConfigGroup {
     }
 
     pub async fn get_default_config() -> anyhow::Result<Self> {
-        log::info!("🔧 Creating default LED strip configuration...");
+        log::info!("🔧 Creating minimal LED strip configuration...");
 
-        // Create a minimal default configuration without display detection
-        // Display IDs will be assigned later when needed
-        let mut strips = Vec::new();
-
-        // Create default configuration for 2 displays (common setup)
-        for i in 0..2 {
-            for j in 0..4 {
-                let item = LedStripConfig {
-                    index: j + i * 4,
-                    display_id: 0, // Will be assigned later
-                    border: match j {
-                        0 => Border::Top,
-                        1 => Border::Right,
-                        2 => Border::Bottom,
-                        3 => Border::Left,
-                        _ => unreachable!(),
-                    },
-                    len: 30,
-                    led_type: LedType::WS2812B,
-                    reversed: false,
-                };
-                strips.push(item);
-            }
-        }
+        // Create a minimal default configuration without any LED strips
+        // Users will need to manually add LED strips through the frontend
+        let strips = Vec::new();
 
         let mut config = Self {
             strips,

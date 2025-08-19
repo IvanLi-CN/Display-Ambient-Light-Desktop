@@ -10,7 +10,7 @@ use utoipa::ToSchema;
 
 use crate::{
     ambient_light::LedStripConfig,
-    display::{DisplayConfig, DisplayManager, DisplayRegistry, DisplayState},
+    display::{DisplayConfig, DisplayManager, DisplayState},
     http_server::{ApiResponse, AppState},
     led_color::LedColor,
     DisplayInfoWrapper, ScreenshotManager,
@@ -79,16 +79,11 @@ pub async fn list_display_info() -> Result<Json<ApiResponse<String>>, StatusCode
     tag = "display"
 )]
 pub async fn get_display_configs() -> Result<Json<ApiResponse<Vec<DisplayConfig>>>, StatusCode> {
-    match DisplayRegistry::global().await {
-        Ok(registry) => {
-            let configs = registry.get_all_displays().await;
-            Ok(Json(ApiResponse::success(configs)))
-        }
-        Err(e) => {
-            log::error!("Failed to get display registry: {e}");
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
-        }
-    }
+    // Use the DisplayRegistry managed by ConfigManagerV2 to ensure internal_id consistency
+    let cm = crate::ambient_light::ConfigManagerV2::global().await;
+    let registry = cm.get_display_registry();
+    let configs = registry.get_all_displays().await;
+    Ok(Json(ApiResponse::success(configs)))
 }
 
 /// 获取指定显示器的颜色

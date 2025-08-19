@@ -66,7 +66,7 @@ impl DisplayMatcher {
                 if config_display.exact_match(system_display) {
                     let match_result = MatchResult {
                         config_internal_id: config_display.internal_id.clone(),
-                        system_display: system_display.clone(),
+                        system_display: *system_display,
                         match_score: config_display.match_score(system_display),
                         match_type: MatchType::Exact,
                     };
@@ -111,7 +111,7 @@ impl DisplayMatcher {
                 let config_display = self.config_group.find_by_internal_id(&config_id).unwrap();
                 let match_result = MatchResult {
                     config_internal_id: config_id.clone(),
-                    system_display: system_display.clone(),
+                    system_display: *system_display,
                     match_score: score,
                     match_type: MatchType::Partial,
                 };
@@ -147,7 +147,7 @@ impl DisplayMatcher {
 
             let match_result = MatchResult {
                 config_internal_id: String::new(), // 新显示器没有配置ID
-                system_display: system_display.clone(),
+                system_display: *system_display,
                 match_score: 0,
                 match_type: MatchType::New,
             };
@@ -214,7 +214,7 @@ impl DisplayMatcher {
                 let config_display = self.config_group.find_by_internal_id(&config_id).unwrap();
                 let match_result = MatchResult {
                     config_internal_id: config_id.clone(),
-                    system_display: system_display.clone(),
+                    system_display: *system_display,
                     match_score: score,
                     match_type: MatchType::Position,
                 };

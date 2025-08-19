@@ -44,8 +44,10 @@ use tokio::sync::RwLock;
 use volume::VolumeManager;
 
 // Global static variables for LED test effect management
+#[allow(dead_code)]
 static EFFECT_HANDLE: tokio::sync::OnceCell<Arc<RwLock<Option<tokio::task::JoinHandle<()>>>>> =
     tokio::sync::OnceCell::const_new();
+#[allow(dead_code)]
 static CANCEL_TOKEN: tokio::sync::OnceCell<
     Arc<RwLock<Option<tokio_util::sync::CancellationToken>>>,
 > = tokio::sync::OnceCell::const_new();
@@ -76,6 +78,7 @@ struct DisplayInfoWrapper<'a>(#[serde(with = "DisplayInfoDef")] &'a DisplayInfo)
 // Tauri commands removed - using HTTP API only
 
 #[derive(Serialize)]
+#[allow(dead_code)]
 struct AppVersion {
     version: String,
     is_dev: bool,
