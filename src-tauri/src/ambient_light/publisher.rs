@@ -1128,8 +1128,20 @@ impl LedColorsPublisher {
         let edge_colors = self.generate_edge_colors_from_constants(border_colors);
 
         // 2. 读取完整的LED灯带配置以计算正确的全局偏移量
-        let config_manager = crate::ambient_light::ConfigManager::global().await;
-        let all_configs = config_manager.configs().await;
+        // 使用V2配置管理器并转换为V1格式
+        let config_manager_v2 = crate::ambient_light::ConfigManagerV2::global().await;
+        let v2_config = config_manager_v2.get_config().await;
+
+        // 使用适配器转换V2配置为V1格式
+        let adapter = crate::ambient_light::PublisherAdapter::new(config_manager_v2.get_display_registry());
+        let all_configs = match adapter.convert_v2_to_v1_config(&v2_config).await {
+            Ok(v1_config) => v1_config,
+            Err(e) => {
+                log::error!("❌ 转换V2配置到V1格式失败: {}", e);
+                // 如果转换失败，使用传入的config_group作为备选
+                config_group.clone()
+            }
+        };
 
         // 3. 检查是否有活跃灯带需要呼吸效果
         let active_strip = {
