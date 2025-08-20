@@ -283,8 +283,7 @@ impl LedColorsPublisher {
         let initial_v2_config = config_receiver.borrow().clone();
         if !initial_v2_config.strips.is_empty() {
             log::info!("📋 Processing initial LED configuration (v2)...");
-            self
-                .handle_config_change_v2(initial_v2_config, display_registry.clone())
+            self.handle_config_change_v2(initial_v2_config, display_registry.clone())
                 .await;
         } else {
             log::warn!("⚠️ Initial LED configuration is empty, waiting for updates...");
@@ -313,7 +312,11 @@ impl LedColorsPublisher {
         });
     }
 
-    async fn handle_config_change_v2(&self, v2_config: LedStripConfigGroupV2, _display_registry: std::sync::Arc<DisplayRegistry>) {
+    async fn handle_config_change_v2(
+        &self,
+        v2_config: LedStripConfigGroupV2,
+        display_registry: std::sync::Arc<DisplayRegistry>,
+    ) {
         // 将 v2 配置映射到 v1 运行路径所需的 LedStripConfigGroup（系统 display_id）
         let mut v1_group = LedStripConfigGroup {
             strips: Vec::new(),
@@ -322,10 +325,33 @@ impl LedColorsPublisher {
         };
 
         for s in v2_config.strips.iter() {
+            // 通过显示器注册表获取正确的系统ID
+            let system_id = match display_registry
+                .get_display_id_by_internal_id(&s.display_internal_id)
+                .await
+            {
+                Ok(id) => {
+                    log::debug!(
+                        "✅ 映射显示器内部ID {} -> 系统ID {}",
+                        s.display_internal_id,
+                        id
+                    );
+                    id
+                }
+                Err(e) => {
+                    log::warn!(
+                        "⚠️ 无法获取显示器 {} 的系统ID: {}，使用默认值0",
+                        s.display_internal_id,
+                        e
+                    );
+                    0
+                }
+            };
+
             v1_group.strips.push(LedStripConfig {
                 index: s.index,
                 border: s.border,
-                display_id: 0, // 先置 0，后续通过显示器检测逻辑赋值
+                display_id: system_id,
                 len: s.len,
                 led_type: s.led_type,
                 reversed: s.reversed,
@@ -353,7 +379,6 @@ impl LedColorsPublisher {
         }
 
         let configs = configs.unwrap();
-
 
         let mut inner_tasks_version = inner_tasks_version.write().await;
         *inner_tasks_version = inner_tasks_version.overflowing_add(1).0;
@@ -895,13 +920,16 @@ impl LedColorsPublisher {
         sender.set_mode(DataSendMode::AmbientLight).await;
         log::info!("✅ 恢复LED数据发送模式为: AmbientLight");
 
-        // 重新启动氛围光处理任务
+        // 重新启动氛围光处理任务 - 使用ConfigManagerV2保持一致性
         log::info!("🔄 重新启动氛围光处理任务...");
-        let config_manager = ConfigManager::global().await;
-        let current_configs = config_manager.configs().await;
-        if !current_configs.strips.is_empty() {
+        let config_manager_v2 = crate::ambient_light::ConfigManagerV2::global().await;
+        let v2_config = config_manager_v2.get_config().await;
+
+        if !v2_config.strips.is_empty() {
             log::info!("📋 重新处理LED配置以恢复氛围光处理...");
-            self.handle_config_change(current_configs).await;
+            let display_registry = config_manager_v2.get_display_registry();
+            self.handle_config_change_v2(v2_config, display_registry)
+                .await;
         } else {
             log::warn!("⚠️ 当前LED配置为空，无法重新启动氛围光处理");
         }
@@ -1133,7 +1161,8 @@ impl LedColorsPublisher {
         let v2_config = config_manager_v2.get_config().await;
 
         // 使用适配器转换V2配置为V1格式
-        let adapter = crate::ambient_light::PublisherAdapter::new(config_manager_v2.get_display_registry());
+        let adapter =
+            crate::ambient_light::PublisherAdapter::new(config_manager_v2.get_display_registry());
         let all_configs = match adapter.convert_v2_to_v1_config(&v2_config).await {
             Ok(v1_config) => v1_config,
             Err(e) => {

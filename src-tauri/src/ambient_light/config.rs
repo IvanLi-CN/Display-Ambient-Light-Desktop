@@ -418,8 +418,9 @@ mod tests {
     async fn test_get_default_config() {
         let default_config = LedStripConfigGroup::get_default_config().await.unwrap();
 
-        assert_eq!(default_config.strips.len(), 8); // 2 displays * 4 borders
-        assert_eq!(default_config.mappers.len(), 8);
+        // 新的默认配置返回空配置，用户需要手动添加LED灯带
+        assert_eq!(default_config.strips.len(), 0); // 空配置
+        assert_eq!(default_config.mappers.len(), 0); // 空mappers
         assert_eq!(default_config.color_calibration.r, 1.0);
         assert_eq!(default_config.color_calibration.g, 1.0);
         assert_eq!(default_config.color_calibration.b, 1.0);

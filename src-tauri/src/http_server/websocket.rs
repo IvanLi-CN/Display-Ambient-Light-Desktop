@@ -112,7 +112,9 @@ pub struct WebSocketManager {
 
 impl WebSocketManager {
     pub fn new() -> Self {
-        let (sender, _) = broadcast::channel(1000);
+        let (sender, _receiver) = broadcast::channel(1000);
+        // 注意：我们不保存receiver，但这可能导致broadcast channel问题
+        // 更好的解决方案是在全局范围内保持一个接收器活跃
         Self {
             sender,
             subscriptions: Arc::new(RwLock::new(HashMap::new())),
@@ -340,20 +342,33 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
     let ws_manager_for_send = ws_manager.clone();
     let mut send_task = tokio::spawn(async move {
         // 实现从ws_receiver接收广播消息并发送给客户端
-        while let Ok(msg) = ws_receiver.recv().await {
-            let text = match serde_json::to_string(&msg) {
-                Ok(text) => text,
-                Err(e) => {
-                    log::error!("序列化WebSocket消息失败: {e}");
+        loop {
+            match ws_receiver.recv().await {
+                Ok(msg) => {
+                    let text = match serde_json::to_string(&msg) {
+                        Ok(text) => text,
+                        Err(e) => {
+                            log::error!("序列化WebSocket消息失败: {e}");
+                            continue;
+                        }
+                    };
+
+                    if sender.send(Message::Text(text)).await.is_err() {
+                        log::debug!("WebSocket发送消息失败，连接可能已断开");
+                        break;
+                    }
+                    // 移除成功发送的日志，减少输出
+                }
+                Err(broadcast::error::RecvError::Closed) => {
+                    log::debug!("WebSocket广播通道已关闭");
+                    break;
+                }
+                Err(broadcast::error::RecvError::Lagged(skipped)) => {
+                    log::warn!("WebSocket接收器滞后，跳过了 {} 条消息", skipped);
+                    // 继续处理，不要断开连接
                     continue;
                 }
-            };
-
-            if sender.send(Message::Text(text)).await.is_err() {
-                log::debug!("WebSocket发送消息失败，连接可能已断开");
-                break;
             }
-            // 移除成功发送的日志，减少输出
         }
         // 发送任务结束时也清理连接
         ws_manager_for_send.remove_connection(connection_id).await;
