@@ -23,30 +23,69 @@ export const LedStripConfiguration = () => {
   console.log('🔧 LedStripConfiguration component loaded');
 
   createEffect(() => {
-    adaptiveApi.listDisplayInfo().then((displays) => {
-      const parsedDisplays = JSON.parse(displays);
-      setDisplayStore({
-        displays: parsedDisplays,
-      });
-    }).catch((error) => {
-      console.error('Failed to load displays:', error);
-    });
-
-    adaptiveApi.getConfig().then((configs) => {
+    // 并行加载显示器信息和配置信息
+    Promise.all([
+      adaptiveApi.listDisplayInfo(),
+      adaptiveApi.getDisplayConfigs(),
+      adaptiveApi.getConfig()
+    ]).then(([displaysStr, displayConfigs, ledConfigs]) => {
       if (import.meta.env.DEV) {
-        console.log('获取到的配置数据:', configs);
-        console.log('配置数据类型:', typeof configs);
-        console.log('配置数据键:', Object.keys(configs || {}));
+        console.log('🔍 加载配置数据: displays=%d, configs=%d, strips=%d',
+          JSON.parse(displaysStr).length,
+          displayConfigs?.length || 0,
+          ledConfigs?.strips?.length || 0
+        );
       }
 
-      // 安全检查：确保 strips 存在且是数组
-      if (configs && configs.strips && Array.isArray(configs.strips)) {
+      // 解析显示器信息
+      const parsedDisplays = JSON.parse(displaysStr);
+
+      // 建立显示器ID映射关系
+      const displayIdMap = new Map<number, string>(); // 数字ID -> 内部ID
+      const internalIdMap = new Map<string, number>(); // 内部ID -> 数字ID
+
+      if (displayConfigs && Array.isArray(displayConfigs)) {
+        displayConfigs.forEach((config: any) => {
+          if (config.last_system_id && config.internal_id) {
+            displayIdMap.set(config.last_system_id, config.internal_id);
+            internalIdMap.set(config.internal_id, config.last_system_id);
+
+            if (import.meta.env.DEV) {
+              console.log(`🔗 ID映射: ${config.last_system_id} <-> ${config.internal_id} (${config.name})`);
+            }
+          }
+        });
+      }
+
+      // 增强显示器信息，添加内部ID
+      const enhancedDisplays = parsedDisplays.map((display: any) => ({
+        ...display,
+        internal_id: displayIdMap.get(display.id),
+        name: displayConfigs?.find((config: any) => config.last_system_id === display.id)?.name
+      }));
+
+      setDisplayStore({
+        displays: enhancedDisplays,
+      });
+
+      // 处理LED配置，确保兼容V2格式
+      if (ledConfigs && ledConfigs.strips && Array.isArray(ledConfigs.strips)) {
         if (import.meta.env.DEV) {
-          console.log('有效的配置数据，strips数量:', configs.strips.length);
+          console.log('✅ 转换LED配置: %d strips', ledConfigs.strips.length);
         }
+
+        // 转换V2配置为前端兼容格式
+        const convertedStrips = ledConfigs.strips.map((strip: any) => ({
+          ...strip,
+          // 保持原有的display_id字段用于兼容性
+          display_id: internalIdMap.get(strip.display_internal_id) || 0,
+          // 添加display_internal_id字段
+          display_internal_id: strip.display_internal_id
+        }));
+
         setLedStripStore({
-          strips: configs.strips,
-          colorCalibration: configs.color_calibration || {
+          strips: convertedStrips,
+          colorCalibration: ledConfigs.color_calibration || {
             r: 1.0,
             g: 1.0,
             b: 1.0,
@@ -54,8 +93,7 @@ export const LedStripConfiguration = () => {
           }
         });
       } else {
-        console.warn('配置数据无效或缺少strips:', configs);
-        // 设置空的配置
+        console.warn('⚠️ LED配置数据无效或缺少strips:', ledConfigs);
         setLedStripStore({
           strips: [],
           colorCalibration: {
@@ -67,8 +105,9 @@ export const LedStripConfiguration = () => {
         });
       }
     }).catch((error) => {
-      console.error('Failed to load LED strip configs:', error);
+      console.error('❌ 加载配置失败:', error);
       // 设置空的配置
+      setDisplayStore({ displays: [] });
       setLedStripStore({
         strips: [],
         colorCalibration: {
