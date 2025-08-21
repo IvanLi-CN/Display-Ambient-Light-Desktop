@@ -40,6 +40,7 @@ export const enUS: TranslationDict = {
     back: 'Back',
     clear: 'Clear',
     confirmUnsavedChanges: 'There are unsaved changes, are you sure you want to leave?',
+    noData: 'No data',
   },
   
   info: {

@@ -40,6 +40,7 @@ export const zhCN: TranslationDict = {
     back: '返回',
     clear: '清空',
     confirmUnsavedChanges: '有未保存的更改，确定要离开吗？',
+    noData: '无数据',
   },
   
   info: {

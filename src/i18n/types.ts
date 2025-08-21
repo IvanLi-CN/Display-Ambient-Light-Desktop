@@ -42,6 +42,7 @@ export interface TranslationDict {
     back: string;
     clear: string;
     confirmUnsavedChanges: string;
+    noData: string;
   };
   
   // Info page
