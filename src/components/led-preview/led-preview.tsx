@@ -3,15 +3,17 @@
  * 订阅排序后的LED颜色数据，以一行的形式显示所有LED的颜色
  */
 
-import { createSignal, onMount, onCleanup, Show, For } from 'solid-js';
+import { createSignal, createMemo, onMount, onCleanup, Show, For } from 'solid-js';
 import { adaptiveApi } from '../../services/api-adapter';
 import { useLanguage } from '../../i18n/index';
 import { DataSendMode } from '../../types/led-status';
 import { LedSortedColorsChangedEvent } from '../../types/websocket';
+import { LedApiService } from '../../services/led-api.service';
 
 export interface LedPreviewProps {
   class?: string;
   maxLeds?: number; // 最大显示的LED数量，超过则缩放
+  enabled?: boolean; // 是否启用LED预览
 }
 
 export function LedPreview(props: LedPreviewProps) {
@@ -19,6 +21,7 @@ export function LedPreview(props: LedPreviewProps) {
   const [sortedColors, setSortedColors] = createSignal<Uint8ClampedArray>(new Uint8ClampedArray(0));
   const [connected, setConnected] = createSignal(false);
   const [lastUpdateTime, setLastUpdateTime] = createSignal<Date | null>(null);
+
 
   // 用于组装分片数据的缓冲区
   const [colorBuffer, setColorBuffer] = createSignal<Map<number, Uint8ClampedArray>>(new Map());
@@ -28,12 +31,102 @@ export function LedPreview(props: LedPreviewProps) {
   let unsubscribeSortedColors: (() => void) | null = null;
   let unsubscribeConnection: (() => void) | null = null;
 
-  // 防抖动相关变量
-  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-  let lastDataSize = 0;
-  let stableDataCount = 0;
-  const DEBOUNCE_DELAY = 100; // 100ms防抖
-  const STABLE_COUNT_THRESHOLD = 3; // 需要连续3次相同大小才认为稳定
+  // 渲染节流相关变量（目标 30FPS）
+  let renderTimer: ReturnType<typeof setTimeout> | null = null;
+  let lastRenderMs = 0;
+  const TARGET_FPS = 30;
+  const MIN_RENDER_INTERVAL = Math.floor(1000 / TARGET_FPS);
+  let pendingEvent: LedSortedColorsChangedEvent | null = null;
+
+  const scheduleRender = (event: LedSortedColorsChangedEvent, fromPolling = false) => {
+    pendingEvent = event;
+    const now = Date.now();
+    const elapsed = now - lastRenderMs;
+
+    const doRender = () => {
+      if (pendingEvent) {
+        updateColors(pendingEvent, fromPolling);
+        pendingEvent = null;
+      }
+      lastRenderMs = Date.now();
+      renderTimer = null;
+    };
+
+    if (elapsed >= MIN_RENDER_INTERVAL) {
+      doRender();
+    } else if (!renderTimer) {
+      renderTimer = setTimeout(doRender, MIN_RENDER_INTERVAL - elapsed);
+    }
+  };
+
+  // 轮询相关变量（在预览界面加速，提升可见刷新率）
+  let pollingTimer: ReturnType<typeof setInterval> | null = null;
+  let lastWebSocketUpdate = Date.now();
+  const POLLING_INTERVAL = 200; // 200ms 轮询间隔（5Hz）
+  const WEBSOCKET_TIMEOUT = 500; // 500ms 无WebSocket数据则开始轮询
+
+  // 轮询获取LED颜色数据（用于氛围光模式）
+  const pollLedColors = async () => {
+    try {
+      console.log('🔄 Polling LED colors from API...');
+
+      // 🔧 同时获取LED颜色数据和状态信息（包含真实时间戳）
+      const [colors, ledStatus] = await Promise.all([
+        LedApiService.getCurrentLedColors(),
+        adaptiveApi.getLedStatus()
+      ]);
+
+      if (colors && colors.length > 0) {
+        console.log('🌈 Polled LED colors:', colors.length, 'bytes');
+
+        // 模拟WebSocket事件格式
+        const mockEvent = {
+          sorted_colors: colors,
+          mode: 'AmbientLight' as DataSendMode,
+          led_offset: 0
+        };
+
+        // 走统一的节流渲染通道
+        scheduleRender(mockEvent, true);
+
+        // 🔧 使用后端状态中的真实时间戳
+        if (ledStatus && ledStatus.last_updated) {
+          setLastUpdateTime(new Date(ledStatus.last_updated));
+          // console.log('🕒 Updated timestamp from backend:', ledStatus.last_updated);
+        }
+      } else {
+        console.log('📭 No LED color data available from API');
+      }
+    } catch (error) {
+      console.error('❌ Failed to poll LED colors:', error);
+    }
+  };
+
+  // 启动轮询机制
+  const startPolling = () => {
+    if (pollingTimer) {
+      clearInterval(pollingTimer);
+    }
+
+    console.log('🔄 Starting LED color polling...');
+    pollingTimer = setInterval(() => {
+      const timeSinceLastUpdate = Date.now() - lastWebSocketUpdate;
+
+      // 如果超过WEBSOCKET_TIMEOUT时间没有收到WebSocket数据，则开始轮询
+      if (timeSinceLastUpdate > WEBSOCKET_TIMEOUT) {
+        pollLedColors();
+      }
+    }, POLLING_INTERVAL);
+  };
+
+  // 停止轮询机制
+  const stopPolling = () => {
+    if (pollingTimer) {
+      console.log('⏹️ Stopping LED color polling...');
+      clearInterval(pollingTimer);
+      pollingTimer = null;
+    }
+  };
 
   // 组装颜色分片为完整数据
   const assembleColorFragments = (buffer: Map<number, Uint8ClampedArray>): Uint8ClampedArray => {
@@ -49,6 +142,11 @@ export function LedPreview(props: LedPreviewProps) {
     for (const [offset, fragment] of sortedFragments) {
       const endPosition = offset + fragment.length;
       totalLength = Math.max(totalLength, endPosition);
+    }
+
+    // 容错：如果后端分片未从0开始，确保数组足够大
+    if (sortedFragments.length > 0 && sortedFragments[0][0] > 0) {
+      totalLength = Math.max(totalLength, sortedFragments[0][0] + sortedFragments[0][1].length);
     }
 
     // 创建完整的颜色数组
@@ -70,10 +168,21 @@ export function LedPreview(props: LedPreviewProps) {
   };
 
   // 颜色更新函数 - 处理分片数据
-  const updateColors = (event: LedSortedColorsChangedEvent) => {
+  const updateColors = (event: LedSortedColorsChangedEvent, fromPolling = false) => {
     const colorsArray = new Uint8ClampedArray(event.sorted_colors);
     const ledOffset = event.led_offset || 0; // 向后兼容，默认偏移量为0
     const mode = event.mode || 'AmbientLight';
+
+    // 如果不是来自轮询，则更新WebSocket数据时间戳
+    if (!fromPolling) {
+      lastWebSocketUpdate = Date.now();
+
+      // 🔧 使用WebSocket事件中的时间戳（如果有的话）
+      if (event.timestamp) {
+        setLastUpdateTime(new Date(event.timestamp));
+        // console.log('🕒 Updated timestamp from WebSocket event:', event.timestamp);
+      }
+    }
 
     // 将LED偏移量转换为字节偏移量（每个LED占3字节RGB）
     const byteOffset = ledOffset * 3;
@@ -82,7 +191,8 @@ export function LedPreview(props: LedPreviewProps) {
       bytes: colorsArray.length,
       ledOffset: ledOffset,
       byteOffset: byteOffset,
-      mode: mode
+      mode: mode,
+      firstFewBytes: colorsArray.length > 0 ? Array.from(colorsArray.slice(0, 12)) : 'empty'
     });
 
     // 检测模式切换，如果模式改变则清理缓冲区
@@ -104,16 +214,35 @@ export function LedPreview(props: LedPreviewProps) {
     const maxBytes = props.maxLeds ? props.maxLeds * 3 : assembledColors.length;
     const limitedColors = assembledColors.slice(0, maxBytes);
 
+    console.log('🎨 Before setSortedColors:', {
+      assembledLength: assembledColors.length,
+      limitedLength: limitedColors.length,
+      currentSortedLength: sortedColors().length,
+      firstFewAssembled: assembledColors.length > 0 ? Array.from(assembledColors.slice(0, 12)) : 'empty',
+      firstFewLimited: limitedColors.length > 0 ? Array.from(limitedColors.slice(0, 12)) : 'empty'
+    });
+
     setSortedColors(limitedColors);
-    setLastUpdateTime(new Date());
+    // 🔧 移除前端自己生成时间戳，应该从后端数据中获取
+    // setLastUpdateTime(new Date());
+
+    console.log('🎨 After setSortedColors:', {
+      newSortedLength: limitedColors.length,
+      firstFewSorted: limitedColors.length > 0 ? Array.from(limitedColors.slice(0, 12)) : 'empty'
+    });
+
     console.log('✅ LED Preview colors updated:', limitedColors.length, 'bytes, mode:', event.mode);
   };
 
   onMount(async () => {
     try {
       console.log('🎨 LED Preview initializing...');
+      console.log('🎨 LED Preview enabled:', props.enabled);
+
+
 
       // 监听LED排序颜色变化事件
+      console.log('📤 Subscribing to LedSortedColorsChanged events...');
       unsubscribeSortedColors = await adaptiveApi.onEvent<LedSortedColorsChangedEvent>(
         'LedSortedColorsChanged',
         (event) => {
@@ -128,28 +257,8 @@ export function LedPreview(props: LedPreviewProps) {
               if (mode === 'AmbientLight' || mode === 'TestEffect' || mode === 'StripConfig' || mode === 'ColorCalibration') {
                 const currentDataSize = event.sorted_colors.length;
 
-                // 检查数据大小稳定性
-                if (currentDataSize === lastDataSize) {
-                  stableDataCount++;
-                } else {
-                  stableDataCount = 1;
-                  lastDataSize = currentDataSize;
-                }
-
-                // 清除之前的防抖定时器
-                if (debounceTimer) {
-                  clearTimeout(debounceTimer);
-                }
-
-                // 只有在数据稳定或者是第一次更新时才立即更新
-                if (stableDataCount >= STABLE_COUNT_THRESHOLD || sortedColors().length === 0) {
-                  updateColors(event);
-                } else {
-                  // 否则使用防抖延迟更新
-                  debounceTimer = setTimeout(() => {
-                    updateColors(event);
-                  }, DEBOUNCE_DELAY);
-                }
+                // 节流渲染：统一通过 scheduleRender 以 ~30FPS 刷新
+                scheduleRender(event);
               } else {
                 console.log('🚫 Skipping LED Preview update for mode:', mode);
               }
@@ -171,19 +280,15 @@ export function LedPreview(props: LedPreviewProps) {
         }
       );
 
-      // 订阅LED排序颜色变化事件
-      console.log('📤 Subscribing to LedSortedColorsChanged events...');
-      try {
-        await adaptiveApi.subscribeToEvents(['LedSortedColorsChanged']);
-        console.log('✅ Subscribed to LedSortedColorsChanged events');
-      } catch (subscribeError) {
-        console.error('❌ Failed to subscribe to LedSortedColorsChanged events:', subscribeError);
-      }
+      console.log('✅ Subscribed to LedSortedColorsChanged events');
 
       // 设置连接状态为true（假设WebSocket已连接）
       setConnected(true);
 
       console.log('✅ LED Preview WebSocket listeners initialized');
+
+      // 启动轮询机制（用于氛围光模式下的数据获取）
+      startPolling();
 
     } catch (error) {
       console.error('❌ Failed to initialize LED Preview WebSocket listeners:', error);
@@ -191,11 +296,14 @@ export function LedPreview(props: LedPreviewProps) {
   });
 
   onCleanup(() => {
-    // 清理防抖定时器
-    if (debounceTimer) {
-      clearTimeout(debounceTimer);
-      debounceTimer = null;
+    // 清理渲染节流定时器
+    if (renderTimer) {
+      clearTimeout(renderTimer);
+      renderTimer = null;
     }
+
+    // 停止轮询机制
+    stopPolling();
 
     if (unsubscribeSortedColors) {
       unsubscribeSortedColors();
@@ -210,6 +318,16 @@ export function LedPreview(props: LedPreviewProps) {
     const colors = sortedColors();
     const ledColors: string[] = [];
 
+    // 添加详细调试信息
+    console.log('🎨 getLedColors() called:', {
+      colorsLength: colors.length,
+      colorsType: colors.constructor.name,
+      firstFewBytes: colors.length > 0 ? Array.from(colors.slice(0, 12)) : 'empty',
+      lastFewBytes: colors.length > 12 ? Array.from(colors.slice(-12)) : 'not enough data'
+    });
+
+
+
     // 后端发送的数据已经是RGB格式，直接解析
     for (let i = 0; i < colors.length; i += 3) {
       if (i + 2 < colors.length) {
@@ -217,8 +335,20 @@ export function LedPreview(props: LedPreviewProps) {
         const g = colors[i + 1]; // Green
         const b = colors[i + 2]; // Blue
         ledColors.push(`rgb(${r}, ${g}, ${b})`);
+
+        // 记录前几个LED的颜色用于调试
+        if (i < 15) { // 前5个LED
+          console.log(`🌈 LED ${i/3}: rgb(${r}, ${g}, ${b})`);
+        }
       }
     }
+
+    console.log('🎨 getLedColors() result:', {
+      totalLeds: ledColors.length,
+      expectedLeds: Math.floor(colors.length / 3),
+      firstFewColors: ledColors.slice(0, 5),
+      lastFewColors: ledColors.length > 5 ? ledColors.slice(-5) : 'not enough colors'
+    });
 
     return ledColors;
   };
@@ -267,34 +397,53 @@ export function LedPreview(props: LedPreviewProps) {
     return t('ledStatus.connected');
   };
 
-  const displayInfo = () => getDisplayInfo();
+  // 格式化时间（只显示时分秒）
+  const formatTimeOnly = (date: Date | null) => {
+    if (!date) return '无数据';
+    return date.toLocaleString('zh-CN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+  };
+
+  // 格式化最后更新时间
+  const formatLastUpdateTime = () => {
+    return formatTimeOnly(lastUpdateTime());
+  };
+
+  const displayInfo = createMemo(() => getDisplayInfo());
 
   return (
-    <div class={`${props.class || ''}`}>
+    <div class={`${props.class || ''}`} style={{ display: props.enabled === false ? 'none' : 'block' }}>
       {/* LED颜色显示 */}
       <Show
         when={displayInfo().colors.length > 0}
         fallback={
-          <div class="flex items-center justify-center h-6 text-base-content/60 text-xs bg-base-100 border border-base-300 rounded">
-            {connected() ? t('ledStatus.waitingForData') : t('ledStatus.disconnected')}
+          <div class="flex items-center justify-center h-16 text-base-content/60 text-xs bg-base-100 border border-base-300 rounded">
+            <div class="opacity-70">等待状态数据...</div>
           </div>
         }
       >
-        <div class="flex gap-0.5 overflow-hidden">
-          <For each={displayInfo().colors}>
-            {(color) => (
-              <div
-                class="flex-shrink-0 rounded-sm"
-                style={{
-                  'background-color': color,
-                  width: `${displayInfo().ledSize}px`,
-                  height: '6px',
-                  'min-width': '2px'
-                }}
-                title={color}
-              />
-            )}
-          </For>
+        <div class="space-y-1">
+          <div class="flex gap-0.5 overflow-hidden">
+            <For each={displayInfo().colors}>
+              {(color) => (
+                <div
+                  class="flex-shrink-0 rounded-sm"
+                  style={{
+                    'background-color': color,
+                    width: `${displayInfo().ledSize}px`,
+                    height: '6px',
+                    'min-width': '2px'
+                  }}
+                  title={color}
+                />
+              )}
+            </For>
+          </div>
+
         </div>
       </Show>
     </div>

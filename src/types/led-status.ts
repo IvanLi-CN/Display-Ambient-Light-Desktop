@@ -144,15 +144,15 @@ export const getModeIcon = (mode: DataSendMode): string => {
 /**
  * 计算发送频率（Hz）
  * 基于发送统计信息计算
+ * 注意：前端现在基于 WebSocket 实际接收时间计算频率，此处返回0作为占位，避免误导
  */
 export function calculateFrequency(stats: LedSendStats | undefined): number {
   if (!stats || !stats.last_send_time || stats.total_packets_sent === 0) {
     return 0;
   }
 
-  // 这里可以根据实际需要实现更复杂的频率计算逻辑
-  // 目前返回一个估算值
-  return stats.total_packets_sent > 0 ? 30 : 0; // 默认30Hz
+  // 如需基于后端统计估算，可在未来引入更准确的算法
+  return 0;
 }
 
 /**
@@ -193,7 +193,10 @@ export function convertToStatusBarData(
   const safeStatus = ledStatus || {};
 
   const frequency = calculateFrequency(safeStatus.send_stats);
-  const totalLedCount = calculateLedCount(safeStatus.current_colors_bytes || 0);
+
+  // 优先使用后端计算好的 total_led_count，如果没有则根据数据长度计算
+  const dataLength = safeStatus.data_length || safeStatus.current_colors_bytes || 0;
+  const totalLedCount = safeStatus.total_led_count || calculateLedCount(dataLength);
 
   // 获取模式显示名称
   const mode = (safeStatus.data_send_mode || safeStatus.mode) as DataSendMode;
@@ -206,8 +209,8 @@ export function convertToStatusBarData(
     raw_mode: mode,
     frequency: safeStatus.frequency || frequency,
     // 兼容后端新格式：data_length 字段名
-    data_length: safeStatus.data_length || safeStatus.current_colors_bytes || 0,
-    total_led_count: safeStatus.total_led_count || totalLedCount,
+    data_length: dataLength,
+    total_led_count: totalLedCount,
     test_mode_active: safeStatus.test_mode_active || false,
     // 兼容后端新格式：timestamp 字段名
     last_update: formatTime(safeStatus.timestamp || safeStatus.last_updated || new Date().toISOString()),

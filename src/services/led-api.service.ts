@@ -94,6 +94,14 @@ export class LedApiService {
     return api.get('/api/v1/led/status');
   }
 
+  /**
+   * 获取当前LED颜色数据
+   * 用于在氛围光模式下获取实时LED颜色数据
+   */
+  static async getCurrentLedColors(): Promise<number[]> {
+    return api.get('/api/v1/led/current-colors');
+  }
+
 
 
   /**
