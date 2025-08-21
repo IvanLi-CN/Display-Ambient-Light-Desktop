@@ -20,6 +20,8 @@ export interface LedSortedColorsChangedEvent {
   mode: DataSendMode;
   /** LED偏移量（用于前端组装完整预览） */
   led_offset: number;
+  /** 时间戳（来自后端数据生成时间） */
+  timestamp?: string;
 }
 
 /**

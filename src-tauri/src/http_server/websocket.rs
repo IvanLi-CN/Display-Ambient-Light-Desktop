@@ -67,6 +67,8 @@ pub struct LedSortedColorsChangedData {
     pub mode: crate::led_data_sender::DataSendMode,
     /// LED偏移量（用于前端组装完整预览）
     pub led_offset: usize,
+    /// 时间戳（来自后端数据生成时间）
+    pub timestamp: chrono::DateTime<chrono::Utc>,
 }
 
 /// LED灯带颜色变化数据（按灯带分组）

@@ -125,6 +125,11 @@ export class ApiAdapter {
 
     // 只使用WebSocket事件
     return api.onEvent(eventName, (message: any) => {
+      // 添加调试日志
+      if (eventName === 'LedSortedColorsChanged') {
+        console.log('🔍 adaptiveApi.onEvent received:', eventName, message);
+        console.log('🔍 Will pass to handler:', message.data || message);
+      }
       handler(message.data || message);
     });
   }
@@ -233,6 +238,13 @@ export class ApiAdapter {
     return this.call(
       'get_led_data_send_mode',
       () => LedApiService.getDataSendMode()
+    );
+  }
+
+  public async getLedStatus(): Promise<any> {
+    return this.call(
+      'get_led_status',
+      () => LedApiService.getLedStatus()
     );
   }
 
@@ -571,6 +583,7 @@ export const adaptiveApi = {
   disableTestMode: () => apiAdapter.disableTestMode(),
   setDataSendMode: (mode: DataSendMode) => apiAdapter.setDataSendMode(mode),
   getDataSendMode: () => apiAdapter.getDataSendMode(),
+  getLedStatus: () => apiAdapter.getLedStatus(),
   getLedPreviewState: () => apiAdapter.getLedPreviewState(),
   setLedPreviewState: (enabled: boolean) => apiAdapter.setLedPreviewState(enabled),
   startLedTestEffect: (params: any) => apiAdapter.startLedTestEffect(params),

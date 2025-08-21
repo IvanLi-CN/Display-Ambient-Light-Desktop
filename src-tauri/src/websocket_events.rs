@@ -71,15 +71,21 @@ impl WebSocketEventPublisher {
 
     /// 发布LED排序颜色变化事件
     pub async fn publish_led_sorted_colors_changed(&self, sorted_colors: &[u8], led_offset: usize) {
-        // 获取当前模式信息
+        // 获取当前模式信息和时间戳
         let sender = crate::led_data_sender::LedDataSender::global().await;
         let current_mode = sender.get_mode().await;
 
+        // 🔧 从LED状态管理器获取真实的数据更新时间戳
+        let status_manager = crate::led_status_manager::LedStatusManager::global().await;
+        let status = status_manager.get_status().await;
+        let timestamp = status.last_updated;
+
         log::info!(
-            "🌈 Publishing LED sorted colors changed event: {} bytes, mode={:?}, offset={}",
+            "🌈 Publishing LED sorted colors changed event: {} bytes, mode={:?}, offset={}, timestamp={}",
             sorted_colors.len(),
             current_mode,
-            led_offset
+            led_offset,
+            timestamp.to_rfc3339()
         );
 
         let message = WsMessage::LedSortedColorsChanged {
@@ -87,6 +93,7 @@ impl WebSocketEventPublisher {
                 sorted_colors: sorted_colors.to_vec(),
                 mode: current_mode,
                 led_offset,
+                timestamp,
             },
         };
         match self
@@ -182,7 +189,7 @@ impl WebSocketEventPublisher {
     pub async fn publish_led_status_changed_with_mode(&self, mode_override: Option<DataSendMode>) {
         // 获取当前LED状态
         let sender = crate::led_data_sender::LedDataSender::global().await;
-        let config_manager = crate::ambient_light::ConfigManager::global().await;
+        let config_manager = crate::ambient_light::ConfigManagerV2::global().await;
 
         // 获取当前模式（如果没有提供覆盖值）
         let mode = if let Some(mode) = mode_override {
@@ -192,7 +199,7 @@ impl WebSocketEventPublisher {
         };
 
         // 获取LED配置以计算总数量和数据长度
-        let configs = config_manager.configs().await;
+        let configs = config_manager.get_config().await;
         let total_led_count: u32 = configs.strips.iter().map(|strip| strip.len as u32).sum();
 
         // 计算数据长度（每个LED 3字节 RGB 或 4字节 RGBW）

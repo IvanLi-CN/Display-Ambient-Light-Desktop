@@ -221,6 +221,21 @@ pub async fn get_led_status() -> Result<Json<ApiResponse<LedStatusStats>>, Statu
     Ok(Json(ApiResponse::success(status)))
 }
 
+/// 获取当前LED颜色数据
+#[utoipa::path(
+    get,
+    path = "/api/v1/led/current-colors",
+    responses(
+        (status = 200, description = "获取LED颜色数据成功", body = ApiResponse<Vec<u8>>),
+    ),
+    tag = "led"
+)]
+pub async fn get_current_led_colors() -> Result<Json<ApiResponse<Vec<u8>>>, StatusCode> {
+    let status_manager = LedStatusManager::global().await;
+    let colors = status_manager.get_sorted_colors().await;
+    Ok(Json(ApiResponse::success(colors)))
+}
+
 /// 获取LED数据发送模式
 #[utoipa::path(
     get,
@@ -606,6 +621,7 @@ pub async fn set_led_preview_state(
 pub fn create_routes() -> Router<AppState> {
     Router::new()
         .route("/status", get(get_led_status))
+        .route("/current-colors", get(get_current_led_colors))
         .route("/colors", post(send_colors))
         .route("/calibration-color", post(send_calibration_color))
         .route("/test-colors", post(send_test_colors_to_board))
