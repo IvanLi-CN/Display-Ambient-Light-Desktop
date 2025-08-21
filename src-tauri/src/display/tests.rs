@@ -2,8 +2,7 @@
 #[allow(clippy::module_inception)]
 mod tests {
     use crate::display::{
-        DisplayConfig, DisplayConfigGroup, DisplayMatcher, DisplayRegistry,
-        MatchType,
+        DisplayConfig, DisplayConfigGroup, DisplayMatcher, DisplayRegistry, MatchType,
     };
 
     /// 创建测试用的显示器信息

@@ -11,7 +11,6 @@ mod manager;
 #[cfg(test)]
 mod tests;
 
-
 pub use display_config::*;
 pub use display_matcher::*;
 pub use display_registry::*;

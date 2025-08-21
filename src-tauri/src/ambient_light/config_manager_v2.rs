@@ -3,9 +3,7 @@ use std::sync::Arc;
 use tauri::async_runtime::RwLock;
 use tokio::sync::OnceCell;
 
-use crate::ambient_light::{
-    ColorCalibration, LedStripConfigGroupV2, LedStripConfigV2,
-};
+use crate::ambient_light::{ColorCalibration, LedStripConfigGroupV2, LedStripConfigV2};
 use crate::display::DisplayRegistry;
 
 /// 新版本的配置管理器，支持稳定的显示器ID系统

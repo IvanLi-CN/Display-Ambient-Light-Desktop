@@ -39,8 +39,7 @@ impl PublisherAdapter {
                 .await
             {
                 Ok(system_id) => {
-                    internal_id_to_system_id
-                        .insert(display_config.internal_id.clone(), system_id);
+                    internal_id_to_system_id.insert(display_config.internal_id.clone(), system_id);
                     log::debug!(
                         "映射显示器(注册表): '{}' ({}) -> 系统ID {}",
                         display_config.name,
@@ -66,10 +65,8 @@ impl PublisherAdapter {
                             .iter()
                             .find(|sd| display_config.exact_match(sd))
                         {
-                            internal_id_to_system_id.insert(
-                                display_config.internal_id.clone(),
-                                sys_display.id,
-                            );
+                            internal_id_to_system_id
+                                .insert(display_config.internal_id.clone(), sys_display.id);
                             log::warn!(
                                 "⚠️ 无法通过注册表映射显示器 '{}' ({})，但通过属性匹配到了系统ID {}",
                                 display_config.name,
@@ -78,8 +75,7 @@ impl PublisherAdapter {
                             );
                         } else {
                             // 4) 最后回退：使用0（保持兼容性，避免直接失败），但记录警告
-                            internal_id_to_system_id
-                                .insert(display_config.internal_id.clone(), 0);
+                            internal_id_to_system_id.insert(display_config.internal_id.clone(), 0);
                             log::warn!(
                                 "⚠️ 无法为显示器 '{}' ({}) 找到系统ID，使用默认值0",
                                 display_config.name,
@@ -145,10 +141,16 @@ impl PublisherAdapter {
                     }
                     Err(_) => {
                         // 2) 再尝试根据 display_config 中的记录做属性匹配
-                        if let Some(dc) = v2_config.display_config.find_by_internal_id(&target_internal_id) {
-                            if let Some(sys_display) = system_displays.iter().find(|sd| dc.exact_match(sd)) {
+                        if let Some(dc) = v2_config
+                            .display_config
+                            .find_by_internal_id(&target_internal_id)
+                        {
+                            if let Some(sys_display) =
+                                system_displays.iter().find(|sd| dc.exact_match(sd))
+                            {
                                 system_id = sys_display.id;
-                                internal_id_to_system_id.insert(target_internal_id.clone(), system_id);
+                                internal_id_to_system_id
+                                    .insert(target_internal_id.clone(), system_id);
                                 log::debug!(
                                     "条目级映射(属性匹配): {} -> 系统ID {}",
                                     target_internal_id,

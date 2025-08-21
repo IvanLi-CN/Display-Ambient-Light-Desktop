@@ -153,8 +153,6 @@ async fn test_complete_stable_display_id_workflow() {
     println!("🎉 稳定显示器ID系统集成测试完成！");
 }
 
-
-
 /// 测试ConfigManagerV2的基本功能
 #[tokio::test]
 async fn test_config_manager_v2_basic_operations() {

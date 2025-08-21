@@ -173,10 +173,6 @@ impl LedStripConfigGroupV2 {
         Ok(())
     }
 
-
-
-
-
     /// 获取默认配置
     pub async fn get_default_config() -> anyhow::Result<Self> {
         log::info!("🔧 创建默认LED灯带配置...");

@@ -8,7 +8,7 @@ use serde::Deserialize;
 use utoipa::ToSchema;
 
 use crate::{
-    ambient_light::{self, Border, ColorCalibration, LedType, LedStripConfigGroupV2},
+    ambient_light::{self, Border, ColorCalibration, LedStripConfigGroupV2, LedType},
     http_server::{ApiResponse, AppState},
     language_manager::LanguageManager,
     user_preferences::{UIPreferences, UserPreferences, UserPreferencesManager, WindowPreferences},
@@ -104,7 +104,8 @@ pub struct UpdateLanguageRequest {
     ),
     tag = "config"
 )]
-pub async fn get_led_strip_configs_v2() -> Result<Json<ApiResponse<LedStripConfigGroupV2>>, StatusCode> {
+pub async fn get_led_strip_configs_v2(
+) -> Result<Json<ApiResponse<LedStripConfigGroupV2>>, StatusCode> {
     let config_manager_v2 = ambient_light::ConfigManagerV2::global().await;
     let v2_config = config_manager_v2.get_config().await;
     Ok(Json(ApiResponse::success(v2_config)))
@@ -139,8 +140,6 @@ pub async fn update_led_strip_configs_v2(
         }
     }
 }
-
-
 
 /// 更新LED灯带长度
 #[utoipa::path(

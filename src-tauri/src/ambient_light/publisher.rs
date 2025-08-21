@@ -1064,13 +1064,16 @@ impl LedColorsPublisher {
         sender.set_mode(restore_mode).await;
         log::info!("✅ 恢复LED数据发送模式为: {restore_mode:?}");
 
-        // 🔧 重新启动氛围光处理任务
+        // 🔧 重新启动氛围光处理任务 - 使用ConfigManagerV2保持一致性
         log::info!("🔄 重新启动氛围光处理任务...");
-        let config_manager = ConfigManager::global().await;
-        let current_configs = config_manager.configs().await;
-        if !current_configs.strips.is_empty() {
+        let config_manager_v2 = crate::ambient_light::ConfigManagerV2::global().await;
+        let v2_config = config_manager_v2.get_config().await;
+
+        if !v2_config.strips.is_empty() {
             log::info!("📋 重新处理LED配置以恢复氛围光处理...");
-            self.handle_config_change(current_configs).await;
+            let display_registry = config_manager_v2.get_display_registry();
+            self.handle_config_change_v2(v2_config, display_registry)
+                .await;
         } else {
             log::warn!("⚠️ 当前LED配置为空，无法重新启动氛围光处理");
         }
@@ -1139,6 +1142,13 @@ impl LedColorsPublisher {
                     .await
                 {
                     log::error!("❌ 生成和发布定位色数据失败: {e}");
+
+                    // 🔧 如果是模式冲突错误，立即停止任务
+                    let error_msg = e.to_string();
+                    if error_msg.contains("Cannot send") && error_msg.contains("mode") {
+                        log::warn!("🛑 检测到模式冲突，停止单屏配置任务: {e}");
+                        break;
+                    }
                 }
             }
 
