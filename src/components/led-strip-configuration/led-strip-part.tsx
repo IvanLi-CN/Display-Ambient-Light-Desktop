@@ -148,6 +148,22 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
     }
   };
 
+
+  // 计算是否选中/悬浮，仅在双方都存在时才成立，避免 undefined === undefined 造成的误判
+  const isSelected = !!(
+    stripConfiguration.selectedStripPart &&
+    localProps.config &&
+    stripConfiguration.selectedStripPart.displayId === localProps.config.display_id &&
+    stripConfiguration.selectedStripPart.border === localProps.config.border
+  );
+
+  const isHovered = !!(
+    stripConfiguration.hoveredStripPart &&
+    localProps.config &&
+    stripConfiguration.hoveredStripPart.displayId === localProps.config.display_id &&
+    stripConfiguration.hoveredStripPart.border === localProps.config.border
+  );
+
   return (
     <section
       {...rootProps}
@@ -157,13 +173,8 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
         rootProps.class
       }
       classList={{
-        'ring ring-inset bg-yellow-400/50 ring-orange-400 animate-pulse':
-          stripConfiguration.selectedStripPart?.border === localProps.config?.border &&
-          stripConfiguration.selectedStripPart?.displayId ===
-            localProps.config?.display_id,
-        'ring-2 ring-primary bg-primary/20 border-primary':
-          stripConfiguration.hoveredStripPart?.border === localProps.config?.border &&
-          stripConfiguration.hoveredStripPart?.displayId === localProps.config?.display_id,
+        'ring ring-inset bg-yellow-400/50 ring-orange-400 animate-pulse': isSelected,
+        'ring-2 ring-primary bg-primary/20 border-primary': isHovered,
       }}
       onWheel={onWheel}
       onMouseEnter={onMouseEnter}
