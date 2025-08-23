@@ -10,12 +10,12 @@ type: "always_apply"
 
 | 命令 | 前端 | 后端 | GUI | 服务端口 |
 |------|------|------|-----|----------|
-| `pnpm dev:browser` | ✅ Vite (1420) | ✅ Browser模式 | ❌ | HTTP:3030, WS:8765 |
+| `pnpm dev:browser` | ✅ Vite (24100) | ✅ Browser模式 | ❌ | HTTP:24101, WS:24102 |
 | `pnpm tauri dev` | ✅ Vite | ✅ Desktop模式 | ✅ | 桌面应用 |
-| `pnpm dev:headless` | ❌ | ✅ Headless模式 | ❌ | HTTP:3030, WS:8765 |
-| `pnpm tauri:browser` | ❌ | ✅ Browser模式 | ❌ | HTTP:3030, WS:8765 |
-| `pnpm tauri:headless` | ❌ | ✅ Headless模式 | ❌ | HTTP:3030, WS:8765 |
-| `pnpm dev` | ✅ Vite (1420) | ❌ | ❌ | 仅前端 |
+| `pnpm dev:headless` | ❌ | ✅ Headless模式 | ❌ | HTTP:24101, WS:24102 |
+| `pnpm tauri:browser` | ❌ | ✅ Browser模式 | ❌ | HTTP:24101, WS:24102 |
+| `pnpm tauri:headless` | ❌ | ✅ Headless模式 | ❌ | HTTP:24101, WS:24102 |
+| `pnpm dev` | ✅ Vite (24100) | ❌ | ❌ | 仅前端 |
 
 ### **后端模式说明**
 

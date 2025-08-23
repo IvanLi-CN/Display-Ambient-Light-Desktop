@@ -598,7 +598,7 @@ async fn main() {
     // 启动HTTP服务器
     let http_config = http_server::ServerConfig {
         host: "127.0.0.1".to_string(),
-        port: 3030,
+        port: 24101,
         enable_cors: true,
         serve_static_files: false,
         static_files_path: None,
@@ -693,9 +693,9 @@ async fn main() {
     // 如果是无头模式，只运行后端服务，不启动GUI
     if headless_mode {
         info!("🚀 Running in headless mode - HTTP API only");
-        info!("📡 HTTP API server: http://127.0.0.1:3030");
-        info!("🔌 WebSocket server: ws://127.0.0.1:8765");
-        info!("📖 API documentation: http://127.0.0.1:3030/swagger-ui/");
+        info!("📡 HTTP API server: http://127.0.0.1:24101");
+        info!("🔌 WebSocket server: ws://127.0.0.1:24102");
+        info!("📖 API documentation: http://127.0.0.1:24101/swagger-ui/");
         info!("💡 Press Ctrl+C to stop the server");
 
         // 启动WebSocket服务器
@@ -714,10 +714,10 @@ async fn main() {
     // 如果是浏览器模式，启动后端服务（不启动GUI）
     if browser_mode {
         info!("🌐 Running in browser mode - Backend only");
-        info!("� HTTP API server: http://127.0.0.1:3030");
-        info!("🔌 WebSocket server: ws://127.0.0.1:8765");
+        info!("� HTTP API server: http://127.0.0.1:24101");
+        info!("🔌 WebSocket server: ws://127.0.0.1:24102");
         info!("🌐 Web interface: Start frontend dev server with 'npm run dev'");
-        info!("� Then access http://localhost:1420 in your browser");
+        info!("� Then access http://localhost:24100 in your browser");
         info!("💡 Press Ctrl+C to stop the server");
 
         // 启动WebSocket服务器
@@ -1051,8 +1051,8 @@ async fn main() {
 async fn start_websocket_server() -> anyhow::Result<()> {
     use tokio::net::TcpListener;
 
-    let listener = TcpListener::bind("127.0.0.1:8765").await?;
-    info!("WebSocket server listening on ws://127.0.0.1:8765");
+    let listener = TcpListener::bind("127.0.0.1:24102").await?;
+    info!("WebSocket server listening on ws://127.0.0.1:24102");
 
     while let Ok((stream, addr)) = listener.accept().await {
         info!("New WebSocket connection from: {}", addr);

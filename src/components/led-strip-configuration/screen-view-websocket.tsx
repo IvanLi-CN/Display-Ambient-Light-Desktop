@@ -46,7 +46,7 @@ export const ScreenViewWebSocket: Component<ScreenViewWebSocketProps> = (props) 
       return;
     }
 
-    const wsUrl = `ws://127.0.0.1:8765`;
+    const wsUrl = `ws://127.0.0.1:24102`;
 
     setConnectionStatus('connecting');
     websocket = new WebSocket(wsUrl);

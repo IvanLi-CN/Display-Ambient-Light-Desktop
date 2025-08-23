@@ -66,10 +66,10 @@ export class ApiClient {
   public static getInstance(config?: ApiClientConfig): ApiClient {
     if (!ApiClient.instance) {
       const defaultConfig: ApiClientConfig = {
-        baseUrl: 'http://127.0.0.1:3030',
+        baseUrl: 'http://127.0.0.1:24101',
         timeout: 10000,
         enableWebSocket: true,
-        webSocketUrl: 'ws://127.0.0.1:3030/ws'
+        webSocketUrl: 'ws://127.0.0.1:24101/ws'
       };
       console.log('🔧 创建ApiClient实例，配置:', config || defaultConfig);
       ApiClient.instance = new ApiClient(config || defaultConfig);

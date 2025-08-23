@@ -22,7 +22,7 @@ impl Default for ServerConfig {
     fn default() -> Self {
         Self {
             host: "127.0.0.1".to_string(),
-            port: 3030,
+            port: 24101,
             enable_cors: true,
             serve_static_files: false,
             static_files_path: None,
