@@ -171,15 +171,25 @@ async fn test_config_manager_v2_basic_operations() {
         current_config.display_config.displays.len()
     );
 
-    // 测试颜色校准更新
-    let mut new_calibration = ColorCalibration::new();
-    new_calibration.r = 0.9;
-    new_calibration.g = 1.0;
-    new_calibration.b = 1.1;
-    new_calibration.w = 0.8;
+    // 保存原始颜色校准配置，以便测试后恢复
+    let original_calibration = current_config.color_calibration;
+    println!(
+        "   💾 保存原始颜色校准: r={:.3}, g={:.3}, b={:.3}, w={:.3}",
+        original_calibration.r,
+        original_calibration.g,
+        original_calibration.b,
+        original_calibration.w
+    );
+
+    // 测试颜色校准更新（使用不同的测试值，避免与生产环境冲突）
+    let mut test_calibration = ColorCalibration::new();
+    test_calibration.r = 0.95; // 使用接近默认值的测试值
+    test_calibration.g = 1.05;
+    test_calibration.b = 0.85;
+    test_calibration.w = 0.90;
 
     match config_manager
-        .update_color_calibration(new_calibration)
+        .update_color_calibration(test_calibration)
         .await
     {
         Ok(_) => println!("   ✅ 颜色校准更新成功"),
@@ -188,9 +198,26 @@ async fn test_config_manager_v2_basic_operations() {
 
     // 验证更新后的配置
     let updated_config = config_manager.get_config().await;
-    assert!((updated_config.color_calibration.r - 0.9).abs() < 0.01);
-    assert!((updated_config.color_calibration.w - 0.8).abs() < 0.01);
+    assert!((updated_config.color_calibration.r - 0.95).abs() < 0.01);
+    assert!((updated_config.color_calibration.w - 0.90).abs() < 0.01);
     println!("   ✅ 颜色校准验证成功");
+
+    // 🔄 重要：恢复原始配置，避免污染生产环境
+    match config_manager
+        .update_color_calibration(original_calibration)
+        .await
+    {
+        Ok(_) => println!("   🔄 原始颜色校准已恢复"),
+        Err(e) => println!("   ❌ 恢复原始颜色校准失败: {}", e),
+    }
+
+    // 验证配置已恢复
+    let final_config = config_manager.get_config().await;
+    assert!((final_config.color_calibration.r - original_calibration.r).abs() < 0.01);
+    assert!((final_config.color_calibration.g - original_calibration.g).abs() < 0.01);
+    assert!((final_config.color_calibration.b - original_calibration.b).abs() < 0.01);
+    assert!((final_config.color_calibration.w - original_calibration.w).abs() < 0.01);
+    println!("   ✅ 原始配置恢复验证成功");
 
     println!("🎉 ConfigManagerV2基本操作测试完成！");
 }
