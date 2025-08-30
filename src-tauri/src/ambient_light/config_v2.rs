@@ -1,6 +1,7 @@
 use dirs::config_dir;
 use serde::{Deserialize, Serialize};
 use std::env::current_dir;
+use std::path::PathBuf;
 use std::time::SystemTime;
 
 use crate::display::DisplayConfigGroup;
@@ -132,11 +133,22 @@ impl LedStripConfigGroupV2 {
         }
     }
 
+    /// 获取配置文件路径
+    /// 优先使用环境变量 AMBIENT_LIGHT_CONFIG_PATH 指定的路径
+    /// 如果未设置环境变量，则使用默认的全局配置路径
+    fn get_config_path() -> PathBuf {
+        if let Ok(custom_path) = std::env::var("AMBIENT_LIGHT_CONFIG_PATH") {
+            PathBuf::from(custom_path)
+        } else {
+            config_dir()
+                .unwrap_or(current_dir().unwrap())
+                .join(CONFIG_FILE_NAME_V2)
+        }
+    }
+
     /// 读取配置文件
     pub async fn read_config() -> anyhow::Result<Self> {
-        let config_path = config_dir()
-            .unwrap_or(current_dir().unwrap())
-            .join(CONFIG_FILE_NAME_V2);
+        let config_path = Self::get_config_path();
 
         log::info!(
             "📖 [COLOR_CALIBRATION] Reading config from: {}",
@@ -183,9 +195,7 @@ impl LedStripConfigGroupV2 {
 
     /// 写入配置文件
     pub async fn write_config(&self) -> anyhow::Result<()> {
-        let config_path = config_dir()
-            .unwrap_or(current_dir().unwrap())
-            .join(CONFIG_FILE_NAME_V2);
+        let config_path = Self::get_config_path();
 
         log::info!(
             "💾 [COLOR_CALIBRATION] Writing config to: {}",
