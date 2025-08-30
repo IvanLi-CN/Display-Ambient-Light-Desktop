@@ -80,6 +80,7 @@ impl LedColorsPublisher {
         strips: Vec<LedStripConfig>,
         color_calibration: ColorCalibration,
         start_led_offset: usize,
+        all_strips: Vec<LedStripConfig>, // 新增：全部灯带配置，用于正确计算字节偏移
     ) {
         let internal_tasks_version = self.inner_tasks_version.clone();
         let screenshot_manager = ScreenshotManager::global().await;
@@ -152,6 +153,7 @@ impl LedColorsPublisher {
                         &strips,
                         &color_calibration,
                         start_led_offset,
+                        &all_strips,
                     )
                     .await
                     {
@@ -448,6 +450,7 @@ impl LedColorsPublisher {
                 display_strips,
                 updated_configs.color_calibration,
                 start_led_offset,
+                updated_configs.strips.clone(), // 传入全部灯带配置
             )
             .await;
         }
@@ -558,7 +561,10 @@ impl LedColorsPublisher {
                     // 如果是模式冲突错误，停止任务
                     let error_msg = e.to_string();
                     if error_msg.contains("Cannot send") && error_msg.contains("mode") {
-                        log::warn!("🛑 Mode conflict detected, stopping calibration task: {}", e);
+                        log::warn!(
+                            "🛑 Mode conflict detected, stopping calibration task: {}",
+                            e
+                        );
                         break;
                     }
                 }
@@ -616,6 +622,62 @@ impl LedColorsPublisher {
         Ok(())
     }
 
+    /// 计算指定LED位置对应的字节偏移量
+    ///
+    /// 考虑不同LED类型的字节数差异：
+    /// - WS2812B: 3字节/LED (GRB)
+    /// - SK6812: 4字节/LED (GRBW)
+    ///
+    /// # 参数
+    /// * `target_led_offset` - 目标LED的位置偏移量
+    /// * `all_strips` - 所有灯带配置（按index排序）
+    ///
+    /// # 返回值
+    /// 返回对应的字节偏移量
+    fn calculate_byte_offset_for_led_position(
+        target_led_offset: usize,
+        all_strips: &[LedStripConfig],
+    ) -> anyhow::Result<usize> {
+        // 按序列号排序灯带，确保正确的串联顺序
+        let mut sorted_strips: Vec<_> = all_strips.iter().collect();
+        sorted_strips.sort_by_key(|strip| strip.index);
+
+        let mut cumulative_led_count = 0;
+        let mut cumulative_byte_count = 0;
+
+        for strip in sorted_strips {
+            // 如果目标LED位置在当前灯带范围内
+            if target_led_offset < cumulative_led_count + strip.len {
+                // 计算在当前灯带内的偏移量
+                let offset_in_strip = target_led_offset - cumulative_led_count;
+                let bytes_per_led = match strip.led_type {
+                    crate::ambient_light::config::LedType::WS2812B => 3,
+                    crate::ambient_light::config::LedType::SK6812 => 4,
+                };
+                return Ok(cumulative_byte_count + offset_in_strip * bytes_per_led);
+            }
+
+            // 累加当前灯带的LED数量和字节数
+            cumulative_led_count += strip.len;
+            let bytes_per_led = match strip.led_type {
+                crate::ambient_light::config::LedType::WS2812B => 3,
+                crate::ambient_light::config::LedType::SK6812 => 4,
+            };
+            cumulative_byte_count += strip.len * bytes_per_led;
+        }
+
+        // 如果目标LED位置等于总LED数量，返回总字节数（用于下一个显示器的起始位置）
+        if target_led_offset == cumulative_led_count {
+            Ok(cumulative_byte_count)
+        } else {
+            Err(anyhow::anyhow!(
+                "LED偏移量 {} 超出范围，总LED数量: {}",
+                target_led_offset,
+                cumulative_led_count
+            ))
+        }
+    }
+
     /// Get updated configs with proper display IDs assigned
     async fn get_updated_configs_with_display_ids(
         configs: &LedStripConfigGroup,
@@ -661,6 +723,7 @@ impl LedColorsPublisher {
         strips: &[LedStripConfig],
         color_calibration: &ColorCalibration,
         start_led_offset: usize,
+        all_strips: &[LedStripConfig], // 新增：全部灯带配置，用于正确计算字节偏移
     ) -> anyhow::Result<()> {
         // 将一维颜色数组转换为二维数组，按灯带分组
         let led_colors_2d = Self::convert_1d_to_2d_colors(&colors, strips)?;
@@ -677,7 +740,12 @@ impl LedColorsPublisher {
 
         // 发送到硬件
         let sender = LedDataSender::global().await;
-        let byte_offset = start_led_offset * 3; // 计算字节偏移量
+
+        // 正确计算字节偏移量：需要考虑不同LED类型的字节数差异
+        // 不能简单地用LED数量乘以3，因为SK6812是4字节/LED，WS2812B是3字节/LED
+        let byte_offset =
+            Self::calculate_byte_offset_for_led_position(start_led_offset, all_strips)?;
+
         sender
             .send_complete_led_data(byte_offset as u16, hardware_data, "AmbientLight")
             .await?;
