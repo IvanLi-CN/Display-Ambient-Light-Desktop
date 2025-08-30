@@ -37,6 +37,9 @@ export const LedStripTest = () => {
   const [currentPattern, setCurrentPattern] = createSignal<TestPattern | null>(null);
   const [animationSpeed, setAnimationSpeed] = createSignal(33); // ~30fps
 
+  // 事件监听器管理
+  const [boardsChangeUnlisten, setBoardsChangeUnlisten] = createSignal<(() => void) | null>(null);
+
   // Temporary input values for better UX
   const [ledCountInput, setLedCountInput] = createSignal('60');
   const [ledOffsetInput, setLedOffsetInput] = createSignal('0');
@@ -130,31 +133,10 @@ export const LedStripTest = () => {
     setAnimationSpeedInput(animationSpeed().toString());
   });
 
-  // Load available boards on mount
-  onMount(async () => {
+  // 注册BoardsChanged事件监听器
+  const setupBoardsChangeListener = async () => {
     try {
-      // 1. 首先停止所有正在运行的测试效果并重置模式
-      console.log('🧹 Cleaning up any existing test effects...');
-      try {
-        // 禁用测试模式，这会停止所有测试效果并重置为AmbientLight模式
-        await adaptiveApi.disableTestMode();
-        console.log('✅ Test mode disabled and cleaned up');
-      } catch (error) {
-        console.warn('⚠️ Failed to disable test mode during cleanup:', error);
-      }
-
-      // 2. 加载可用的设备列表
-      const boardList = await adaptiveApi.getBoards();
-      setBoards(boardList);
-      if (boardList.length > 0 && !selectedBoard()) {
-        setSelectedBoard(boardList[0]);
-      }
-    } catch (error) {
-      console.error('Failed to load boards:', error);
-    }
-
-    // Listen for board changes
-    try {
+      console.log('🔌 Setting up BoardsChanged event listener...');
       const unlisten = await adaptiveApi.onEvent<any>('BoardsChanged', (data) => {
         console.log('🔌 LED Strip Test - BoardsChanged event received:', data);
 
@@ -197,17 +179,57 @@ export const LedStripTest = () => {
         }
       });
 
-      // Cleanup listener when component is unmounted
-      onCleanup(() => {
-        unlisten();
-      });
+      setBoardsChangeUnlisten(() => unlisten);
+      console.log('✅ BoardsChanged event listener registered');
     } catch (error) {
-      console.error('Failed to setup board change listener:', error);
+      console.error('❌ Failed to setup board change listener:', error);
+    }
+  };
+
+  // Load available boards on mount
+  onMount(async () => {
+    try {
+      // 1. 首先停止所有正在运行的测试效果并重置模式
+      console.log('🧹 Cleaning up any existing test effects...');
+      try {
+        // 禁用测试模式，这会停止所有测试效果并重置为AmbientLight模式
+        await adaptiveApi.disableTestMode();
+        console.log('✅ Test mode disabled and cleaned up');
+      } catch (error) {
+        console.warn('⚠️ Failed to disable test mode during cleanup:', error);
+      }
+
+      // 2. 加载可用的设备列表
+      const boardList = await adaptiveApi.getBoards();
+      setBoards(boardList);
+      if (boardList.length > 0 && !selectedBoard()) {
+        setSelectedBoard(boardList[0]);
+      }
+
+      // 3. 设置事件监听器
+      await setupBoardsChangeListener();
+    } catch (error) {
+      console.error('❌ Failed to initialize LED Strip Test:', error);
     }
   });
 
   // Cleanup when component is unmounted
   onCleanup(() => {
+    console.log('🧹 LED Strip Test component cleanup started...');
+
+    // 1. 清理事件监听器
+    const unlistenFn = boardsChangeUnlisten();
+    if (unlistenFn) {
+      try {
+        unlistenFn();
+        console.log('✅ BoardsChanged event listener cleaned up');
+      } catch (error) {
+        console.warn('⚠️ Error cleaning up BoardsChanged listener:', error);
+      }
+      setBoardsChangeUnlisten(null);
+    }
+
+    // 2. 停止正在运行的测试效果
     if (isRunning() && selectedBoard()) {
       // Use non-async cleanup to avoid the warning
       adaptiveApi.stopLedTestEffect({
@@ -217,13 +239,15 @@ export const LedStripTest = () => {
       }).then(() => {
         console.log('✅ Test effect stopped during cleanup');
       }).catch((error) => {
-        console.error('Failed to stop test during cleanup:', error);
+        console.error('❌ Failed to stop test during cleanup:', error);
       });
 
       // Update local state immediately
       setIsRunning(false);
       setCurrentPattern(null);
     }
+
+    console.log('✅ LED Strip Test component cleanup completed');
   });
 
 
