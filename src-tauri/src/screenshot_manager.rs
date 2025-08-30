@@ -156,7 +156,10 @@ impl ScreenshotManager {
                     // Also check LED data send mode - don't capture during color calibration
                     let led_sender = crate::led_data_sender::LedDataSender::global().await;
                     let current_mode = led_sender.get_mode().await;
-                    let is_color_calibration = matches!(current_mode, crate::led_data_sender::DataSendMode::ColorCalibration);
+                    let is_color_calibration = matches!(
+                        current_mode,
+                        crate::led_data_sender::DataSendMode::ColorCalibration
+                    );
 
                     ambient_light_enabled && !is_color_calibration
                 };

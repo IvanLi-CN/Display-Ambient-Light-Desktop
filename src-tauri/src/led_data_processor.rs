@@ -99,7 +99,13 @@ impl LedDataProcessor {
             .await;
 
         // 3.1. 按灯带分组发布（替代旧的 LedColorsChanged 事件）- V2版本
-        Self::publish_led_strip_colors_v2(&led_colors, strips, display_registry, websocket_publisher).await;
+        Self::publish_led_strip_colors_v2(
+            &led_colors,
+            strips,
+            display_registry,
+            websocket_publisher,
+        )
+        .await;
 
         // 4. 硬件编码（应用颜色校准）- V2版本
         let hardware_data =
@@ -416,10 +422,7 @@ impl LedDataProcessor {
 
             debug!(
                 "🔧 Processing V2 strip {}: len={}, led_type={:?}, display_internal_id={}",
-                strip.index,
-                strip.len,
-                strip.led_type,
-                strip.display_internal_id
+                strip.index, strip.len, strip.led_type, strip.display_internal_id
             );
 
             // 处理每个LED
@@ -560,28 +563,21 @@ impl LedDataProcessor {
                 Ok(id) => {
                     debug!(
                         "✅ V2发布：映射显示器内部ID {} -> 系统ID {}",
-                        strip.display_internal_id,
-                        id
+                        strip.display_internal_id, id
                     );
                     id
                 }
                 Err(e) => {
                     warn!(
                         "⚠️ V2发布：无法获取显示器 {} 的系统ID: {}，使用默认值0",
-                        strip.display_internal_id,
-                        e
+                        strip.display_internal_id, e
                     );
                     0
                 }
             };
 
             websocket_publisher
-                .publish_led_strip_colors_changed(
-                    display_id,
-                    border_str,
-                    strip.index,
-                    &rgb_bytes,
-                )
+                .publish_led_strip_colors_changed(display_id, border_str, strip.index, &rgb_bytes)
                 .await;
         }
     }
