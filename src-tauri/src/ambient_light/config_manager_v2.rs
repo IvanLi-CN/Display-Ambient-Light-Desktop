@@ -22,17 +22,11 @@ impl ConfigManagerV2 {
         static CONFIG_MANAGER_V2_GLOBAL: OnceCell<ConfigManagerV2> = OnceCell::const_new();
         CONFIG_MANAGER_V2_GLOBAL
             .get_or_init(|| async {
-                log::info!("🔧 初始化新版本配置管理器...");
-
                 // 直接尝试读取V2配置，不进行任何迁移
                 match LedStripConfigGroupV2::read_config().await {
-                    Ok(config) => {
-                        log::info!("✅ 成功加载V2配置");
-                        Self::create_from_config(config).await
-                    }
+                    Ok(config) => Self::create_from_config(config).await,
                     Err(e) => {
                         log::warn!("⚠️ 无法加载V2配置: {}", e);
-                        log::info!("🔄 创建默认V2配置");
                         Self::create_default().await
                     }
                 }
@@ -114,7 +108,6 @@ impl ConfigManagerV2 {
             }
         }
 
-        log::info!("✅ 配置更新成功");
         Ok(())
     }
 
@@ -132,7 +125,6 @@ impl ConfigManagerV2 {
             .update_config_group(new_config.display_config.clone())
             .await?;
 
-        log::info!("✅ 配置重新加载成功");
         Ok(())
     }
 

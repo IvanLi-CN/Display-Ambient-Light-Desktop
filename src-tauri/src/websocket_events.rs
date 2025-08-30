@@ -80,14 +80,6 @@ impl WebSocketEventPublisher {
         let status = status_manager.get_status().await;
         let timestamp = status.last_updated;
 
-        log::info!(
-            "🌈 Publishing LED sorted colors changed event: {} bytes, mode={:?}, offset={}, timestamp={}",
-            sorted_colors.len(),
-            current_mode,
-            led_offset,
-            timestamp.to_rfc3339()
-        );
-
         let message = WsMessage::LedSortedColorsChanged {
             data: LedSortedColorsChangedData {
                 sorted_colors: sorted_colors.to_vec(),
@@ -105,7 +97,6 @@ impl WebSocketEventPublisher {
                 if subscriber_count > 0 {
                     log::info!("✅ LED排序颜色变化事件已发送给 {subscriber_count} 个订阅者");
                 } else {
-                    log::info!("📭 没有订阅者接收LED排序颜色变化事件");
                 }
             }
             Err(e) => {
@@ -153,11 +144,7 @@ impl WebSocketEventPublisher {
             .send_to_subscribers(&display_event, message.clone())
             .await
         {
-            Ok(subscriber_count) => {
-                if subscriber_count > 0 {
-                    log::debug!("✅ LED灯带颜色变化事件已发送给 {subscriber_count} 个显示器 {display_id} 订阅者");
-                }
-            }
+            Ok(_) => {}
             Err(e) => {
                 log::error!("❌ 发送LED灯带颜色变化事件到显示器 {display_id} 失败: {e}");
             }
@@ -169,11 +156,7 @@ impl WebSocketEventPublisher {
             .send_to_subscribers("LedStripColorsChanged", message)
             .await
         {
-            Ok(subscriber_count) => {
-                if subscriber_count > 0 {
-                    log::debug!("✅ LED灯带颜色变化事件已发送给 {subscriber_count} 个通用订阅者");
-                }
-            }
+            Ok(_) => {}
             Err(e) => {
                 log::error!("❌ 发送LED灯带颜色变化事件失败: {e}");
             }
@@ -233,26 +216,13 @@ impl WebSocketEventPublisher {
             "timestamp": chrono::Utc::now().to_rfc3339()
         });
 
-        log::info!(
-            "🔄 Publishing LED status changed event: mode={:?}, frequency={}Hz, test_mode_active={}",
-            mode,
-            frequency,
-            mode == DataSendMode::TestEffect
-        );
-
         let message = WsMessage::LedStatusChanged { data: status };
         match self
             .ws_manager
             .send_to_subscribers("LedStatusChanged", message)
             .await
         {
-            Ok(subscriber_count) => {
-                if subscriber_count > 0 {
-                    log::info!("✅ LED状态变化事件已发送给 {subscriber_count} 个订阅者");
-                } else {
-                    log::warn!("📭 没有订阅者接收LED状态变化事件");
-                }
-            }
+            Ok(_) => {}
             Err(e) => {
                 log::warn!("发送LED状态变化事件失败: {e}");
             }

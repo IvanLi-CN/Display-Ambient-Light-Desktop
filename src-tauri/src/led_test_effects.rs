@@ -63,12 +63,6 @@ impl LedTestEffectManager {
         config: TestEffectConfig,
         update_interval_ms: u32,
     ) -> anyhow::Result<()> {
-        log::info!(
-            "🚀 Starting LED test effect for board: {}, effect: {:?}",
-            board_address,
-            config.effect_type
-        );
-
         // 如果已有相同设备的任务在运行，先停止它
         self.stop_test_effect(&board_address).await?;
 
@@ -198,14 +192,12 @@ impl LedTestEffectManager {
                         remaining = remaining.saturating_sub(current_sleep);
                     }
                     _ = task.cancellation_token.cancelled() => {
-                        log::info!("🚫 Test effect cancelled for board: {board_address}");
                         return Ok(()); // 立即返回，不继续循环
                     }
                 }
             }
         }
 
-        log::info!("✅ Test effect loop ended for board: {board_address}");
         Ok(())
     }
 

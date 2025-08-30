@@ -71,10 +71,6 @@ impl UdpRpc {
                 }
 
                 let boards = receiver.borrow().clone();
-                info!(
-                    "Publishing boards change via WebSocket: {} boards",
-                    boards.len()
-                );
 
                 // Publish via WebSocket
                 crate::websocket_events::publish_boards_changed(&boards).await;
@@ -119,11 +115,7 @@ impl UdpRpc {
                         continue;
                     }
 
-                    if boards.insert(board_info.fullname.clone(), board).is_some() {
-                        info!("replace board {:?}", board_info);
-                    } else {
-                        info!("add board {:?}", board_info);
-                    }
+                    boards.insert(board_info.fullname.clone(), board);
 
                     let tx_boards = boards
                         .values()
@@ -137,11 +129,8 @@ impl UdpRpc {
                     }
                 }
                 ServiceEvent::ServiceRemoved(_, fullname) => {
-                    info!("removed board {:?}", fullname);
                     let mut boards = self.boards.write().await;
-                    if boards.remove(&fullname).is_some() {
-                        info!("removed board {:?} successful", fullname);
-                    }
+                    boards.remove(&fullname);
 
                     let tx_boards = boards
                         .values()
@@ -267,7 +256,6 @@ impl UdpRpc {
             let boards = self.boards.read().await;
 
             if boards.is_empty() {
-                info!("no boards found");
                 continue;
             }
 

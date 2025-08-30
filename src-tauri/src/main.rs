@@ -524,9 +524,7 @@ async fn main() {
     env_logger::init();
 
     // 初始化新的稳定显示器ID系统
-    log::info!("🚀 初始化稳定显示器ID系统...");
     let _config_manager_v2 = ambient_light::ConfigManagerV2::global().await;
-    log::info!("✅ 稳定显示器ID系统初始化完成");
 
     // Parse command line arguments
     let args: Vec<String> = std::env::args().collect();
@@ -552,26 +550,22 @@ async fn main() {
             info!("Command line argument detected: --browser");
         } else if args[i] == "--test-single-display-config" {
             _test_single_display_config = true;
-            info!("Command line argument detected: --test-single-display-config");
         }
     }
 
     // Check environment variables
     if !headless_mode && std::env::var("AMBIENT_LIGHT_HEADLESS").is_ok() {
         headless_mode = true;
-        info!("Environment variable detected: AMBIENT_LIGHT_HEADLESS");
     }
 
     if !browser_mode && std::env::var("AMBIENT_LIGHT_BROWSER").is_ok() {
         browser_mode = true;
-        info!("Environment variable detected: AMBIENT_LIGHT_BROWSER");
     }
 
     // In development mode, also check environment variables for navigation
     if target_page.is_none() {
         if let Ok(env_page) = std::env::var("TAURI_DEV_PAGE") {
             target_page = Some(env_page.clone());
-            info!("Environment variable detected: TAURI_DEV_PAGE={}", env_page);
         }
     }
     if display_id.is_none() {
@@ -660,14 +654,10 @@ async fn main() {
     });
 
     tokio::spawn(async move {
-        info!("💡 Starting LED color publisher...");
-
         // Add a small delay to avoid initialization conflicts
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        info!("⏰ LED color publisher delay completed, proceeding...");
 
         let led_color_publisher = ambient_light::LedColorsPublisher::global().await;
-        info!("📦 LED color publisher instance obtained");
 
         // Add timeout to prevent infinite blocking
         match tokio::time::timeout(
@@ -676,9 +666,7 @@ async fn main() {
         )
         .await
         {
-            Ok(_) => {
-                info!("✅ LED color publisher started successfully");
-            }
+            Ok(_) => {}
             Err(_) => {
                 error!("❌ LED color publisher start() timed out after 30 seconds");
                 error!("💡 This indicates a blocking issue in the start() method");

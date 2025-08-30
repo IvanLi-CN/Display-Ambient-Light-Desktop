@@ -577,19 +577,6 @@ impl LedColorsPublisher {
         let displays = display_info::DisplayInfo::all()
             .map_err(|e| anyhow::anyhow!("Failed to get displays: {}", e))?;
 
-        // Log display detection order for debugging
-        log::info!("🖥️ Detected displays in order:");
-        for (i, display) in displays.iter().enumerate() {
-            log::info!(
-                "  Display {}: ID={}, X={}, Y={}, Primary={}",
-                i,
-                display.id,
-                display.x,
-                display.y,
-                display.is_primary
-            );
-        }
-
         // Create a mutable copy of configs with proper display IDs
         let mut updated_configs = configs.clone();
         for strip in updated_configs.strips.iter_mut() {
@@ -629,21 +616,8 @@ impl LedColorsPublisher {
         color_calibration: &ColorCalibration,
         start_led_offset: usize,
     ) -> anyhow::Result<()> {
-        log::info!(
-            "Starting LED data send for display: colors_count={}, strips_count={}, start_offset={}",
-            colors.len(),
-            strips.len(),
-            start_led_offset
-        );
-
         // 将一维颜色数组转换为二维数组，按灯带分组
         let led_colors_2d = Self::convert_1d_to_2d_colors(&colors, strips)?;
-
-        log::info!(
-            "转换为二维颜色数组: {} strips, 总颜色数: {}",
-            led_colors_2d.len(),
-            led_colors_2d.iter().map(|strip| strip.len()).sum::<usize>()
-        );
 
         // 使用新的LED数据处理器
         let hardware_data = crate::led_data_processor::LedDataProcessor::process_and_publish(
@@ -752,19 +726,6 @@ impl LedColorsPublisher {
             log::error!("Failed to get display info in get_colors_configs: {e}");
             anyhow::anyhow!("Failed to get display info: {}", e)
         })?;
-
-        // Log display detection order for debugging
-        log::info!("🖥️ get_colors_configs - Detected displays in order:");
-        for (i, display) in displays.iter().enumerate() {
-            log::info!(
-                "  Display {}: ID={}, X={}, Y={}, Primary={}",
-                i,
-                display.id,
-                display.x,
-                display.y,
-                display.is_primary
-            );
-        }
 
         // Create a mutable copy of configs with proper display IDs
         let mut updated_configs = configs.clone();
@@ -1120,8 +1081,6 @@ impl LedColorsPublisher {
         let inner_tasks_version = self.inner_tasks_version.clone();
 
         tokio::spawn(async move {
-            log::info!("🚀 启动单屏配置模式30Hz发布任务 (版本: {current_version})");
-
             let mut interval = tokio::time::interval(Duration::from_millis(33)); // 30Hz
 
             loop {
@@ -1130,9 +1089,6 @@ impl LedColorsPublisher {
                 // 检查任务版本是否已更改
                 let version = *inner_tasks_version.read().await;
                 if version != current_version {
-                    log::info!(
-                        "🛑 单屏配置模式任务版本已更改，停止任务 ({version} != {current_version})"
-                    );
                     break;
                 }
 
@@ -1151,8 +1107,6 @@ impl LedColorsPublisher {
                     }
                 }
             }
-
-            log::info!("✅ 单屏配置模式30Hz发布任务结束");
         });
     }
 
@@ -1540,10 +1494,6 @@ impl LedColorsPublisher {
                 s.len * bytes_per_led
             })
             .sum();
-
-        log::info!(
-            "🎨 生成完整LED数据流(带呼吸效果): 总LED数={total_leds}, 总字节数={total_bytes}"
-        );
 
         // 获取当前显示器的灯带ID集合
         let current_display_strips: std::collections::HashSet<usize> =

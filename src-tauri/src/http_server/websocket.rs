@@ -237,7 +237,6 @@ pub async fn websocket_handler(ws: WebSocketUpgrade, State(state): State<AppStat
 
 /// 处理WebSocket连接
 async fn handle_socket(socket: WebSocket, state: AppState) {
-    log::debug!("New WebSocket connection established for LED events");
     let (mut sender, mut receiver) = socket.split();
 
     // 从AppState获取WebSocketManager
@@ -256,7 +255,6 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
         .await
         .is_err()
     {
-        log::debug!("Failed to send connection confirmation message");
         return;
     }
     log::info!("✅ Connection confirmation message sent to LED events WebSocket");
@@ -290,14 +288,10 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
         while let Some(Ok(msg)) = receiver.next().await {
             match msg {
                 Message::Text(text) => {
-                    log::debug!("收到WebSocket文本消息: {text}");
                     if let Ok(ws_msg) = serde_json::from_str::<WsMessage>(&text) {
                         match ws_msg {
-                            WsMessage::Ping => {
-                                log::debug!("收到WebSocket心跳");
-                            }
+                            WsMessage::Ping => {}
                             WsMessage::Subscribe { data: event_types } => {
-                                log::debug!("收到订阅请求: {event_types:?}");
                                 ws_manager_for_recv
                                     .subscribe_events(connection_id, event_types.clone())
                                     .await;

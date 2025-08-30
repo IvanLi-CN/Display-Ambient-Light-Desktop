@@ -35,13 +35,6 @@ impl LedDataProcessor {
         mode: DataSendMode,
         start_led_offset: usize,
     ) -> Result<Vec<u8>> {
-        log::info!(
-            "🔧 LedDataProcessor::process_and_publish - strips: {}, mode: {:?}, offset: {}",
-            strips.len(),
-            mode,
-            start_led_offset
-        );
-
         // 1. 获取颜色校准配置
         let calibration = match color_calibration {
             Some(cal) => *cal,
@@ -50,10 +43,6 @@ impl LedDataProcessor {
 
         // 2. 转换为预览数据（一维RGB字节数组，无校准）
         let preview_rgb_bytes = Self::colors_2d_to_rgb_bytes(&led_colors);
-        log::info!(
-            "📊 Generated preview data: {} bytes",
-            preview_rgb_bytes.len()
-        );
 
         // 3. 发布预览数据（避免不必要的clone）
         let websocket_publisher = WebSocketEventPublisher::global().await;
@@ -65,16 +54,10 @@ impl LedDataProcessor {
         // 3.1. 按灯带分组发布（替代旧的 LedColorsChanged 事件）
         Self::publish_led_strip_colors(&led_colors, strips, websocket_publisher).await;
 
-        log::info!("✅ LED preview data published successfully");
-
         // 4. 硬件编码（应用颜色校准）
         let hardware_data =
             Self::encode_for_hardware(led_colors, strips, &calibration, start_led_offset)?;
 
-        log::info!(
-            "🔧 Hardware encoding completed: {} bytes",
-            hardware_data.len()
-        );
         Ok(hardware_data)
     }
 

@@ -46,26 +46,9 @@ impl DisplayRegistry {
 
     /// 检测并注册当前系统中的所有显示器
     pub async fn detect_and_register_displays(&self) -> Result<Vec<MatchResult>> {
-        log::info!("🔍 开始检测系统显示器...");
-
         // 获取系统显示器信息
         let system_displays = display_info::DisplayInfo::all()
             .map_err(|e| anyhow::anyhow!("Failed to get display info: {}", e))?;
-
-        log::info!("🖥️ 检测到 {} 个系统显示器", system_displays.len());
-        for (i, display) in system_displays.iter().enumerate() {
-            log::info!(
-                "  显示器 {}: ID={}, {}x{}, 位置=({}, {}), 主显示器={}, 缩放={}",
-                i,
-                display.id,
-                display.width,
-                display.height,
-                display.x,
-                display.y,
-                display.is_primary,
-                display.scale_factor
-            );
-        }
 
         // 使用匹配器进行匹配
         let matcher = self.matcher.read().await;
@@ -285,10 +268,6 @@ impl DisplayRegistry {
                 // 检查属性是否有变化
                 if !config_display.exact_match(sys_display) {
                     outdated_displays.push(config_display.internal_id.clone());
-                    log::info!(
-                        "🔄 显示器配置 '{}' 属性已变化，需要更新",
-                        config_display.name
-                    );
                 }
             }
         }

@@ -143,11 +143,11 @@ impl LedStripConfigGroupV2 {
             let content = tokio::fs::read_to_string(&config_path).await?;
             let mut config: Self = toml::from_str(&content)?;
             config.generate_mappers();
-            log::info!("✅ 成功加载新版本LED灯带配置 (v{})", config.version);
+
             Ok(config)
         } else {
             // 不再进行旧版迁移，直接创建并写入默认的 v2 配置
-            log::info!("🆕 未找到 v2 配置，创建默认 v2 配置（不做迁移）");
+
             let config = Self::get_default_config().await?;
             // 立即写入以确保文件存在
             config.write_config().await?;
@@ -169,14 +169,11 @@ impl LedStripConfigGroupV2 {
         let content = toml::to_string_pretty(self)?;
         tokio::fs::write(&config_path, content).await?;
 
-        log::info!("✅ 配置已保存到: {:?}", config_path);
         Ok(())
     }
 
     /// 获取默认配置
     pub async fn get_default_config() -> anyhow::Result<Self> {
-        log::info!("🔧 创建默认LED灯带配置...");
-
         let mut config = Self::new();
 
         // 尝试检测显示器

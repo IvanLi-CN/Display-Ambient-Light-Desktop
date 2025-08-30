@@ -233,26 +233,15 @@ impl LedDataSender {
             .await;
 
         // 根据模式选择发送方式
-        log::info!("🔍 Checking send mode: expected_mode={expected_mode:?}");
         let send_result = if expected_mode == DataSendMode::TestEffect
             || expected_mode == DataSendMode::StripConfig
         {
             let target_addr_option = *self.test_target_address.read().await;
-            log::info!("🎯 Target address option: {target_addr_option:?}");
 
             if let Some(target_addr) = target_addr_option {
-                log::info!(
-                    "✅ Sending {} data to specific address: {}",
-                    packet.source,
-                    target_addr
-                );
-
                 // 首先尝试发送到已知设备
                 match udp_rpc.send_to(&packet_data, target_addr).await {
-                    Ok(()) => {
-                        log::info!("📤 Successfully sent to known device: {target_addr}");
-                        Ok(())
-                    }
+                    Ok(()) => Ok(()),
                     Err(e) => {
                         log::warn!("⚠️ Failed to send to known device: {e}, trying direct send...");
                         // 如果失败，尝试直接发送（用于调试设备）
@@ -267,10 +256,6 @@ impl LedDataSender {
                 udp_rpc.send_to_all(&packet_data).await
             }
         } else {
-            log::info!(
-                "📡 Sending {} data to all devices (broadcast mode)",
-                packet.source
-            );
             udp_rpc.send_to_all(&packet_data).await
         };
 
@@ -320,13 +305,6 @@ impl LedDataSender {
         let mut current_offset = start_offset;
         let mut remaining_data = complete_data.as_slice();
 
-        log::info!(
-            "📦 Splitting complete LED data: total_size={} bytes, start_offset={}, source={}",
-            complete_data.len(),
-            start_offset,
-            source
-        );
-
         let mut packet_count = 0;
         while !remaining_data.is_empty() {
             let chunk_size = std::cmp::min(max_data_size, remaining_data.len());
@@ -334,26 +312,12 @@ impl LedDataSender {
             remaining_data = &remaining_data[chunk_size..];
 
             packet_count += 1;
-            log::info!(
-                "📤 Sending packet {}: offset={}, size={} bytes, progress={}/{}",
-                packet_count,
-                current_offset,
-                chunk.len(),
-                complete_data.len() - remaining_data.len(),
-                complete_data.len()
-            );
 
             let packet = LedDataPacket::new(current_offset, chunk, source.to_string());
             self.send_packet(packet, mode).await?;
 
             current_offset += chunk_size as u16;
         }
-
-        log::info!(
-            "🎉 All data sent: {} packets, {} total bytes",
-            packet_count,
-            complete_data.len()
-        );
 
         // 记录发送统计信息到状态管理器
         let status_manager = LedStatusManager::global().await;
