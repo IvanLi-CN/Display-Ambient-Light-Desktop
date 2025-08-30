@@ -125,11 +125,6 @@ export class ApiAdapter {
 
     // 只使用WebSocket事件
     return api.onEvent(eventName, (message: any) => {
-      // 添加调试日志
-      if (eventName === 'LedSortedColorsChanged') {
-        console.log('🔍 adaptiveApi.onEvent received:', eventName, message);
-        console.log('🔍 Will pass to handler:', message.data || message);
-      }
       handler(message.data || message);
     });
   }

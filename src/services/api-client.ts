@@ -104,7 +104,7 @@ export class ApiClient {
           // 现在连接到正确的WebSocket服务器，应该只接收JSON文本消息
           if (typeof event.data === 'string') {
             const message: WebSocketMessage = JSON.parse(event.data);
-            console.log('📨 收到WebSocket消息:', message.type, message);
+            // 移除冗余的WebSocket消息日志
 
             // 处理订阅确认消息
             if (message.type === 'SubscriptionConfirmed' && message.data?.event_types) {

@@ -60,7 +60,7 @@ pub struct LedColorsChangedData {
     pub colors: Vec<u8>,
 }
 
-/// LED排序颜色变化数据
+/// LED颜色变化数据（按物理顺序排列）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LedSortedColorsChangedData {
     pub sorted_colors: Vec<u8>,

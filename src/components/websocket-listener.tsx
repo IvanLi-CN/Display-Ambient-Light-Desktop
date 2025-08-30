@@ -71,13 +71,13 @@ export const WebSocketListener = (props: WebSocketListenerProps) => {
         unlistenFunctions.push(unlisten);
       }
 
-      // LED排序颜色变化事件
+      // LED颜色变化事件（按物理顺序排列）
       if (props.handlers?.onLedSortedColorsChanged) {
         const unlisten = await adaptiveApi.onEvent('LedSortedColorsChanged', (data) => {
-          console.log('🌈 LED排序颜色变化:', data);
+          // 移除重复日志，只更新状态
           setStatus(prev => ({
             ...prev,
-            lastMessage: 'LED排序颜色更新',
+            lastMessage: 'LED颜色更新（按物理顺序排列）',
             messageCount: prev.messageCount + 1
           }));
           props.handlers?.onLedSortedColorsChanged?.(data);
@@ -177,13 +177,7 @@ export const WebSocketListener = (props: WebSocketListenerProps) => {
         unlistenFunctions.push(unlisten);
       }
 
-      // 只在开发模式下监听所有事件（用于调试）
-      if (import.meta.env.DEV) {
-        const unlistenAll = await adaptiveApi.onEvent('*', (message) => {
-          console.log('WebSocket消息:', message);
-        });
-        unlistenFunctions.push(unlistenAll);
-      }
+      // 移除全局事件监听以减少日志泛滥
 
       updateConnectionStatus(true);
       if (import.meta.env.DEV) {

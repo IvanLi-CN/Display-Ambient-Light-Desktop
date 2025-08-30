@@ -46,7 +46,7 @@ impl LedDataProcessor {
 
         // 3. 发布预览数据（避免不必要的clone）
         let websocket_publisher = WebSocketEventPublisher::global().await;
-        // 移除旧的 LedColorsChanged 事件，使用按灯带分组的事件替代
+        // 移除旧的 LedColorsChanged 事件，使用按物理顺序排列的颜色事件和按灯带分组的事件替代
         websocket_publisher
             .publish_led_sorted_colors_changed(&preview_rgb_bytes, start_led_offset)
             .await;
@@ -90,7 +90,7 @@ impl LedDataProcessor {
 
         // 2. 发布预览数据
         let websocket_publisher = WebSocketEventPublisher::global().await;
-        // 移除旧的 LedColorsChanged 事件，测试模式使用排序颜色事件
+        // 移除旧的 LedColorsChanged 事件，测试模式使用按物理顺序排列的颜色事件
         websocket_publisher
             .publish_led_sorted_colors_changed(&preview_rgb_bytes, 0) // 测试模式偏移量为0
             .await;

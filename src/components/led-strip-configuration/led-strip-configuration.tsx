@@ -153,7 +153,7 @@ export const LedStripConfiguration = () => {
     // 迁移到按灯带分组的颜色事件处理器
     onLedStripColorsChanged: (data: LedStripColorsChangedEvent) => {
       if (!window.document.hidden) {
-        console.log('🎨 LED灯带颜色变化事件:', data);
+        // 移除频繁的LED灯带颜色变化日志
 
         // 生成灯带唯一键
         const stripKey = `${data.display_id}:${data.border}:${data.strip_index}`;
@@ -167,10 +167,10 @@ export const LedStripConfiguration = () => {
         });
       }
     },
-    // 添加LED排序颜色变化事件处理器
+    // 添加LED颜色变化事件处理器（按物理顺序排列）
     onLedSortedColorsChanged: (data: any) => {
       if (!window.document.hidden) {
-        console.log('🌈 LED排序颜色变化事件:', data);
+        // 移除频繁的LED颜色变化日志
         // 数据应该是 { sorted_colors: Vec<u8> } 格式
         const sortedColors = data.sorted_colors || data;
         const sortedColorsArray = new Uint8ClampedArray(sortedColors);

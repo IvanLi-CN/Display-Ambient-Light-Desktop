@@ -158,10 +158,7 @@ export function StatusBar(props: StatusBarProps) {
 
               const statusBarData = convertToStatusBarData(statusData, connected(), t);
               const updated: StatusBarData = { ...statusBarData, frequency: realtimeHz };
-              // 日志：频率 + 模式
-              if (import.meta.env.DEV) {
-                console.log(`📊 [${new Date().toISOString()}] Status mode=${updated.raw_mode}, test=${updated.test_mode_active}, windowHz=${windowHz}, emaHz=${updated.frequency}`);
-              }
+              // 移除频繁的状态日志
               setStatusData(updated);
               setLastMessageTime(new Date());
               // 移除频繁的状态更新日志

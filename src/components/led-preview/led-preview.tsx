@@ -68,7 +68,7 @@ export function LedPreview(props: LedPreviewProps) {
   // 轮询获取LED颜色数据（用于氛围光模式）
   const pollLedColors = async () => {
     try {
-      console.log('🔄 Polling LED colors from API...');
+      // 轮询LED颜色数据
 
       // 🔧 同时获取LED颜色数据和状态信息（包含真实时间戳）
       const [colors, ledStatus] = await Promise.all([
@@ -77,7 +77,7 @@ export function LedPreview(props: LedPreviewProps) {
       ]);
 
       if (colors && colors.length > 0) {
-        console.log('🌈 Polled LED colors:', colors.length, 'bytes');
+        // 获取到LED颜色数据
 
         // 模拟WebSocket事件格式
         const mockEvent = {
@@ -95,7 +95,7 @@ export function LedPreview(props: LedPreviewProps) {
           // console.log('🕒 Updated timestamp from backend:', ledStatus.last_updated);
         }
       } else {
-        console.log('📭 No LED color data available from API');
+        // 无LED颜色数据
       }
     } catch (error) {
       console.error('❌ Failed to poll LED colors:', error);
@@ -108,7 +108,7 @@ export function LedPreview(props: LedPreviewProps) {
       clearInterval(pollingTimer);
     }
 
-    console.log('🔄 Starting LED color polling...');
+    // 开始LED颜色轮询
     pollingTimer = setInterval(() => {
       const timeSinceLastUpdate = Date.now() - lastWebSocketUpdate;
 
@@ -122,7 +122,7 @@ export function LedPreview(props: LedPreviewProps) {
   // 停止轮询机制
   const stopPolling = () => {
     if (pollingTimer) {
-      console.log('⏹️ Stopping LED color polling...');
+      // 停止LED颜色轮询
       clearInterval(pollingTimer);
       pollingTimer = null;
     }
@@ -157,12 +157,7 @@ export function LedPreview(props: LedPreviewProps) {
       assembledArray.set(fragment, offset);
     }
 
-    console.log('🔧 Assembled LED data:', {
-      fragments: sortedFragments.length,
-      totalBytes: totalLength,
-      fragmentSizes: sortedFragments.map(([offset, fragment]) => `${offset}:${fragment.length}`),
-      fragmentDetails: sortedFragments.map(([offset, fragment]) => `offset=${offset}, length=${fragment.length}, end=${offset + fragment.length}`)
-    });
+    // LED数据组装完成
 
     return assembledArray;
   };
@@ -187,17 +182,11 @@ export function LedPreview(props: LedPreviewProps) {
     // 将LED偏移量转换为字节偏移量（每个LED占3字节RGB）
     const byteOffset = ledOffset * 3;
 
-    console.log('🌈 LED Preview received fragment:', {
-      bytes: colorsArray.length,
-      ledOffset: ledOffset,
-      byteOffset: byteOffset,
-      mode: mode,
-      firstFewBytes: colorsArray.length > 0 ? Array.from(colorsArray.slice(0, 12)) : 'empty'
-    });
+    // 移除冗余的分片日志
 
     // 检测模式切换，如果模式改变则清理缓冲区
     if (currentMode() !== mode) {
-      console.log('🔄 LED Preview mode changed from', currentMode(), 'to', mode, '- clearing buffer');
+      // LED预览模式已切换，清理缓冲区
       setColorBuffer(new Map());
       setCurrentMode(mode);
     }
@@ -214,40 +203,19 @@ export function LedPreview(props: LedPreviewProps) {
     const maxBytes = props.maxLeds ? props.maxLeds * 3 : assembledColors.length;
     const limitedColors = assembledColors.slice(0, maxBytes);
 
-    console.log('🎨 Before setSortedColors:', {
-      assembledLength: assembledColors.length,
-      limitedLength: limitedColors.length,
-      currentSortedLength: sortedColors().length,
-      firstFewAssembled: assembledColors.length > 0 ? Array.from(assembledColors.slice(0, 12)) : 'empty',
-      firstFewLimited: limitedColors.length > 0 ? Array.from(limitedColors.slice(0, 12)) : 'empty'
-    });
-
+    // 更新LED颜色数据
     setSortedColors(limitedColors);
     // 🔧 移除前端自己生成时间戳，应该从后端数据中获取
     // setLastUpdateTime(new Date());
-
-    console.log('🎨 After setSortedColors:', {
-      newSortedLength: limitedColors.length,
-      firstFewSorted: limitedColors.length > 0 ? Array.from(limitedColors.slice(0, 12)) : 'empty'
-    });
-
-    console.log('✅ LED Preview colors updated:', limitedColors.length, 'bytes, mode:', event.mode);
   };
 
   onMount(async () => {
     try {
-      console.log('🎨 LED Preview initializing...');
-      console.log('🎨 LED Preview enabled:', props.enabled);
-
-
-
+      // LED预览初始化
       // 监听LED排序颜色变化事件
-      console.log('📤 Subscribing to LedSortedColorsChanged events...');
       unsubscribeSortedColors = await adaptiveApi.onEvent<LedSortedColorsChangedEvent>(
         'LedSortedColorsChanged',
         (event) => {
-          console.log('🌈 LED Preview received sorted colors update:', event);
-
           if (event && event.sorted_colors) {
             try {
               // 检查模式，只在特定模式下更新预览
@@ -259,8 +227,6 @@ export function LedPreview(props: LedPreviewProps) {
 
                 // 节流渲染：统一通过 scheduleRender 以 ~30FPS 刷新
                 scheduleRender(event);
-              } else {
-                console.log('🚫 Skipping LED Preview update for mode:', mode);
               }
             } catch (error) {
               console.error('❌ Error processing sorted colors:', error);
@@ -275,17 +241,14 @@ export function LedPreview(props: LedPreviewProps) {
       unsubscribeConnection = await adaptiveApi.onEvent<boolean>(
         'ConnectionStatusChanged',
         (isConnected) => {
-          console.log('🔌 LED Preview connection status changed:', isConnected);
+          // LED预览连接状态变化
           setConnected(isConnected);
         }
       );
 
-      console.log('✅ Subscribed to LedSortedColorsChanged events');
-
+      // 订阅LED颜色变化事件完成
       // 设置连接状态为true（假设WebSocket已连接）
       setConnected(true);
-
-      console.log('✅ LED Preview WebSocket listeners initialized');
 
       // 启动轮询机制（用于氛围光模式下的数据获取）
       startPolling();
@@ -318,13 +281,7 @@ export function LedPreview(props: LedPreviewProps) {
     const colors = sortedColors();
     const ledColors: string[] = [];
 
-    // 添加详细调试信息
-    console.log('🎨 getLedColors() called:', {
-      colorsLength: colors.length,
-      colorsType: colors.constructor.name,
-      firstFewBytes: colors.length > 0 ? Array.from(colors.slice(0, 12)) : 'empty',
-      lastFewBytes: colors.length > 12 ? Array.from(colors.slice(-12)) : 'not enough data'
-    });
+    // 处理LED颜色数据
 
 
 
@@ -336,19 +293,11 @@ export function LedPreview(props: LedPreviewProps) {
         const b = colors[i + 2]; // Blue
         ledColors.push(`rgb(${r}, ${g}, ${b})`);
 
-        // 记录前几个LED的颜色用于调试
-        if (i < 15) { // 前5个LED
-          console.log(`🌈 LED ${i/3}: rgb(${r}, ${g}, ${b})`);
-        }
+        // 处理LED颜色
       }
     }
 
-    console.log('🎨 getLedColors() result:', {
-      totalLeds: ledColors.length,
-      expectedLeds: Math.floor(colors.length / 3),
-      firstFewColors: ledColors.slice(0, 5),
-      lastFewColors: ledColors.length > 5 ? ledColors.slice(-5) : 'not enough colors'
-    });
+    // LED颜色处理完成
 
     return ledColors;
   };

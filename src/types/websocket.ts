@@ -13,7 +13,7 @@ export interface LedColorsChangedEvent {
 }
 
 /**
- * LED排序颜色变化事件
+ * LED颜色变化事件（按物理顺序排列）
  */
 export interface LedSortedColorsChangedEvent {
   sorted_colors: number[];

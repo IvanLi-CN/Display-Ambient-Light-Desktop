@@ -69,7 +69,7 @@ impl WebSocketEventPublisher {
         }
     }
 
-    /// 发布LED排序颜色变化事件
+    /// 发布LED颜色变化事件（按物理顺序排列的颜色数据）
     pub async fn publish_led_sorted_colors_changed(&self, sorted_colors: &[u8], led_offset: usize) {
         // 获取当前模式信息和时间戳
         let sender = crate::led_data_sender::LedDataSender::global().await;
@@ -95,12 +95,14 @@ impl WebSocketEventPublisher {
         {
             Ok(subscriber_count) => {
                 if subscriber_count > 0 {
-                    log::info!("✅ LED排序颜色变化事件已发送给 {subscriber_count} 个订阅者");
+                    log::info!(
+                        "✅ LED颜色变化事件（按物理顺序排列）已发送给 {subscriber_count} 个订阅者"
+                    );
                 } else {
                 }
             }
             Err(e) => {
-                log::error!("❌ 发送LED排序颜色变化事件失败: {e}");
+                log::error!("❌ 发送LED颜色变化事件（按物理顺序排列）失败: {e}");
             }
         }
     }

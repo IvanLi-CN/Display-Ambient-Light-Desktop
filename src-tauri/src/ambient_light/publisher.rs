@@ -1152,7 +1152,7 @@ impl LedColorsPublisher {
 
         // 5. 发布RGB预览数据到前端
         let websocket_publisher = crate::websocket_events::WebSocketEventPublisher::global().await;
-        // 移除旧的 LedColorsChanged 事件，使用排序颜色事件
+        // 移除旧的 LedColorsChanged 事件，使用按物理顺序排列的颜色事件
         websocket_publisher
             .publish_led_sorted_colors_changed(&rgb_preview_buffer, 0)
             .await;
