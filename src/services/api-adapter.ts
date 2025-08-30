@@ -40,22 +40,17 @@ export class ApiAdapter {
    * 初始化适配器，检测运行环境
    */
   public async initialize(): Promise<EnvironmentInfo> {
-    console.log('🔧 ApiAdapter.initialize() 被调用');
     if (this.environmentInfo) {
-      console.log('🔧 环境信息已存在，直接返回:', this.environmentInfo);
       return this.environmentInfo;
     }
 
     if (this.initPromise) {
-      console.log('🔧 初始化正在进行中，等待完成...');
       await this.initPromise;
       return this.environmentInfo!;
     }
 
-    console.log('🔧 开始初始化环境检测...');
     this.initPromise = this.detectEnvironment();
     await this.initPromise;
-    console.log('🔧 环境检测完成:', this.environmentInfo);
     return this.environmentInfo!;
   }
 

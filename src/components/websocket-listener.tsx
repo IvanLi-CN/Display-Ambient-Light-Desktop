@@ -132,9 +132,6 @@ export const WebSocketListener = (props: WebSocketListenerProps) => {
       // 设备列表变化事件
       if (props.handlers?.onBoardsChanged) {
         const unlisten = await adaptiveApi.onEvent('BoardsChanged', (data) => {
-          if (import.meta.env.DEV) {
-            console.log('设备列表变化:', data);
-          }
           setStatus(prev => ({
             ...prev,
             lastMessage: '设备列表更新',
@@ -148,9 +145,6 @@ export const WebSocketListener = (props: WebSocketListenerProps) => {
       // 显示器状态变化事件
       if (props.handlers?.onDisplaysChanged) {
         const unlisten = await adaptiveApi.onEvent('DisplaysChanged', (data) => {
-          if (import.meta.env.DEV) {
-            console.log('显示器状态变化:', data);
-          }
           setStatus(prev => ({
             ...prev,
             lastMessage: '显示器状态更新',
