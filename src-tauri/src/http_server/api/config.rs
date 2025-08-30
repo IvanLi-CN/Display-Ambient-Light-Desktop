@@ -510,16 +510,40 @@ pub async fn update_view_scale(
 pub async fn update_global_color_calibration(
     Json(request): Json<UpdateGlobalColorCalibrationRequest>,
 ) -> Result<Json<ApiResponse<String>>, StatusCode> {
+    log::info!(
+        "🎨 [COLOR_CALIBRATION] HTTP API request to update color calibration: r={:.3}, g={:.3}, b={:.3}, w={:.3}",
+        request.calibration.r,
+        request.calibration.g,
+        request.calibration.b,
+        request.calibration.w
+    );
+
     let config_manager_v2 = ambient_light::ConfigManagerV2::global().await;
     match config_manager_v2
         .update_color_calibration(request.calibration)
         .await
     {
-        Ok(_) => Ok(Json(ApiResponse::success(
-            "Global color calibration updated successfully".to_string(),
-        ))),
+        Ok(_) => {
+            log::info!(
+                "✅ [COLOR_CALIBRATION] HTTP API successfully updated color calibration: r={:.3}, g={:.3}, b={:.3}, w={:.3}",
+                request.calibration.r,
+                request.calibration.g,
+                request.calibration.b,
+                request.calibration.w
+            );
+            Ok(Json(ApiResponse::success(
+                "Global color calibration updated successfully".to_string(),
+            )))
+        }
         Err(e) => {
-            log::error!("Failed to update global color calibration: {e}");
+            log::error!(
+                "❌ [COLOR_CALIBRATION] HTTP API failed to update color calibration: r={:.3}, g={:.3}, b={:.3}, w={:.3}, error: {}",
+                request.calibration.r,
+                request.calibration.g,
+                request.calibration.b,
+                request.calibration.w,
+                e
+            );
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }

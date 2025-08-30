@@ -22,11 +22,23 @@ impl ConfigManagerV2 {
         static CONFIG_MANAGER_V2_GLOBAL: OnceCell<ConfigManagerV2> = OnceCell::const_new();
         CONFIG_MANAGER_V2_GLOBAL
             .get_or_init(|| async {
+                log::info!("🏗️ [COLOR_CALIBRATION] Initializing ConfigManagerV2 global instance");
+
                 // 直接尝试读取V2配置，不进行任何迁移
                 match LedStripConfigGroupV2::read_config().await {
-                    Ok(config) => Self::create_from_config(config).await,
+                    Ok(config) => {
+                        log::info!(
+                            "✅ [COLOR_CALIBRATION] Successfully loaded V2 config with color calibration: r={:.3}, g={:.3}, b={:.3}, w={:.3}",
+                            config.color_calibration.r,
+                            config.color_calibration.g,
+                            config.color_calibration.b,
+                            config.color_calibration.w
+                        );
+                        Self::create_from_config(config).await
+                    }
                     Err(e) => {
-                        log::warn!("⚠️ 无法加载V2配置: {}", e);
+                        log::warn!("⚠️ [COLOR_CALIBRATION] Unable to load V2 config: {}", e);
+                        log::info!("🏗️ [COLOR_CALIBRATION] Creating default ConfigManagerV2 instance");
                         Self::create_default().await
                     }
                 }
@@ -36,14 +48,30 @@ impl ConfigManagerV2 {
 
     /// 从配置创建管理器
     async fn create_from_config(config: LedStripConfigGroupV2) -> Self {
+        log::info!(
+            "🏗️ [COLOR_CALIBRATION] Creating ConfigManagerV2 from existing config with color calibration: r={:.3}, g={:.3}, b={:.3}, w={:.3}",
+            config.color_calibration.r,
+            config.color_calibration.g,
+            config.color_calibration.b,
+            config.color_calibration.w
+        );
+
         let display_registry = Arc::new(DisplayRegistry::new(config.display_config.clone()));
 
         // 检测并注册当前显示器
         if let Err(e) = display_registry.detect_and_register_displays().await {
-            log::warn!("⚠️ 显示器检测失败: {}", e);
+            log::warn!("⚠️ [COLOR_CALIBRATION] Display detection failed: {}", e);
         }
 
         let (config_update_sender, _) = tokio::sync::watch::channel(config.clone());
+
+        log::info!(
+            "✅ [COLOR_CALIBRATION] ConfigManagerV2 created from config with color calibration: r={:.3}, g={:.3}, b={:.3}, w={:.3}",
+            config.color_calibration.r,
+            config.color_calibration.g,
+            config.color_calibration.b,
+            config.color_calibration.w
+        );
 
         Self {
             config: Arc::new(RwLock::new(config)),
@@ -54,15 +82,35 @@ impl ConfigManagerV2 {
 
     /// 创建默认配置管理器
     async fn create_default() -> Self {
+        log::info!("🏗️ [COLOR_CALIBRATION] Creating default ConfigManagerV2");
+
         match LedStripConfigGroupV2::get_default_config().await {
             Ok(config) => {
-                log::info!("✅ 创建默认配置成功");
+                log::info!(
+                    "✅ [COLOR_CALIBRATION] Successfully created default config with color calibration: r={:.3}, g={:.3}, b={:.3}, w={:.3}",
+                    config.color_calibration.r,
+                    config.color_calibration.g,
+                    config.color_calibration.b,
+                    config.color_calibration.w
+                );
                 Self::create_from_config(config).await
             }
             Err(e) => {
-                log::error!("❌ 创建默认配置失败: {}", e);
+                log::error!(
+                    "❌ [COLOR_CALIBRATION] Failed to create default config: {}",
+                    e
+                );
+                log::info!("🆘 [COLOR_CALIBRATION] Creating minimal fallback config");
+
                 // 创建最小配置
                 let config = LedStripConfigGroupV2::new();
+                log::info!(
+                    "🆘 [COLOR_CALIBRATION] Fallback config created with color calibration: r={:.3}, g={:.3}, b={:.3}, w={:.3}",
+                    config.color_calibration.r,
+                    config.color_calibration.g,
+                    config.color_calibration.b,
+                    config.color_calibration.w
+                );
                 Self::create_from_config(config).await
             }
         }
@@ -75,38 +123,69 @@ impl ConfigManagerV2 {
 
     /// 更新配置
     pub async fn update_config(&self, new_config: LedStripConfigGroupV2) -> Result<()> {
+        log::info!(
+            "🔄 [COLOR_CALIBRATION] ConfigManagerV2::update_config called with color calibration: r={:.3}, g={:.3}, b={:.3}, w={:.3}",
+            new_config.color_calibration.r,
+            new_config.color_calibration.g,
+            new_config.color_calibration.b,
+            new_config.color_calibration.w
+        );
+
         // 保存到文件
+        log::info!("💾 [COLOR_CALIBRATION] Saving config to file...");
         new_config.write_config().await?;
 
         // 更新内存中的配置
+        log::info!("🧠 [COLOR_CALIBRATION] Updating in-memory config...");
         {
             let mut config = self.config.write().await;
             *config = new_config.clone();
         }
 
         // 更新显示器注册管理器
+        log::info!("📺 [COLOR_CALIBRATION] Updating display registry...");
         self.display_registry
             .update_config_group(new_config.display_config.clone())
             .await?;
 
         // 发送更新通知
+        log::info!("📡 [COLOR_CALIBRATION] Sending config update notification...");
         if let Err(e) = self.config_update_sender.send(new_config.clone()) {
-            log::error!("发送配置更新通知失败: {}", e);
+            log::error!(
+                "❌ [COLOR_CALIBRATION] Failed to send config update notification: {}",
+                e
+            );
         }
 
         // 通过适配器转换为v1格式并广播配置变化
+        log::info!("🔄 [COLOR_CALIBRATION] Converting to v1 format for WebSocket broadcast...");
         let adapter = crate::ambient_light::PublisherAdapter::new(self.display_registry.clone());
         match adapter.convert_v2_to_v1_config(&new_config).await {
             Ok(v1_config) => {
+                log::info!(
+                    "📡 [COLOR_CALIBRATION] Broadcasting config change via WebSocket with color calibration: r={:.3}, g={:.3}, b={:.3}, w={:.3}",
+                    v1_config.color_calibration.r,
+                    v1_config.color_calibration.g,
+                    v1_config.color_calibration.b,
+                    v1_config.color_calibration.w
+                );
                 crate::websocket_events::publish_config_changed(&v1_config).await;
             }
             Err(e) => {
                 log::error!(
-                    "Failed to convert v2 config to v1 for WebSocket broadcast: {}",
+                    "❌ [COLOR_CALIBRATION] Failed to convert v2 config to v1 for WebSocket broadcast: {}",
                     e
                 );
             }
         }
+
+        log::info!(
+            "✅ [COLOR_CALIBRATION] ConfigManagerV2::update_config completed successfully with color calibration: r={:.3}, g={:.3}, b={:.3}, w={:.3}",
+            new_config.color_calibration.r,
+            new_config.color_calibration.g,
+            new_config.color_calibration.b,
+            new_config.color_calibration.w
+        );
 
         Ok(())
     }
@@ -177,8 +256,60 @@ impl ConfigManagerV2 {
     /// 更新颜色校准
     pub async fn update_color_calibration(&self, calibration: ColorCalibration) -> Result<()> {
         let mut config = self.get_config().await;
+
+        // 记录旧的配置值
+        let old_calibration = config.color_calibration;
+        log::info!("🎨 [COLOR_CALIBRATION] ConfigManagerV2::update_color_calibration called");
+        log::info!(
+            "🔄 [COLOR_CALIBRATION] Old calibration: r={:.3}, g={:.3}, b={:.3}, w={:.3}",
+            old_calibration.r,
+            old_calibration.g,
+            old_calibration.b,
+            old_calibration.w
+        );
+        log::info!(
+            "🆕 [COLOR_CALIBRATION] New calibration: r={:.3}, g={:.3}, b={:.3}, w={:.3}",
+            calibration.r,
+            calibration.g,
+            calibration.b,
+            calibration.w
+        );
+
+        // 检查是否有实际变化
+        if old_calibration.r == calibration.r
+            && old_calibration.g == calibration.g
+            && old_calibration.b == calibration.b
+            && old_calibration.w == calibration.w
+        {
+            log::info!("ℹ️ [COLOR_CALIBRATION] No changes detected, skipping update");
+            return Ok(());
+        }
+
         config.color_calibration = calibration;
-        self.update_config(config).await
+
+        match self.update_config(config).await {
+            Ok(_) => {
+                log::info!(
+                    "✅ [COLOR_CALIBRATION] Successfully updated color calibration: r={:.3}, g={:.3}, b={:.3}, w={:.3}",
+                    calibration.r,
+                    calibration.g,
+                    calibration.b,
+                    calibration.w
+                );
+                Ok(())
+            }
+            Err(e) => {
+                log::error!(
+                    "❌ [COLOR_CALIBRATION] Failed to update color calibration: r={:.3}, g={:.3}, b={:.3}, w={:.3}, error: {}",
+                    calibration.r,
+                    calibration.g,
+                    calibration.b,
+                    calibration.w,
+                    e
+                );
+                Err(e)
+            }
+        }
     }
 
     /// 获取指定显示器的LED灯带

@@ -138,17 +138,43 @@ impl LedStripConfigGroupV2 {
             .unwrap_or(current_dir().unwrap())
             .join(CONFIG_FILE_NAME_V2);
 
+        log::info!(
+            "📖 [COLOR_CALIBRATION] Reading config from: {}",
+            config_path.display()
+        );
+
         if config_path.exists() {
             // 读取新版本配置
             let content = tokio::fs::read_to_string(&config_path).await?;
             let mut config: Self = toml::from_str(&content)?;
             config.generate_mappers();
 
+            log::info!(
+                "✅ [COLOR_CALIBRATION] Successfully loaded config with color calibration: r={:.3}, g={:.3}, b={:.3}, w={:.3}",
+                config.color_calibration.r,
+                config.color_calibration.g,
+                config.color_calibration.b,
+                config.color_calibration.w
+            );
+
             Ok(config)
         } else {
-            // 不再进行旧版迁移，直接创建并写入默认的 v2 配置
+            log::warn!(
+                "⚠️ [COLOR_CALIBRATION] Config file not found at {}, creating default config",
+                config_path.display()
+            );
 
+            // 不再进行旧版迁移，直接创建并写入默认的 v2 配置
             let config = Self::get_default_config().await?;
+
+            log::info!(
+                "🆕 [COLOR_CALIBRATION] Created default config with color calibration: r={:.3}, g={:.3}, b={:.3}, w={:.3}",
+                config.color_calibration.r,
+                config.color_calibration.g,
+                config.color_calibration.b,
+                config.color_calibration.w
+            );
+
             // 立即写入以确保文件存在
             config.write_config().await?;
             Ok(config)
@@ -161,20 +187,63 @@ impl LedStripConfigGroupV2 {
             .unwrap_or(current_dir().unwrap())
             .join(CONFIG_FILE_NAME_V2);
 
+        log::info!(
+            "💾 [COLOR_CALIBRATION] Writing config to: {}",
+            config_path.display()
+        );
+        log::info!(
+            "💾 [COLOR_CALIBRATION] Saving color calibration: r={:.3}, g={:.3}, b={:.3}, w={:.3}",
+            self.color_calibration.r,
+            self.color_calibration.g,
+            self.color_calibration.b,
+            self.color_calibration.w
+        );
+
         // 确保目录存在
         if let Some(parent) = config_path.parent() {
             tokio::fs::create_dir_all(parent).await?;
         }
 
         let content = toml::to_string_pretty(self)?;
-        tokio::fs::write(&config_path, content).await?;
 
-        Ok(())
+        match tokio::fs::write(&config_path, content).await {
+            Ok(_) => {
+                log::info!(
+                    "✅ [COLOR_CALIBRATION] Successfully wrote config with color calibration: r={:.3}, g={:.3}, b={:.3}, w={:.3}",
+                    self.color_calibration.r,
+                    self.color_calibration.g,
+                    self.color_calibration.b,
+                    self.color_calibration.w
+                );
+                Ok(())
+            }
+            Err(e) => {
+                log::error!(
+                    "❌ [COLOR_CALIBRATION] Failed to write config with color calibration: r={:.3}, g={:.3}, b={:.3}, w={:.3}, error: {}",
+                    self.color_calibration.r,
+                    self.color_calibration.g,
+                    self.color_calibration.b,
+                    self.color_calibration.w,
+                    e
+                );
+                Err(e.into())
+            }
+        }
     }
 
     /// 获取默认配置
     pub async fn get_default_config() -> anyhow::Result<Self> {
+        log::info!("🏗️ [COLOR_CALIBRATION] Creating default config");
+
         let mut config = Self::new();
+
+        log::info!(
+            "🎨 [COLOR_CALIBRATION] Default color calibration created: r={:.3}, g={:.3}, b={:.3}, w={:.3}",
+            config.color_calibration.r,
+            config.color_calibration.g,
+            config.color_calibration.b,
+            config.color_calibration.w
+        );
 
         // 尝试检测显示器
         match display_info::DisplayInfo::all() {
