@@ -147,14 +147,21 @@ impl ScreenshotManager {
         tokio::spawn(async move {
             // Implement screen capture using screen-capture-kit
             loop {
-                // Check if ambient light is enabled before capturing screenshots
-                let ambient_light_enabled = {
+                // Check if ambient light is enabled and not in color calibration mode
+                let should_capture = {
                     let state_manager =
                         crate::ambient_light_state::AmbientLightStateManager::global().await;
-                    state_manager.is_enabled().await
+                    let ambient_light_enabled = state_manager.is_enabled().await;
+
+                    // Also check LED data send mode - don't capture during color calibration
+                    let led_sender = crate::led_data_sender::LedDataSender::global().await;
+                    let current_mode = led_sender.get_mode().await;
+                    let is_color_calibration = matches!(current_mode, crate::led_data_sender::DataSendMode::ColorCalibration);
+
+                    ambient_light_enabled && !is_color_calibration
                 };
 
-                if ambient_light_enabled {
+                if should_capture {
                     match Self::capture_display_screenshot(display_id, scale_factor).await {
                         Ok(screenshot) => {
                             let tx_for_send = tx.read().await;
@@ -195,13 +202,13 @@ impl ScreenshotManager {
                         }
                     }
                 } else {
-                    // If ambient light is disabled, sleep longer to reduce CPU usage
+                    // If ambient light is disabled or in color calibration mode, sleep longer to reduce CPU usage
                     sleep(Duration::from_millis(1000)).await;
                 }
 
                 // Sleep for a frame duration when enabled
                 // Adjusted from 200ms (5 FPS) -> 33ms (~30 FPS) for smoother preview
-                if ambient_light_enabled {
+                if should_capture {
                     sleep(Duration::from_millis(33)).await;
                 }
                 yield_now().await;

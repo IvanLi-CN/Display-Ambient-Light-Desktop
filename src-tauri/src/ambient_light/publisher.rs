@@ -98,6 +98,13 @@ impl LedColorsPublisher {
             let init_version = *internal_tasks_version.read().await;
 
             loop {
+                // Check if the inner task version changed FIRST
+                let version = *internal_tasks_version.read().await;
+                if version != init_version {
+                    log::info!("🛑 Ambient light fetcher for display #{display_id} stopped (version changed)");
+                    break;
+                }
+
                 if let Err(err) = screenshot_rx.changed().await {
                     log::error!("Screenshot channel closed for display #{display_id}: {err:?}");
                     break;
@@ -175,12 +182,6 @@ impl LedColorsPublisher {
                         warn!("Failed to send display_colors: {}", err);
                     }
                 };
-
-                // Check if the inner task version changed
-                let version = *internal_tasks_version.read().await;
-                if version != init_version {
-                    break;
-                }
             }
         });
     }
@@ -195,9 +196,15 @@ impl LedColorsPublisher {
         let colors_tx = self.colors_tx.clone();
 
         tokio::spawn(async move {
-            // Set data send mode to AmbientLight when starting ambient light worker
+            // 检查当前模式，只有在非颜色校准模式下才设置为环境光
             let sender = LedDataSender::global().await;
-            sender.set_mode(DataSendMode::AmbientLight).await;
+            let current_mode = sender.get_mode().await;
+            if current_mode != DataSendMode::ColorCalibration {
+                sender.set_mode(DataSendMode::AmbientLight).await;
+                log::info!("✅ 氛围光工作器启动，设置LED数据发送模式为: AmbientLight");
+            } else {
+                log::info!("🎨 保持颜色校准模式，氛围光工作器跳过模式切换");
+            }
 
             let sorted_colors_tx = sorted_colors_tx.write().await;
             let colors_tx = colors_tx.write().await;
@@ -485,7 +492,19 @@ impl LedColorsPublisher {
     pub async fn send_calibration_color(r: u8, g: u8, b: u8) -> anyhow::Result<()> {
         log::info!("🎨 Sending calibration color: RGB({r}, {g}, {b})");
 
-        // 首先设置LED数据发送模式为颜色校准
+        // 首先停止所有环境光任务，避免冲突
+        log::info!("🛑 Stopping ambient light tasks to avoid conflicts...");
+        let publisher = Self::global().await;
+        {
+            let mut version = publisher.inner_tasks_version.write().await;
+            *version += 1;
+        }
+        log::info!("✅ Ambient light tasks stopped (task version incremented)");
+
+        // 等待一段时间确保所有任务完全停止
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        // 然后设置LED数据发送模式为颜色校准
         log::info!("🔧 Setting LED data send mode to ColorCalibration...");
         let sender = LedDataSender::global().await;
         sender
@@ -493,26 +512,79 @@ impl LedColorsPublisher {
             .await;
         log::info!("✅ LED data send mode set to ColorCalibration");
 
-        // 获取当前配置 (直接使用V2配置，无需转换)
+        // 启动持续发送任务
+        Self::start_calibration_color_task(r, g, b).await?;
+
+        log::info!("✅ 颜色校准模式已启动，将持续发送校准颜色");
+        Ok(())
+    }
+
+    /// 启动颜色校准持续发送任务
+    ///
+    /// 类似环境光模式，持续发送校准颜色以维持LED显示
+    ///
+    /// # 参数
+    /// * `r` - 红色分量 (0-255)
+    /// * `g` - 绿色分量 (0-255)
+    /// * `b` - 蓝色分量 (0-255)
+    async fn start_calibration_color_task(r: u8, g: u8, b: u8) -> anyhow::Result<()> {
+        log::info!("🔄 Starting calibration color continuous sending task...");
+
+        let publisher = Self::global().await;
+        let current_version = {
+            let version = publisher.inner_tasks_version.read().await;
+            *version
+        };
+
+        let inner_tasks_version = publisher.inner_tasks_version.clone();
+
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(1000)); // 1Hz (每秒发送一次)
+
+            loop {
+                interval.tick().await;
+
+                // 检查任务版本是否已更改
+                let version = *inner_tasks_version.read().await;
+                if version != current_version {
+                    log::info!("🛑 Calibration color task stopped (version changed)");
+                    break;
+                }
+
+                // 发送校准颜色
+                if let Err(e) = Self::send_single_calibration_color(r, g, b).await {
+                    log::error!("❌ Failed to send calibration color: {}", e);
+
+                    // 如果是模式冲突错误，停止任务
+                    let error_msg = e.to_string();
+                    if error_msg.contains("Cannot send") && error_msg.contains("mode") {
+                        log::warn!("🛑 Mode conflict detected, stopping calibration task: {}", e);
+                        break;
+                    }
+                }
+            }
+        });
+
+        log::info!("✅ Calibration color continuous sending task started");
+        Ok(())
+    }
+
+    /// 发送单次校准颜色（内部方法）
+    ///
+    /// 用于持续发送任务中的实际颜色发送
+    ///
+    /// # 参数
+    /// * `r` - 红色分量 (0-255)
+    /// * `g` - 绿色分量 (0-255)
+    /// * `b` - 蓝色分量 (0-255)
+    async fn send_single_calibration_color(r: u8, g: u8, b: u8) -> anyhow::Result<()> {
+        // 获取配置
         let config_manager_v2 = crate::ambient_light::ConfigManagerV2::global().await;
         let configs_v2 = config_manager_v2.get_config().await;
         let display_registry = config_manager_v2.get_display_registry();
         let strips = &configs_v2.strips;
 
-        log::info!("🔧 Retrieved {} LED strips from V2 config", strips.len());
-        for (i, strip) in strips.iter().enumerate() {
-            log::info!(
-                "  Strip {}: len={}, display_internal_id={}, border={:?}",
-                i,
-                strip.len,
-                strip.display_internal_id,
-                strip.border
-            );
-        }
-
-        // 检查是否有LED配置
         if strips.is_empty() {
-            log::error!("❌ No LED strips configured");
             return Err(anyhow::anyhow!("No LED strips configured"));
         }
 
@@ -523,15 +595,8 @@ impl LedColorsPublisher {
             .map(|strip| vec![single_color; strip.len])
             .collect();
 
-        log::info!(
-            "生成校准颜色数据: {} strips, 总LED数: {}",
-            led_colors_2d.len(),
-            led_colors_2d.iter().map(|strip| strip.len()).sum::<usize>()
-        );
-
         // 使用新的LED数据处理器 (V2版本)
-        log::info!("🔧 Calling LedDataProcessor::process_and_publish_v2...");
-        let hardware_data = match crate::led_data_processor::LedDataProcessor::process_and_publish_v2(
+        let hardware_data = crate::led_data_processor::LedDataProcessor::process_and_publish_v2(
             led_colors_2d,
             strips,
             &display_registry,
@@ -539,37 +604,16 @@ impl LedColorsPublisher {
             crate::led_data_sender::DataSendMode::ColorCalibration,
             0, // 校准模式偏移量为0
         )
-        .await
-        {
-            Ok(data) => {
-                log::info!(
-                    "✅ LedDataProcessor::process_and_publish succeeded, {} bytes",
-                    data.len()
-                );
-                data
-            }
-            Err(e) => {
-                log::error!("❌ LedDataProcessor::process_and_publish failed: {}", e);
-                return Err(e);
-            }
-        };
+        .await?;
 
         // 发送到硬件
-        log::info!("🔧 Sending to hardware...");
         let sender = LedDataSender::global().await;
-        match sender
+        sender
             .send_complete_led_data(0, hardware_data, "ColorCalibration")
-            .await
-        {
-            Ok(_) => {
-                log::info!("✅ 校准颜色发送成功");
-                Ok(())
-            }
-            Err(e) => {
-                log::error!("❌ 发送到硬件失败: {}", e);
-                Err(e)
-            }
-        }
+            .await?;
+
+        log::debug!("✅ Calibration color sent successfully");
+        Ok(())
     }
 
     /// Get updated configs with proper display IDs assigned
@@ -878,10 +922,15 @@ impl LedColorsPublisher {
             return Ok(());
         }
 
-        // 设置LED数据发送模式为环境光
+        // 检查当前模式，只有在非颜色校准模式下才设置为环境光
         let sender = LedDataSender::global().await;
-        sender.set_mode(DataSendMode::AmbientLight).await;
-        log::info!("✅ 恢复LED数据发送模式为: AmbientLight");
+        let current_mode = sender.get_mode().await;
+        if current_mode != DataSendMode::ColorCalibration {
+            sender.set_mode(DataSendMode::AmbientLight).await;
+            log::info!("✅ 设置LED数据发送模式为: AmbientLight");
+        } else {
+            log::info!("🎨 保持颜色校准模式，跳过模式切换");
+        }
 
         // 重新启动氛围光处理任务 - 使用ConfigManagerV2保持一致性
         log::info!("🔄 重新启动氛围光处理任务...");
