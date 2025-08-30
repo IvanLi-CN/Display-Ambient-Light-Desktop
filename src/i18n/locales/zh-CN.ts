@@ -254,7 +254,7 @@ export const zhCN: TranslationDict = {
     // LED test form labels
     ledCount: 'LED数量',
     ledType: 'LED类型',
-    ledOffset: 'LED偏移',
+    ledOffset: '字节偏移',
     animationSpeed: '动画速度 (ms)',
     startTestButton: '开始测试',
     // Hardware selection
