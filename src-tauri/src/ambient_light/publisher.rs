@@ -493,18 +493,19 @@ impl LedColorsPublisher {
             .await;
         log::info!("✅ LED data send mode set to ColorCalibration");
 
-        // 获取当前配置
-        let config_manager = crate::ambient_light::ConfigManager::global().await;
-        let configs = config_manager.configs().await;
-        let strips = &configs.strips;
+        // 获取当前配置 (直接使用V2配置，无需转换)
+        let config_manager_v2 = crate::ambient_light::ConfigManagerV2::global().await;
+        let configs_v2 = config_manager_v2.get_config().await;
+        let display_registry = config_manager_v2.get_display_registry();
+        let strips = &configs_v2.strips;
 
-        log::info!("🔧 Retrieved {} LED strips from config", strips.len());
+        log::info!("🔧 Retrieved {} LED strips from V2 config", strips.len());
         for (i, strip) in strips.iter().enumerate() {
             log::info!(
-                "  Strip {}: len={}, display_id={}, border={:?}",
+                "  Strip {}: len={}, display_internal_id={}, border={:?}",
                 i,
                 strip.len,
-                strip.display_id,
+                strip.display_internal_id,
                 strip.border
             );
         }
@@ -528,12 +529,13 @@ impl LedColorsPublisher {
             led_colors_2d.iter().map(|strip| strip.len()).sum::<usize>()
         );
 
-        // 使用新的LED数据处理器
-        log::info!("🔧 Calling LedDataProcessor::process_and_publish...");
-        let hardware_data = match crate::led_data_processor::LedDataProcessor::process_and_publish(
+        // 使用新的LED数据处理器 (V2版本)
+        log::info!("🔧 Calling LedDataProcessor::process_and_publish_v2...");
+        let hardware_data = match crate::led_data_processor::LedDataProcessor::process_and_publish_v2(
             led_colors_2d,
             strips,
-            Some(&configs.color_calibration),
+            &display_registry,
+            Some(&configs_v2.color_calibration),
             crate::led_data_sender::DataSendMode::ColorCalibration,
             0, // 校准模式偏移量为0
         )
