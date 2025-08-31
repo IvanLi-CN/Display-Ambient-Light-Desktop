@@ -8,7 +8,7 @@ use serde::Deserialize;
 use utoipa::ToSchema;
 
 use crate::{
-    ambient_light::{self, Border, ColorCalibration, LedStripConfigGroup, LedType},
+    ambient_light::{self, Border, ColorCalibration, LedStripConfigGroupV2, LedType},
     http_server::{ApiResponse, AppState},
     language_manager::LanguageManager,
     user_preferences::{UIPreferences, UserPreferences, UserPreferencesManager, WindowPreferences},
@@ -34,6 +34,15 @@ pub struct UpdateLedStripTypeRequest {
     pub border: Border,
     /// LED类型
     pub led_type: LedType,
+}
+
+/// LED灯带反转请求
+#[derive(Deserialize, ToSchema)]
+pub struct ReverseLedStripRequest {
+    /// 显示器ID
+    pub display_id: u32,
+    /// 边框
+    pub border: Border,
 }
 
 /// 主题更新请求
@@ -85,38 +94,43 @@ pub struct UpdateLanguageRequest {
     pub language: String,
 }
 
-/// 获取LED灯带配置
+/// 获取LED灯带配置 (v1 接口，v2 语义)
 #[utoipa::path(
     get,
     path = "/api/v1/config/led-strips",
     responses(
-        (status = 200, description = "获取LED灯带配置成功", body = ApiResponse<LedStripConfigGroup>),
+        (status = 200, description = "获取LED灯带配置成功 (v2 语义)", body = ApiResponse<LedStripConfigGroupV2>),
         (status = 500, description = "获取失败", body = ApiResponse<String>),
     ),
     tag = "config"
 )]
-pub async fn get_led_strip_configs() -> Result<Json<ApiResponse<LedStripConfigGroup>>, StatusCode> {
-    let config_manager = ambient_light::ConfigManager::global().await;
-    let config = config_manager.configs().await;
-    Ok(Json(ApiResponse::success(config)))
+pub async fn get_led_strip_configs_v2(
+) -> Result<Json<ApiResponse<LedStripConfigGroupV2>>, StatusCode> {
+    let config_manager_v2 = ambient_light::ConfigManagerV2::global().await;
+    let v2_config = config_manager_v2.get_config().await;
+    Ok(Json(ApiResponse::success(v2_config)))
 }
 
-/// 更新LED灯带配置
+// （已弃用）原先的 v1 兼容层接口说明，已由 v2 语义直接替换 v1 接口
+// 旧 v1 获取接口已废弃，不再提供实现，避免误用。
+// 如需追溯，请参考 git 历史。
+
+/// 更新LED灯带配置 (v1 接口，v2 语义)
 #[utoipa::path(
     post,
     path = "/api/v1/config/led-strips",
-    request_body = LedStripConfigGroup,
+    request_body = LedStripConfigGroupV2,
     responses(
-        (status = 200, description = "更新LED灯带配置成功", body = ApiResponse<String>),
+        (status = 200, description = "更新LED灯带配置成功 (v2 语义)", body = ApiResponse<String>),
         (status = 500, description = "更新失败", body = ApiResponse<String>),
     ),
     tag = "config"
 )]
-pub async fn update_led_strip_configs(
-    Json(config): Json<LedStripConfigGroup>,
+pub async fn update_led_strip_configs_v2(
+    Json(v2_config): Json<LedStripConfigGroupV2>,
 ) -> Result<Json<ApiResponse<String>>, StatusCode> {
-    let config_manager = ambient_light::ConfigManager::global().await;
-    match config_manager.update(&config).await {
+    let config_manager_v2 = ambient_light::ConfigManagerV2::global().await;
+    match config_manager_v2.update_config(v2_config).await {
         Ok(_) => Ok(Json(ApiResponse::success(
             "LED strip configs updated successfully".to_string(),
         ))),
@@ -141,16 +155,96 @@ pub async fn update_led_strip_configs(
 pub async fn update_led_strip_length(
     Json(request): Json<UpdateLedStripLenRequest>,
 ) -> Result<Json<ApiResponse<String>>, StatusCode> {
-    let config_manager = ambient_light::ConfigManager::global().await;
-    match config_manager
-        .patch_led_strip_len(request.display_id, request.border, request.delta_len)
+    let config_manager_v2 = ambient_light::ConfigManagerV2::global().await;
+
+    // 获取当前配置
+    let mut v2_config = config_manager_v2.get_config().await;
+
+    // 通过显示器注册管理器获取内部ID
+    let display_registry = config_manager_v2.get_display_registry();
+    let internal_id = match display_registry
+        .get_internal_id_by_display_id(request.display_id)
         .await
     {
+        Ok(id) => id,
+        Err(e) => {
+            log::error!(
+                "Failed to get internal ID for display {}: {}",
+                request.display_id,
+                e
+            );
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+
+    // 查找并更新对应的灯带
+    let mut found = false;
+    for strip in &mut v2_config.strips {
+        if strip.display_internal_id == internal_id && strip.border == request.border {
+            let new_len = (strip.len as i32 + request.delta_len as i32).max(0) as usize;
+            strip.len = new_len;
+            found = true;
+            break;
+        }
+    }
+
+    if !found {
+        log::error!(
+            "LED strip not found for display {} border {:?}",
+            request.display_id,
+            request.border
+        );
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    // 重新生成mappers
+    v2_config.generate_mappers();
+
+    // 保存配置
+    match config_manager_v2.update_config(v2_config).await {
         Ok(_) => Ok(Json(ApiResponse::success(
             "LED strip length updated successfully".to_string(),
         ))),
         Err(e) => {
             log::error!("Failed to update LED strip length: {e}");
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+/// 反转LED灯带
+#[utoipa::path(
+    put,
+    path = "/api/v1/config/led-strips/reverse",
+    request_body = ReverseLedStripRequest,
+    responses(
+        (status = 200, description = "反转LED灯带成功", body = ApiResponse<String>),
+        (status = 404, description = "未找到指定的LED灯带", body = ApiResponse<String>),
+        (status = 500, description = "反转失败", body = ApiResponse<String>),
+    ),
+    tag = "config"
+)]
+pub async fn reverse_led_strip(
+    Json(request): Json<ReverseLedStripRequest>,
+) -> Result<Json<ApiResponse<String>>, StatusCode> {
+    let config_manager = ambient_light::ConfigManager::global().await;
+
+    match config_manager
+        .reverse_led_strip_part(request.display_id, request.border)
+        .await
+    {
+        Ok(_) => {
+            log::info!(
+                "LED strip reversed successfully: display_id={}, border={:?}",
+                request.display_id,
+                request.border
+            );
+            Ok(Json(ApiResponse::success(
+                "LED strip reversed successfully".to_string(),
+            )))
+        }
+        Err(e) => {
+            log::error!("Failed to reverse LED strip: {e}");
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -212,11 +306,52 @@ pub async fn update_theme(
 pub async fn update_led_strip_type(
     Json(request): Json<UpdateLedStripTypeRequest>,
 ) -> Result<Json<ApiResponse<String>>, StatusCode> {
-    let config_manager = ambient_light::ConfigManager::global().await;
-    match config_manager
-        .patch_led_strip_type(request.display_id, request.border, request.led_type)
+    let config_manager_v2 = ambient_light::ConfigManagerV2::global().await;
+
+    // 获取当前配置
+    let mut v2_config = config_manager_v2.get_config().await;
+
+    // 通过显示器注册管理器获取内部ID
+    let display_registry = config_manager_v2.get_display_registry();
+    let internal_id = match display_registry
+        .get_internal_id_by_display_id(request.display_id)
         .await
     {
+        Ok(id) => id,
+        Err(e) => {
+            log::error!(
+                "Failed to get internal ID for display {}: {}",
+                request.display_id,
+                e
+            );
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+
+    // 查找并更新对应的灯带
+    let mut found = false;
+    for strip in &mut v2_config.strips {
+        if strip.display_internal_id == internal_id && strip.border == request.border {
+            strip.led_type = request.led_type;
+            found = true;
+            break;
+        }
+    }
+
+    if !found {
+        log::error!(
+            "LED strip not found for display {} border {:?}",
+            request.display_id,
+            request.border
+        );
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    // 重新生成mappers
+    v2_config.generate_mappers();
+
+    // 保存配置
+    match config_manager_v2.update_config(v2_config).await {
         Ok(_) => Ok(Json(ApiResponse::success(
             "LED strip type updated successfully".to_string(),
         ))),
@@ -375,16 +510,40 @@ pub async fn update_view_scale(
 pub async fn update_global_color_calibration(
     Json(request): Json<UpdateGlobalColorCalibrationRequest>,
 ) -> Result<Json<ApiResponse<String>>, StatusCode> {
-    let config_manager = ambient_light::ConfigManager::global().await;
-    match config_manager
-        .set_color_calibration(request.calibration)
+    log::info!(
+        "🎨 [COLOR_CALIBRATION] HTTP API request to update color calibration: r={:.3}, g={:.3}, b={:.3}, w={:.3}",
+        request.calibration.r,
+        request.calibration.g,
+        request.calibration.b,
+        request.calibration.w
+    );
+
+    let config_manager_v2 = ambient_light::ConfigManagerV2::global().await;
+    match config_manager_v2
+        .update_color_calibration(request.calibration)
         .await
     {
-        Ok(_) => Ok(Json(ApiResponse::success(
-            "Global color calibration updated successfully".to_string(),
-        ))),
+        Ok(_) => {
+            log::info!(
+                "✅ [COLOR_CALIBRATION] HTTP API successfully updated color calibration: r={:.3}, g={:.3}, b={:.3}, w={:.3}",
+                request.calibration.r,
+                request.calibration.g,
+                request.calibration.b,
+                request.calibration.w
+            );
+            Ok(Json(ApiResponse::success(
+                "Global color calibration updated successfully".to_string(),
+            )))
+        }
         Err(e) => {
-            log::error!("Failed to update global color calibration: {e}");
+            log::error!(
+                "❌ [COLOR_CALIBRATION] HTTP API failed to update color calibration: r={:.3}, g={:.3}, b={:.3}, w={:.3}, error: {}",
+                request.calibration.r,
+                request.calibration.g,
+                request.calibration.b,
+                request.calibration.w,
+                e
+            );
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -477,13 +636,15 @@ pub async fn update_ui_preferences(
     }
 }
 
-/// 创建配置相关路由
+/// 创建配置相关路由 (v1 兼容)
 pub fn create_routes() -> Router<AppState> {
     Router::new()
-        .route("/led-strips", get(get_led_strip_configs))
-        .route("/led-strips", post(update_led_strip_configs))
+        // v1 端点但直接使用 v2 语义
+        .route("/led-strips", get(get_led_strip_configs_v2))
+        .route("/led-strips", post(update_led_strip_configs_v2))
         .route("/led-strips/length", put(update_led_strip_length))
         .route("/led-strips/type", put(update_led_strip_type))
+        .route("/led-strips/reverse", put(reverse_led_strip))
         .route("/user-preferences", get(get_user_preferences))
         .route("/user-preferences", put(update_user_preferences))
         .route("/window-preferences", put(update_window_preferences))
@@ -506,3 +667,5 @@ pub fn create_routes() -> Router<AppState> {
             get(get_current_language).put(set_current_language),
         )
 }
+
+// 已移除 v2 路由构建函数，统一使用 v1 路径 + v2 语义的 create_routes()

@@ -1,8 +1,35 @@
 [advisories]
 # Ignore known issues from third-party dependencies that we cannot directly control
 ignore = [
-    # serde_yaml vulnerability in ddc-hi dependency chain
-    # This is a third-party dependency issue that doesn't affect our desktop app's security
-    # as we don't process untrusted YAML input directly
+    # GTK3 bindings - no longer maintained but required by Tauri ecosystem
+    # These are warnings about maintenance status, not security vulnerabilities
+    # Desktop applications using Tauri are not directly affected
+    "RUSTSEC-2024-0413", # atk
+    "RUSTSEC-2024-0416", # atk-sys
+    "RUSTSEC-2024-0412", # gdk
+    "RUSTSEC-2024-0418", # gdk-sys
+    "RUSTSEC-2024-0411", # gdkwayland-sys
+    "RUSTSEC-2024-0417", # gdkx11
+    "RUSTSEC-2024-0414", # gdkx11-sys
+    "RUSTSEC-2024-0415", # gtk
+    "RUSTSEC-2024-0420", # gtk-sys
+    "RUSTSEC-2024-0419", # gtk3-macros
+
+    # proc-macro-error - unmaintained but only used at compile time
+    # Does not affect runtime security of the application
+    "RUSTSEC-2024-0370",
+
+    # yaml-rust - unmaintained, used by ddc-hi for display control
+    # We don't process untrusted YAML input directly in our application
+    "RUSTSEC-2024-0320",
+
+    # serde_yaml - uncontrolled recursion in deserialization
+    # Used by ddc-hi dependency chain for display control configuration
+    # Our application doesn't deserialize untrusted YAML input
     "RUSTSEC-2018-0005",
+
+    # glib - unsound iterator implementation
+    # This is a soundness issue, not a direct security vulnerability
+    # Our application doesn't use the affected iterator functionality
+    "RUSTSEC-2024-0429",
 ]

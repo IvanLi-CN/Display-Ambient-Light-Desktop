@@ -10,6 +10,7 @@ import {
   splitProps,
   useContext,
 } from 'solid-js';
+import { useNavigate } from '@solidjs/router';
 import { useTippy } from 'solid-tippy';
 import { followCursor } from 'tippy.js';
 import { LedStripConfig } from '../../models/led-strip-config';
@@ -45,6 +46,7 @@ export const Pixel: Component<PixelProps> = (props) => {
 export const LedStripPart: Component<LedStripPartProps> = (props) => {
   const [localProps, rootProps] = splitProps(props, ['config', 'colors']);
   const [stripConfiguration, { setHoveredStripPart }] = useContext(LedStripConfigurationContext);
+  const navigate = useNavigate();
 
   const [colors, setColors] = createSignal<string[]>([]);
 
@@ -140,26 +142,44 @@ export const LedStripPart: Component<LedStripPartProps> = (props) => {
     setHoveredStripPart(null);
   };
 
+  const onClick = () => {
+    if (localProps.config) {
+      navigate(`/led-strips-configuration/display/${localProps.config.display_id}`);
+    }
+  };
+
+
+  // 计算是否选中/悬浮，仅在双方都存在时才成立，避免 undefined === undefined 造成的误判
+  const isSelected = !!(
+    stripConfiguration.selectedStripPart &&
+    localProps.config &&
+    stripConfiguration.selectedStripPart.displayId === localProps.config.display_id &&
+    stripConfiguration.selectedStripPart.border === localProps.config.border
+  );
+
+  const isHovered = !!(
+    stripConfiguration.hoveredStripPart &&
+    localProps.config &&
+    stripConfiguration.hoveredStripPart.displayId === localProps.config.display_id &&
+    stripConfiguration.hoveredStripPart.border === localProps.config.border
+  );
+
   return (
     <section
       {...rootProps}
       ref={setAnchor}
       class={
-        'flex rounded-full flex-nowrap justify-around items-center overflow-hidden bg-gray-800/20 border border-gray-600/30 min-h-[12px] min-w-[12px] m-1 px-0.5 py-0.5 transition-all duration-200 ' +
+        'flex rounded-full flex-nowrap justify-around items-center overflow-hidden bg-gray-800/20 border border-gray-600/30 min-h-[12px] min-w-[12px] m-1 px-0.5 py-0.5 transition-all duration-200 cursor-pointer hover:bg-primary/10 ' +
         rootProps.class
       }
       classList={{
-        'ring ring-inset bg-yellow-400/50 ring-orange-400 animate-pulse':
-          stripConfiguration.selectedStripPart?.border === localProps.config?.border &&
-          stripConfiguration.selectedStripPart?.displayId ===
-            localProps.config?.display_id,
-        'ring-2 ring-primary bg-primary/20 border-primary':
-          stripConfiguration.hoveredStripPart?.border === localProps.config?.border &&
-          stripConfiguration.hoveredStripPart?.displayId === localProps.config?.display_id,
+        'ring ring-inset bg-yellow-400/50 ring-orange-400 animate-pulse': isSelected,
+        'ring-2 ring-primary bg-primary/20 border-primary': isHovered,
       }}
       onWheel={onWheel}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
+      onClick={onClick}
     >
       <For each={colors()}>{(item) => <Pixel color={item} />}</For>
     </section>

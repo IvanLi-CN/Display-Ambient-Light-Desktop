@@ -13,13 +13,15 @@ export interface LedColorsChangedEvent {
 }
 
 /**
- * LED排序颜色变化事件
+ * LED颜色变化事件（按物理顺序排列）
  */
 export interface LedSortedColorsChangedEvent {
   sorted_colors: number[];
   mode: DataSendMode;
   /** LED偏移量（用于前端组装完整预览） */
   led_offset: number;
+  /** 时间戳（来自后端数据生成时间） */
+  timestamp?: string;
 }
 
 /**

@@ -9,6 +9,7 @@ import { DisplayApiService, DeviceApiService, HealthApiService } from './display
 import { InfoApiService } from './info-api.service';
 import { api, WebSocketEventListener } from './api-client';
 import { DataSendMode } from '../types/led-status';
+import { Borders } from '../constants/border';
 
 // 环境检测结果
 export interface EnvironmentInfo {
@@ -39,22 +40,17 @@ export class ApiAdapter {
    * 初始化适配器，检测运行环境
    */
   public async initialize(): Promise<EnvironmentInfo> {
-    console.log('🔧 ApiAdapter.initialize() 被调用');
     if (this.environmentInfo) {
-      console.log('🔧 环境信息已存在，直接返回:', this.environmentInfo);
       return this.environmentInfo;
     }
 
     if (this.initPromise) {
-      console.log('🔧 初始化正在进行中，等待完成...');
       await this.initPromise;
       return this.environmentInfo!;
     }
 
-    console.log('🔧 开始初始化环境检测...');
     this.initPromise = this.detectEnvironment();
     await this.initPromise;
-    console.log('🔧 环境检测完成:', this.environmentInfo);
     return this.environmentInfo!;
   }
 
@@ -235,6 +231,13 @@ export class ApiAdapter {
     );
   }
 
+  public async getLedStatus(): Promise<any> {
+    return this.call(
+      'get_led_status',
+      () => LedApiService.getLedStatus()
+    );
+  }
+
   public async getLedPreviewState(): Promise<{ enabled: boolean }> {
     return this.call(
       'get_led_preview_state',
@@ -250,19 +253,19 @@ export class ApiAdapter {
     );
   }
 
-  // ===== 配置相关API =====
+  // ===== 配置相关API（V2-only） =====
 
   public async readLedStripConfigs(): Promise<any> {
     return this.call(
-      'read_led_strip_configs',
-      () => ConfigApiService.readLedStripConfigs()
+      'read_led_strip_configs_v2',
+      () => ConfigApiService.readLedStripConfigsV2()
     );
   }
 
   public async writeLedStripConfigs(configs: any): Promise<void> {
     return this.call(
-      'write_led_strip_configs',
-      () => ConfigApiService.writeLedStripConfigs(configs),
+      'write_led_strip_configs_v2',
+      () => ConfigApiService.writeLedStripConfigsV2(configs),
       { configs }
     );
   }
@@ -280,6 +283,13 @@ export class ApiAdapter {
     return this.call(
       'get_displays',
       () => DisplayApiService.getDisplays()
+    );
+  }
+
+  public async getDisplayConfigs(): Promise<any[]> {
+    return this.call(
+      'get_display_configs',
+      () => DisplayApiService.getDisplayConfigs()
     );
   }
 
@@ -358,8 +368,8 @@ export class ApiAdapter {
 
   public async getConfig(): Promise<any> {
     return this.call(
-      'read_config',
-      () => ConfigApiService.getConfig()
+      'read_led_strip_configs_v2',
+      () => ConfigApiService.readLedStripConfigsV2()
     );
   }
 
@@ -379,21 +389,15 @@ export class ApiAdapter {
     );
   }
 
-  public async moveStripPart(displayId: number, border: string, fromIndex: number, toIndex: number): Promise<void> {
+  public async reverseLedStrip(displayId: number, border: Borders): Promise<void> {
     return this.call(
-      'move_strip_part',
-      () => ConfigApiService.moveStripPart(displayId, border as any, fromIndex, toIndex),
-      { displayId, border, fromIndex, toIndex }
+      'reverse_led_strip_part',
+      () => ConfigApiService.reverseLedStrip(displayId, border),
+      { displayId, border }
     );
   }
 
-  public async reverseLedStripPart(displayId: number, border: string, startIndex: number, endIndex: number): Promise<void> {
-    return this.call(
-      'reverse_led_strip_part',
-      () => ConfigApiService.reverseLedStripPart(displayId, border as any, startIndex, endIndex),
-      { displayId, border, startIndex, endIndex }
-    );
-  }
+
 
   public async setColorCalibration(displayId: number, border: string, calibration: any): Promise<void> {
     return this.call(
@@ -569,6 +573,7 @@ export const adaptiveApi = {
   disableTestMode: () => apiAdapter.disableTestMode(),
   setDataSendMode: (mode: DataSendMode) => apiAdapter.setDataSendMode(mode),
   getDataSendMode: () => apiAdapter.getDataSendMode(),
+  getLedStatus: () => apiAdapter.getLedStatus(),
   getLedPreviewState: () => apiAdapter.getLedPreviewState(),
   setLedPreviewState: (enabled: boolean) => apiAdapter.setLedPreviewState(enabled),
   startLedTestEffect: (params: any) => apiAdapter.startLedTestEffect(params),
@@ -587,10 +592,9 @@ export const adaptiveApi = {
     apiAdapter.patchLedStripLen(displayId, border, deltaLen),
   patchLedStripType: (displayId: number, border: string, ledType: string) =>
     apiAdapter.patchLedStripType(displayId, border, ledType),
-  moveStripPart: (displayId: number, border: string, fromIndex: number, toIndex: number) =>
-    apiAdapter.moveStripPart(displayId, border, fromIndex, toIndex),
-  reverseLedStripPart: (displayId: number, border: string, startIndex: number, endIndex: number) =>
-    apiAdapter.reverseLedStripPart(displayId, border, startIndex, endIndex),
+  reverseLedStrip: (displayId: number, border: Borders) =>
+    apiAdapter.reverseLedStrip(displayId, border),
+
   setColorCalibration: (displayId: number, border: string, calibration: any) =>
     apiAdapter.setColorCalibration(displayId, border, calibration),
   updateUserPreferences: (preferences: any) => apiAdapter.updateUserPreferences(preferences),
@@ -611,6 +615,7 @@ export const adaptiveApi = {
   // 显示器API
   listDisplayInfo: () => apiAdapter.listDisplayInfo(),
   getDisplays: () => apiAdapter.getDisplays(),
+  getDisplayConfigs: () => apiAdapter.getDisplayConfigs(),
   
   // 设备API
   getBoards: () => apiAdapter.getBoards(),

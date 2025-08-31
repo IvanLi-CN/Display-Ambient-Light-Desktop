@@ -21,7 +21,7 @@ pub struct TestEffectConfig {
     pub led_count: u32,
     pub led_type: LedType,
     pub speed: f64,  // Speed multiplier
-    pub offset: u32, // LED offset
+    pub offset: u32, // Byte offset
 }
 
 /// LED测试效果任务信息
@@ -63,12 +63,6 @@ impl LedTestEffectManager {
         config: TestEffectConfig,
         update_interval_ms: u32,
     ) -> anyhow::Result<()> {
-        log::info!(
-            "🚀 Starting LED test effect for board: {}, effect: {:?}",
-            board_address,
-            config.effect_type
-        );
-
         // 如果已有相同设备的任务在运行，先停止它
         self.stop_test_effect(&board_address).await?;
 
@@ -168,8 +162,8 @@ impl LedTestEffectManager {
             // 生成LED颜色数据
             let colors = LedTestEffects::generate_colors(&task.config, elapsed_ms);
 
-            // 计算字节偏移量
-            let byte_offset = LedTestEffects::calculate_byte_offset(&task.config);
+            // 使用配置中的字节偏移量
+            let byte_offset = task.config.offset as u16;
 
             // 发送数据到硬件
             if let Err(e) = self
@@ -198,14 +192,12 @@ impl LedTestEffectManager {
                         remaining = remaining.saturating_sub(current_sleep);
                     }
                     _ = task.cancellation_token.cancelled() => {
-                        log::info!("🚫 Test effect cancelled for board: {board_address}");
                         return Ok(()); // 立即返回，不继续循环
                     }
                 }
             }
         }
 
-        log::info!("✅ Test effect loop ended for board: {board_address}");
         Ok(())
     }
 
@@ -277,7 +269,7 @@ impl LedTestEffectManager {
             3
         };
         let clear_data = vec![0u8; (config.led_count * bytes_per_led) as usize];
-        let byte_offset = LedTestEffects::calculate_byte_offset(config);
+        let byte_offset = config.offset as u16;
 
         // 直接发送清除数据，不通过send_test_data避免模式冲突
         let sender = crate::led_data_sender::LedDataSender::global().await;
@@ -410,16 +402,6 @@ impl LedTestEffects {
         }
 
         buffer
-    }
-
-    /// Calculate byte offset for 0x02 packet based on LED offset and LED type
-    pub fn calculate_byte_offset(config: &TestEffectConfig) -> u16 {
-        let bytes_per_led = if Self::is_rgbw_type(&config.led_type) {
-            4
-        } else {
-            3
-        };
-        (config.offset * bytes_per_led) as u16
     }
 
     /// Flowing rainbow effect - smooth rainbow colors flowing along the strip
@@ -594,45 +576,6 @@ mod tests {
         let rgb_colors =
             LedTestEffects::hardware_data_to_rgb_colors(&colors_data, &config.led_type);
         assert_eq!(rgb_colors.len(), 10); // 10 LEDs
-    }
-
-    #[test]
-    fn test_calculate_byte_offset() {
-        // Test WS2812B (3 bytes per LED)
-        let config_ws2812b = TestEffectConfig {
-            effect_type: TestEffectType::GroupCounting,
-            led_count: 60,
-            led_type: LedType::WS2812B,
-            speed: 1.0,
-            offset: 10, // 10 LEDs offset
-        };
-
-        let byte_offset_ws2812b = LedTestEffects::calculate_byte_offset(&config_ws2812b);
-        assert_eq!(byte_offset_ws2812b, 30); // 10 LEDs * 3 bytes = 30 bytes
-
-        // Test SK6812 (4 bytes per LED)
-        let config_sk6812 = TestEffectConfig {
-            effect_type: TestEffectType::GroupCounting,
-            led_count: 60,
-            led_type: LedType::SK6812,
-            speed: 1.0,
-            offset: 10, // 10 LEDs offset
-        };
-
-        let byte_offset_sk6812 = LedTestEffects::calculate_byte_offset(&config_sk6812);
-        assert_eq!(byte_offset_sk6812, 40); // 10 LEDs * 4 bytes = 40 bytes
-
-        // Test zero offset
-        let config_zero_offset = TestEffectConfig {
-            effect_type: TestEffectType::GroupCounting,
-            led_count: 60,
-            led_type: LedType::WS2812B,
-            speed: 1.0,
-            offset: 0,
-        };
-
-        let byte_offset_zero = LedTestEffects::calculate_byte_offset(&config_zero_offset);
-        assert_eq!(byte_offset_zero, 0); // 0 LEDs * 3 bytes = 0 bytes
     }
 
     #[test]

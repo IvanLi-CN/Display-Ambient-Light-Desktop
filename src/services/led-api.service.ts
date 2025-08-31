@@ -94,6 +94,14 @@ export class LedApiService {
     return api.get('/api/v1/led/status');
   }
 
+  /**
+   * 获取当前LED颜色数据
+   * 用于在氛围光模式下获取实时LED颜色数据
+   */
+  static async getCurrentLedColors(): Promise<number[]> {
+    return api.get('/api/v1/led/current-colors');
+  }
+
 
 
   /**
@@ -203,27 +211,17 @@ export class LedApiService {
  */
 export class ConfigApiService {
   /**
-   * 获取配置信息
-   * 替代: invoke('read_config')
+   * 读取LED灯带配置（用 v2 语义，但走 v1 路径）
    */
-  static async getConfig(): Promise<any> {
+  static async readLedStripConfigsV2(): Promise<any> {
     return api.get('/api/v1/config/led-strips');
   }
 
   /**
-   * 读取LED灯带配置
-   * 替代: invoke('read_led_strip_configs')
+   * 写入LED灯带配置（用 v2 语义，但走 v1 路径）
    */
-  static async readLedStripConfigs(): Promise<any> {
-    return api.get('/api/v1/config/led-strips');
-  }
-
-  /**
-   * 写入LED灯带配置
-   * 替代: invoke('write_led_strip_configs', { configs })
-   */
-  static async writeLedStripConfigs(configGroup: any): Promise<void> {
-    return api.post('/api/v1/config/led-strips', configGroup);
+  static async writeLedStripConfigsV2(configGroupV2: any): Promise<void> {
+    return api.post('/api/v1/config/led-strips', configGroupV2);
   }
 
   /**
@@ -255,6 +253,17 @@ export class ConfigApiService {
       display_id: displayId,
       border,
       led_type: ledType
+    });
+  }
+
+  /**
+   * 反转LED灯带
+   * 替代: invoke('reverse_led_strip_part', { displayId, border })
+   */
+  static async reverseLedStrip(displayId: number, border: Borders): Promise<void> {
+    return api.put('/api/v1/config/led-strips/reverse', {
+      display_id: displayId,
+      border
     });
   }
 
@@ -388,40 +397,6 @@ export class ConfigApiService {
     });
   }
 
-  /**
-   * 移动灯带部分
-   * 替代: invoke('move_strip_part', { displayId, border, fromIndex, toIndex })
-   */
-  static async moveStripPart(
-    displayId: number,
-    border: Borders,
-    fromIndex: number,
-    toIndex: number
-  ): Promise<void> {
-    return api.put('/api/v1/config/move-strip-part', {
-      display_id: displayId,
-      border,
-      from_index: fromIndex,
-      to_index: toIndex
-    });
-  }
 
-  /**
-   * 反转LED灯带部分
-   * 替代: invoke('reverse_led_strip_part', { displayId, border, startIndex, endIndex })
-   */
-  static async reverseLedStripPart(
-    displayId: number,
-    border: Borders,
-    startIndex: number,
-    endIndex: number
-  ): Promise<void> {
-    return api.put('/api/v1/config/reverse-strip-part', {
-      display_id: displayId,
-      border,
-      start_index: startIndex,
-      end_index: endIndex
-    });
-  }
 
 }

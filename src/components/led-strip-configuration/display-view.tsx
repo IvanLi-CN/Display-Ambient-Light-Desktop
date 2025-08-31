@@ -38,7 +38,23 @@ export const DisplayView: Component<DisplayViewProps> = (props) => {
     if (!ledStripStore.strips || !Array.isArray(ledStripStore.strips)) {
       return [];
     }
-    return ledStripStore.strips.filter((c) => c.display_id === props.display.id);
+
+    // 使用增强的匹配逻辑，支持V2配置格式
+    return ledStripStore.strips.filter((strip) => {
+      // 如果strip有matchesDisplay方法，使用它进行匹配
+      if (typeof strip.matchesDisplay === 'function') {
+        return strip.matchesDisplay(props.display.id, props.display.internal_id);
+      }
+
+      // 回退到传统匹配逻辑
+      // 优先使用内部ID匹配
+      if (strip.display_internal_id && props.display.internal_id) {
+        return strip.display_internal_id === props.display.internal_id;
+      }
+
+      // 回退到数字ID匹配
+      return strip.display_id === props.display.id;
+    });
   });
 
   // 处理LED灯带颜色变化事件
@@ -116,20 +132,7 @@ export const DisplayView: Component<DisplayViewProps> = (props) => {
           colors={displayLedColors().get('Bottom')}
         />
 
-        {/* LED数量显示在右边 */}
-        <div class="row-start-2 col-start-4 flex flex-col justify-center items-start pl-2 text-xs text-base-content/60 space-y-1">
-          {ledStripConfigs().map((config) => (
-            <div class="flex items-center gap-1">
-              <div class={`w-2 h-2 rounded-sm ${
-                config.border === 'Top' ? 'bg-blue-400' :
-                config.border === 'Right' ? 'bg-red-400' :
-                config.border === 'Bottom' ? 'bg-orange-400' :
-                'bg-green-400'
-              }`} />
-              <span>{config.len}</span>
-            </div>
-          ))}
-        </div>
+
       </section>
     </>
   );

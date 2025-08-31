@@ -29,18 +29,7 @@
   }
 }
 
-/* Ensure LED control panels are responsive */
-.led-control-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 0.75rem;
-}
 
-@media (max-width: 600px) {
-  .led-control-grid {
-    grid-template-columns: 1fr;
-  }
-}
 
 /* Settings page card styles */
 .settings-card {
@@ -87,4 +76,19 @@
 
 .ambient-control-toggle .toggle {
   margin-left: auto !important;
+}
+
+/* Frequency display styles */
+.frequency-display {
+  font-family: 'Monaco', 'Menlo', 'Consolas', 'SF Mono', monospace !important;
+  font-variant-numeric: tabular-nums;
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  min-width: 3.5rem;
+  text-align: right;
+}
+
+/* Ensure monospace font for frequency values */
+.font-mono {
+  font-family: 'Monaco', 'Menlo', 'Consolas', 'SF Mono', monospace !important;
+  font-variant-numeric: tabular-nums;
 }

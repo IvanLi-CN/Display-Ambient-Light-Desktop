@@ -7,6 +7,7 @@
 ## ✅ 已实现功能
 
 ### 1. 命令行参数导航
+
 - 支持 `--page` 参数直接启动应用并跳转到指定页面
 - 支持 `--display` 参数指定显示器ID（用于单屏灯带配置）
 - 支持所有主要页面：info, led-strips-configuration, white-balance, led-strip-test, settings
@@ -14,17 +15,20 @@
 - 完全测试通过，日志显示正确的参数检测和页面导航
 
 ### 2. URL Scheme 深度链接
+
 - 注册 `ambient-light://` URL scheme
 - 支持 `ambient-light://navigate/页面名` 格式
 - 使用 Tauri 2.0 深度链接插件实现
 - 在应用安装后可通过系统调用
 
 ### 3. 前端导航服务
+
 - 创建 `NavigationService` 类提供类型安全的导航 API
 - 提供便捷函数如 `navigateToInfo()`, `navigateToSettings()` 等
 - 包含 URL scheme 辅助工具 `AmbientLightUrlScheme`
 
 ### 4. 自动化测试
+
 - 创建完整的测试脚本 `scripts/test-navigation.sh`
 - 自动测试所有页面的命令行参数功能
 - 提供 URL scheme 测试（需要应用安装）
@@ -95,6 +99,7 @@ Current page: led-strips-configuration/display/1 (path: /led-strips-configuratio
 ```
 
 ### URL Scheme（需要安装应用）
+
 ```bash
 # 基本页面导航
 open "ambient-light://navigate/settings"
@@ -106,6 +111,7 @@ open "ambient-light://navigate/led-strips-configuration/display/1"
 ```
 
 ### 前端代码
+
 ```typescript
 import { NavigationService } from './services/navigation-service';
 

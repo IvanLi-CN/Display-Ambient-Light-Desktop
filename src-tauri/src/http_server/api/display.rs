@@ -10,7 +10,7 @@ use utoipa::ToSchema;
 
 use crate::{
     ambient_light::LedStripConfig,
-    display::{DisplayManager, DisplayState},
+    display::{DisplayConfig, DisplayManager, DisplayState},
     http_server::{ApiResponse, AppState},
     led_color::LedColor,
     DisplayInfoWrapper, ScreenshotManager,
@@ -68,6 +68,24 @@ pub async fn list_display_info() -> Result<Json<ApiResponse<String>>, StatusCode
     }
 }
 
+/// 获取所有显示器配置（包括稳定ID信息）
+#[utoipa::path(
+    get,
+    path = "/api/v1/display/configs",
+    responses(
+        (status = 200, description = "获取显示器配置成功", body = ApiResponse<Vec<DisplayConfig>>),
+        (status = 500, description = "获取失败", body = ApiResponse<String>),
+    ),
+    tag = "display"
+)]
+pub async fn get_display_configs() -> Result<Json<ApiResponse<Vec<DisplayConfig>>>, StatusCode> {
+    // Use the DisplayRegistry managed by ConfigManagerV2 to ensure internal_id consistency
+    let cm = crate::ambient_light::ConfigManagerV2::global().await;
+    let registry = cm.get_display_registry();
+    let configs = registry.get_all_displays().await;
+    Ok(Json(ApiResponse::success(configs)))
+}
+
 /// 获取指定显示器的颜色
 #[utoipa::path(
     get,
@@ -118,5 +136,6 @@ pub fn create_routes() -> Router<AppState> {
     Router::new()
         .route("/", get(get_displays))
         .route("/info", get(list_display_info))
+        .route("/configs", get(get_display_configs))
         .route("/:display_id/colors", get(get_display_colors))
 }

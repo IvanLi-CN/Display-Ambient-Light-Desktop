@@ -162,11 +162,10 @@ export const WhiteBalance = () => {
     setLedStripStore('colorCalibration', calibration);
 
     try {
-      // 在用户调整滑块时启用校准模式
-      await colorCalibrationService.handleCalibrationChange();
-
-      // 更新全局颜色校准配置
+      // 只更新配置，不启用颜色校准模式
+      // 颜色校准模式只有在用户点击颜色块进行测试时才启用
       await adaptiveApi.updateGlobalColorCalibration(calibration);
+      console.log('✅ 颜色校准配置已更新，但未启用校准模式');
     } catch (error) {
       console.error('❌ 更新颜色校准失败:', error);
     }

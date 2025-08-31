@@ -5,6 +5,7 @@ mod ambient_light;
 mod ambient_light_state;
 mod auto_start;
 mod display;
+mod frequency_calculator;
 mod http_server;
 mod language_manager;
 mod led_color;
@@ -21,11 +22,15 @@ mod user_preferences;
 mod volume;
 mod websocket_events;
 
+#[cfg(test)]
+mod tests;
+
 use display::DisplayManager;
 use display_info::DisplayInfo;
 use paris::{error, info, warn};
 use rpc::UdpRpc;
 use screenshot_manager::ScreenshotManager;
+
 use tauri::{
     http::{Request, Response},
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
@@ -40,8 +45,10 @@ use tokio::sync::RwLock;
 use volume::VolumeManager;
 
 // Global static variables for LED test effect management
+#[allow(dead_code)]
 static EFFECT_HANDLE: tokio::sync::OnceCell<Arc<RwLock<Option<tokio::task::JoinHandle<()>>>>> =
     tokio::sync::OnceCell::const_new();
+#[allow(dead_code)]
 static CANCEL_TOKEN: tokio::sync::OnceCell<
     Arc<RwLock<Option<tokio_util::sync::CancellationToken>>>,
 > = tokio::sync::OnceCell::const_new();
@@ -72,6 +79,7 @@ struct DisplayInfoWrapper<'a>(#[serde(with = "DisplayInfoDef")] &'a DisplayInfo)
 // Tauri commands removed - using HTTP API only
 
 #[derive(Serialize)]
+#[allow(dead_code)]
 struct AppVersion {
     version: String,
     is_dev: bool,
@@ -516,6 +524,9 @@ fn handle_ambient_light_protocol<R: Runtime>(
 async fn main() {
     env_logger::init();
 
+    // 初始化新的稳定显示器ID系统
+    let _config_manager_v2 = ambient_light::ConfigManagerV2::global().await;
+
     // Parse command line arguments
     let args: Vec<String> = std::env::args().collect();
     let mut target_page: Option<String> = None;
@@ -540,26 +551,22 @@ async fn main() {
             info!("Command line argument detected: --browser");
         } else if args[i] == "--test-single-display-config" {
             _test_single_display_config = true;
-            info!("Command line argument detected: --test-single-display-config");
         }
     }
 
     // Check environment variables
     if !headless_mode && std::env::var("AMBIENT_LIGHT_HEADLESS").is_ok() {
         headless_mode = true;
-        info!("Environment variable detected: AMBIENT_LIGHT_HEADLESS");
     }
 
     if !browser_mode && std::env::var("AMBIENT_LIGHT_BROWSER").is_ok() {
         browser_mode = true;
-        info!("Environment variable detected: AMBIENT_LIGHT_BROWSER");
     }
 
     // In development mode, also check environment variables for navigation
     if target_page.is_none() {
         if let Ok(env_page) = std::env::var("TAURI_DEV_PAGE") {
             target_page = Some(env_page.clone());
-            info!("Environment variable detected: TAURI_DEV_PAGE={}", env_page);
         }
     }
     if display_id.is_none() {
@@ -586,7 +593,7 @@ async fn main() {
     // 启动HTTP服务器
     let http_config = http_server::ServerConfig {
         host: "127.0.0.1".to_string(),
-        port: 3030,
+        port: 24101,
         enable_cors: true,
         serve_static_files: false,
         static_files_path: None,
@@ -648,14 +655,10 @@ async fn main() {
     });
 
     tokio::spawn(async move {
-        info!("💡 Starting LED color publisher...");
-
         // Add a small delay to avoid initialization conflicts
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        info!("⏰ LED color publisher delay completed, proceeding...");
 
         let led_color_publisher = ambient_light::LedColorsPublisher::global().await;
-        info!("📦 LED color publisher instance obtained");
 
         // Add timeout to prevent infinite blocking
         match tokio::time::timeout(
@@ -664,9 +667,7 @@ async fn main() {
         )
         .await
         {
-            Ok(_) => {
-                info!("✅ LED color publisher started successfully");
-            }
+            Ok(_) => {}
             Err(_) => {
                 error!("❌ LED color publisher start() timed out after 30 seconds");
                 error!("💡 This indicates a blocking issue in the start() method");
@@ -681,9 +682,9 @@ async fn main() {
     // 如果是无头模式，只运行后端服务，不启动GUI
     if headless_mode {
         info!("🚀 Running in headless mode - HTTP API only");
-        info!("📡 HTTP API server: http://127.0.0.1:3030");
-        info!("🔌 WebSocket server: ws://127.0.0.1:8765");
-        info!("📖 API documentation: http://127.0.0.1:3030/swagger-ui/");
+        info!("📡 HTTP API server: http://127.0.0.1:24101");
+        info!("🔌 WebSocket server: ws://127.0.0.1:24102");
+        info!("📖 API documentation: http://127.0.0.1:24101/swagger-ui/");
         info!("💡 Press Ctrl+C to stop the server");
 
         // 启动WebSocket服务器
@@ -702,10 +703,10 @@ async fn main() {
     // 如果是浏览器模式，启动后端服务（不启动GUI）
     if browser_mode {
         info!("🌐 Running in browser mode - Backend only");
-        info!("� HTTP API server: http://127.0.0.1:3030");
-        info!("🔌 WebSocket server: ws://127.0.0.1:8765");
+        info!("� HTTP API server: http://127.0.0.1:24101");
+        info!("🔌 WebSocket server: ws://127.0.0.1:24102");
         info!("🌐 Web interface: Start frontend dev server with 'npm run dev'");
-        info!("� Then access http://localhost:1420 in your browser");
+        info!("� Then access http://localhost:24100 in your browser");
         info!("💡 Press Ctrl+C to stop the server");
 
         // 启动WebSocket服务器
@@ -888,8 +889,14 @@ async fn main() {
 
             let app_handle = app.handle().clone();
             tokio::spawn(async move {
-                let config_manager = ambient_light::ConfigManager::global().await;
-                let mut config_update_receiver = config_manager.clone_config_update_receiver();
+                // 使用新的ConfigManagerV2和适配器
+                let config_manager_v2 = ambient_light::ConfigManagerV2::global().await;
+                let mut config_update_receiver = config_manager_v2.subscribe_config_updates();
+
+                // 创建适配器用于转换配置格式
+                let adapter =
+                    ambient_light::PublisherAdapter::new(config_manager_v2.get_display_registry());
+
                 loop {
                     if let Err(err) = config_update_receiver.changed().await {
                         error!("config update receiver changed error: {}", err);
@@ -898,9 +905,17 @@ async fn main() {
 
                     log::info!("config changed. emit config_changed event.");
 
-                    let config = config_update_receiver.borrow().clone();
+                    let v2_config = config_update_receiver.borrow().clone();
 
-                    app_handle.emit("config_changed", config).unwrap();
+                    // 转换为v1格式以保持前端兼容性
+                    match adapter.convert_v2_to_v1_config(&v2_config).await {
+                        Ok(v1_config) => {
+                            app_handle.emit("config_changed", v1_config).unwrap();
+                        }
+                        Err(e) => {
+                            error!("Failed to convert v2 config to v1: {}", e);
+                        }
+                    }
                 }
             });
 
@@ -1025,8 +1040,8 @@ async fn main() {
 async fn start_websocket_server() -> anyhow::Result<()> {
     use tokio::net::TcpListener;
 
-    let listener = TcpListener::bind("127.0.0.1:8765").await?;
-    info!("WebSocket server listening on ws://127.0.0.1:8765");
+    let listener = TcpListener::bind("127.0.0.1:24102").await?;
+    info!("WebSocket server listening on ws://127.0.0.1:24102");
 
     while let Ok((stream, addr)) = listener.accept().await {
         info!("New WebSocket connection from: {}", addr);

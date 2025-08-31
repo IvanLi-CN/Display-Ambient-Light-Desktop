@@ -10,13 +10,17 @@ use tokio::{
 };
 
 use crate::{
-    ambient_light::{config, ConfigManager},
+    ambient_light::config,
     led_color::LedColor,
     led_data_sender::{DataSendMode, LedDataSender},
     led_status_manager::LedStatusManager,
     screenshot::{LedSamplePoints, Screenshot},
     screenshot_manager::ScreenshotManager,
 };
+
+use crate::display::DisplayRegistry;
+
+use crate::ambient_light::config_v2::LedStripConfigGroupV2;
 
 use super::{ColorCalibration, LedStripConfig, LedStripConfigGroup, LedType, SamplePointMapper};
 
@@ -36,6 +40,7 @@ pub struct LedColorsPublisher {
     colors_tx: Arc<RwLock<watch::Sender<Vec<u8>>>>,
     inner_tasks_version: Arc<RwLock<usize>>,
     single_display_config_mode: Arc<RwLock<bool>>,
+    #[allow(clippy::type_complexity)]
     single_display_config_data: Arc<RwLock<Option<(Vec<LedStripConfig>, BorderColors)>>>,
     active_strip_for_breathing: Arc<RwLock<Option<(u32, String)>>>, // (display_id, border)
 }
@@ -64,6 +69,7 @@ impl LedColorsPublisher {
             .await
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn start_one_display_colors_fetcher(
         &self,
         display_id: u32,
@@ -74,6 +80,7 @@ impl LedColorsPublisher {
         strips: Vec<LedStripConfig>,
         color_calibration: ColorCalibration,
         start_led_offset: usize,
+        all_strips: Vec<LedStripConfig>, // 新增：全部灯带配置，用于正确计算字节偏移
     ) {
         let internal_tasks_version = self.inner_tasks_version.clone();
         let screenshot_manager = ScreenshotManager::global().await;
@@ -92,6 +99,13 @@ impl LedColorsPublisher {
             let init_version = *internal_tasks_version.read().await;
 
             loop {
+                // Check if the inner task version changed FIRST
+                let version = *internal_tasks_version.read().await;
+                if version != init_version {
+                    log::info!("🛑 Ambient light fetcher for display #{display_id} stopped (version changed)");
+                    break;
+                }
+
                 if let Err(err) = screenshot_rx.changed().await {
                     log::error!("Screenshot channel closed for display #{display_id}: {err:?}");
                     break;
@@ -139,6 +153,7 @@ impl LedColorsPublisher {
                         &strips,
                         &color_calibration,
                         start_led_offset,
+                        &all_strips,
                     )
                     .await
                     {
@@ -169,12 +184,6 @@ impl LedColorsPublisher {
                         warn!("Failed to send display_colors: {}", err);
                     }
                 };
-
-                // Check if the inner task version changed
-                let version = *internal_tasks_version.read().await;
-                if version != init_version {
-                    break;
-                }
             }
         });
     }
@@ -189,9 +198,15 @@ impl LedColorsPublisher {
         let colors_tx = self.colors_tx.clone();
 
         tokio::spawn(async move {
-            // Set data send mode to AmbientLight when starting ambient light worker
+            // 检查当前模式，只有在非颜色校准模式下才设置为环境光
             let sender = LedDataSender::global().await;
-            sender.set_mode(DataSendMode::AmbientLight).await;
+            let current_mode = sender.get_mode().await;
+            if current_mode != DataSendMode::ColorCalibration {
+                sender.set_mode(DataSendMode::AmbientLight).await;
+                log::info!("✅ 氛围光工作器启动，设置LED数据发送模式为: AmbientLight");
+            } else {
+                log::info!("🎨 保持颜色校准模式，氛围光工作器跳过模式切换");
+            }
 
             let sorted_colors_tx = sorted_colors_tx.write().await;
             let colors_tx = colors_tx.write().await;
@@ -268,29 +283,33 @@ impl LedColorsPublisher {
     pub async fn start(&self) {
         log::info!("🚀 LED color publisher starting...");
 
-        let config_manager = ConfigManager::global().await;
+        // 使用新的ConfigManagerV2（直接消费v2配置）
+        let config_manager_v2 = crate::ambient_light::ConfigManagerV2::global().await;
+        let display_registry = config_manager_v2.get_display_registry();
+        let mut config_receiver = config_manager_v2.subscribe_config_updates();
 
-        let mut config_receiver = config_manager.clone_config_update_receiver();
-
-        // Process initial configuration first
-        let initial_configs = config_receiver.borrow().clone();
-        if !initial_configs.strips.is_empty() {
-            log::info!("📋 Processing initial LED configuration...");
-            self.handle_config_change(initial_configs).await;
+        // 先处理初始配置
+        let initial_v2_config = config_receiver.borrow().clone();
+        if !initial_v2_config.strips.is_empty() {
+            log::info!("📋 Processing initial LED configuration (v2)...");
+            self.handle_config_change_v2(initial_v2_config, display_registry.clone())
+                .await;
         } else {
             log::warn!("⚠️ Initial LED configuration is empty, waiting for updates...");
         }
 
-        // Then, listen for subsequent configuration changes in a separate task
+        // 随后监听后续更新
         let self_clone = self.clone();
         tokio::spawn(async move {
-            log::info!("👂 Listening for subsequent LED configuration changes...");
+            log::info!("👂 Listening for subsequent LED configuration changes (v2)...");
             loop {
                 if config_receiver.changed().await.is_ok() {
-                    let configs = config_receiver.borrow().clone();
-                    if !configs.strips.is_empty() {
-                        log::info!("🔄 Subsequent LED configuration changed, reprocessing...");
-                        self_clone.handle_config_change(configs).await;
+                    let v2_config = config_receiver.borrow().clone();
+                    if !v2_config.strips.is_empty() {
+                        log::info!("🔄 Subsequent LED configuration changed, reprocessing (v2)...");
+                        self_clone
+                            .handle_config_change_v2(v2_config, display_registry.clone())
+                            .await;
                     } else {
                         log::warn!("⚠️ Received empty LED configuration, skipping...");
                     }
@@ -300,6 +319,59 @@ impl LedColorsPublisher {
                 }
             }
         });
+    }
+
+    async fn handle_config_change_v2(
+        &self,
+        v2_config: LedStripConfigGroupV2,
+        display_registry: std::sync::Arc<DisplayRegistry>,
+    ) {
+        // 将 v2 配置映射到 v1 运行路径所需的 LedStripConfigGroup（系统 display_id）
+        let mut v1_group = LedStripConfigGroup {
+            strips: Vec::new(),
+            mappers: Vec::new(),
+            color_calibration: v2_config.color_calibration,
+        };
+
+        for s in v2_config.strips.iter() {
+            // 通过显示器注册表获取正确的系统ID
+            let system_id = match display_registry
+                .get_display_id_by_internal_id(&s.display_internal_id)
+                .await
+            {
+                Ok(id) => {
+                    log::debug!(
+                        "✅ 映射显示器内部ID {} -> 系统ID {}",
+                        s.display_internal_id,
+                        id
+                    );
+                    id
+                }
+                Err(e) => {
+                    log::warn!(
+                        "⚠️ 无法获取显示器 {} 的系统ID: {}，使用默认值0",
+                        s.display_internal_id,
+                        e
+                    );
+                    0
+                }
+            };
+
+            v1_group.strips.push(LedStripConfig {
+                index: s.index,
+                border: s.border,
+                display_id: system_id,
+                len: s.len,
+                led_type: s.led_type,
+                reversed: s.reversed,
+            });
+        }
+
+        // 生成 mapper（保持与 v1 逻辑一致）
+        v1_group.generate_mappers();
+
+        // 走现有 v1 处理管线
+        self.handle_config_change(v1_group).await;
     }
 
     async fn handle_config_change(&self, mut original_configs: LedStripConfigGroup) {
@@ -378,6 +450,7 @@ impl LedColorsPublisher {
                 display_strips,
                 updated_configs.color_calibration,
                 start_led_offset,
+                updated_configs.strips.clone(), // 传入全部灯带配置
             )
             .await;
         }
@@ -422,7 +495,19 @@ impl LedColorsPublisher {
     pub async fn send_calibration_color(r: u8, g: u8, b: u8) -> anyhow::Result<()> {
         log::info!("🎨 Sending calibration color: RGB({r}, {g}, {b})");
 
-        // 首先设置LED数据发送模式为颜色校准
+        // 首先停止所有环境光任务，避免冲突
+        log::info!("🛑 Stopping ambient light tasks to avoid conflicts...");
+        let publisher = Self::global().await;
+        {
+            let mut version = publisher.inner_tasks_version.write().await;
+            *version += 1;
+        }
+        log::info!("✅ Ambient light tasks stopped (task version incremented)");
+
+        // 等待一段时间确保所有任务完全停止
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        // 然后设置LED数据发送模式为颜色校准
         log::info!("🔧 Setting LED data send mode to ColorCalibration...");
         let sender = LedDataSender::global().await;
         sender
@@ -430,25 +515,82 @@ impl LedColorsPublisher {
             .await;
         log::info!("✅ LED data send mode set to ColorCalibration");
 
-        // 获取当前配置
-        let config_manager = crate::ambient_light::ConfigManager::global().await;
-        let configs = config_manager.configs().await;
-        let strips = &configs.strips;
+        // 启动持续发送任务
+        Self::start_calibration_color_task(r, g, b).await?;
 
-        log::info!("🔧 Retrieved {} LED strips from config", strips.len());
-        for (i, strip) in strips.iter().enumerate() {
-            log::info!(
-                "  Strip {}: len={}, display_id={}, border={:?}",
-                i,
-                strip.len,
-                strip.display_id,
-                strip.border
-            );
-        }
+        log::info!("✅ 颜色校准模式已启动，将持续发送校准颜色");
+        Ok(())
+    }
 
-        // 检查是否有LED配置
+    /// 启动颜色校准持续发送任务
+    ///
+    /// 类似环境光模式，持续发送校准颜色以维持LED显示
+    ///
+    /// # 参数
+    /// * `r` - 红色分量 (0-255)
+    /// * `g` - 绿色分量 (0-255)
+    /// * `b` - 蓝色分量 (0-255)
+    async fn start_calibration_color_task(r: u8, g: u8, b: u8) -> anyhow::Result<()> {
+        log::info!("🔄 Starting calibration color continuous sending task...");
+
+        let publisher = Self::global().await;
+        let current_version = {
+            let version = publisher.inner_tasks_version.read().await;
+            *version
+        };
+
+        let inner_tasks_version = publisher.inner_tasks_version.clone();
+
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(1000)); // 1Hz (每秒发送一次)
+
+            loop {
+                interval.tick().await;
+
+                // 检查任务版本是否已更改
+                let version = *inner_tasks_version.read().await;
+                if version != current_version {
+                    log::info!("🛑 Calibration color task stopped (version changed)");
+                    break;
+                }
+
+                // 发送校准颜色
+                if let Err(e) = Self::send_single_calibration_color(r, g, b).await {
+                    log::error!("❌ Failed to send calibration color: {}", e);
+
+                    // 如果是模式冲突错误，停止任务
+                    let error_msg = e.to_string();
+                    if error_msg.contains("Cannot send") && error_msg.contains("mode") {
+                        log::warn!(
+                            "🛑 Mode conflict detected, stopping calibration task: {}",
+                            e
+                        );
+                        break;
+                    }
+                }
+            }
+        });
+
+        log::info!("✅ Calibration color continuous sending task started");
+        Ok(())
+    }
+
+    /// 发送单次校准颜色（内部方法）
+    ///
+    /// 用于持续发送任务中的实际颜色发送
+    ///
+    /// # 参数
+    /// * `r` - 红色分量 (0-255)
+    /// * `g` - 绿色分量 (0-255)
+    /// * `b` - 蓝色分量 (0-255)
+    async fn send_single_calibration_color(r: u8, g: u8, b: u8) -> anyhow::Result<()> {
+        // 获取配置
+        let config_manager_v2 = crate::ambient_light::ConfigManagerV2::global().await;
+        let configs_v2 = config_manager_v2.get_config().await;
+        let display_registry = config_manager_v2.get_display_registry();
+        let strips = &configs_v2.strips;
+
         if strips.is_empty() {
-            log::error!("❌ No LED strips configured");
             return Err(anyhow::anyhow!("No LED strips configured"));
         }
 
@@ -459,51 +601,80 @@ impl LedColorsPublisher {
             .map(|strip| vec![single_color; strip.len])
             .collect();
 
-        log::info!(
-            "生成校准颜色数据: {} strips, 总LED数: {}",
-            led_colors_2d.len(),
-            led_colors_2d.iter().map(|strip| strip.len()).sum::<usize>()
-        );
-
-        // 使用新的LED数据处理器
-        log::info!("🔧 Calling LedDataProcessor::process_and_publish...");
-        let hardware_data = match crate::led_data_processor::LedDataProcessor::process_and_publish(
+        // 使用新的LED数据处理器 (V2版本)
+        let hardware_data = crate::led_data_processor::LedDataProcessor::process_and_publish_v2(
             led_colors_2d,
             strips,
-            Some(&configs.color_calibration),
+            &display_registry,
+            Some(&configs_v2.color_calibration),
             crate::led_data_sender::DataSendMode::ColorCalibration,
             0, // 校准模式偏移量为0
         )
-        .await
-        {
-            Ok(data) => {
-                log::info!(
-                    "✅ LedDataProcessor::process_and_publish succeeded, {} bytes",
-                    data.len()
-                );
-                data
-            }
-            Err(e) => {
-                log::error!("❌ LedDataProcessor::process_and_publish failed: {}", e);
-                return Err(e);
-            }
-        };
+        .await?;
 
         // 发送到硬件
-        log::info!("🔧 Sending to hardware...");
         let sender = LedDataSender::global().await;
-        match sender
+        sender
             .send_complete_led_data(0, hardware_data, "ColorCalibration")
-            .await
-        {
-            Ok(_) => {
-                log::info!("✅ 校准颜色发送成功");
-                Ok(())
+            .await?;
+
+        log::debug!("✅ Calibration color sent successfully");
+        Ok(())
+    }
+
+    /// 计算指定LED位置对应的字节偏移量
+    ///
+    /// 考虑不同LED类型的字节数差异：
+    /// - WS2812B: 3字节/LED (GRB)
+    /// - SK6812: 4字节/LED (GRBW)
+    ///
+    /// # 参数
+    /// * `target_led_offset` - 目标LED的位置偏移量
+    /// * `all_strips` - 所有灯带配置（按index排序）
+    ///
+    /// # 返回值
+    /// 返回对应的字节偏移量
+    fn calculate_byte_offset_for_led_position(
+        target_led_offset: usize,
+        all_strips: &[LedStripConfig],
+    ) -> anyhow::Result<usize> {
+        // 按序列号排序灯带，确保正确的串联顺序
+        let mut sorted_strips: Vec<_> = all_strips.iter().collect();
+        sorted_strips.sort_by_key(|strip| strip.index);
+
+        let mut cumulative_led_count = 0;
+        let mut cumulative_byte_count = 0;
+
+        for strip in sorted_strips {
+            // 如果目标LED位置在当前灯带范围内
+            if target_led_offset < cumulative_led_count + strip.len {
+                // 计算在当前灯带内的偏移量
+                let offset_in_strip = target_led_offset - cumulative_led_count;
+                let bytes_per_led = match strip.led_type {
+                    crate::ambient_light::config::LedType::WS2812B => 3,
+                    crate::ambient_light::config::LedType::SK6812 => 4,
+                };
+                return Ok(cumulative_byte_count + offset_in_strip * bytes_per_led);
             }
-            Err(e) => {
-                log::error!("❌ 发送到硬件失败: {}", e);
-                Err(e)
-            }
+
+            // 累加当前灯带的LED数量和字节数
+            cumulative_led_count += strip.len;
+            let bytes_per_led = match strip.led_type {
+                crate::ambient_light::config::LedType::WS2812B => 3,
+                crate::ambient_light::config::LedType::SK6812 => 4,
+            };
+            cumulative_byte_count += strip.len * bytes_per_led;
+        }
+
+        // 如果目标LED位置等于总LED数量，返回总字节数（用于下一个显示器的起始位置）
+        if target_led_offset == cumulative_led_count {
+            Ok(cumulative_byte_count)
+        } else {
+            Err(anyhow::anyhow!(
+                "LED偏移量 {} 超出范围，总LED数量: {}",
+                target_led_offset,
+                cumulative_led_count
+            ))
         }
     }
 
@@ -513,19 +684,6 @@ impl LedColorsPublisher {
     ) -> anyhow::Result<LedStripConfigGroup> {
         let displays = display_info::DisplayInfo::all()
             .map_err(|e| anyhow::anyhow!("Failed to get displays: {}", e))?;
-
-        // Log display detection order for debugging
-        log::info!("🖥️ Detected displays in order:");
-        for (i, display) in displays.iter().enumerate() {
-            log::info!(
-                "  Display {}: ID={}, X={}, Y={}, Primary={}",
-                i,
-                display.id,
-                display.x,
-                display.y,
-                display.is_primary
-            );
-        }
 
         // Create a mutable copy of configs with proper display IDs
         let mut updated_configs = configs.clone();
@@ -565,22 +723,10 @@ impl LedColorsPublisher {
         strips: &[LedStripConfig],
         color_calibration: &ColorCalibration,
         start_led_offset: usize,
+        all_strips: &[LedStripConfig], // 新增：全部灯带配置，用于正确计算字节偏移
     ) -> anyhow::Result<()> {
-        log::info!(
-            "Starting LED data send for display: colors_count={}, strips_count={}, start_offset={}",
-            colors.len(),
-            strips.len(),
-            start_led_offset
-        );
-
         // 将一维颜色数组转换为二维数组，按灯带分组
         let led_colors_2d = Self::convert_1d_to_2d_colors(&colors, strips)?;
-
-        log::info!(
-            "转换为二维颜色数组: {} strips, 总颜色数: {}",
-            led_colors_2d.len(),
-            led_colors_2d.iter().map(|strip| strip.len()).sum::<usize>()
-        );
 
         // 使用新的LED数据处理器
         let hardware_data = crate::led_data_processor::LedDataProcessor::process_and_publish(
@@ -594,7 +740,12 @@ impl LedColorsPublisher {
 
         // 发送到硬件
         let sender = LedDataSender::global().await;
-        let byte_offset = start_led_offset * 3; // 计算字节偏移量
+
+        // 正确计算字节偏移量：需要考虑不同LED类型的字节数差异
+        // 不能简单地用LED数量乘以3，因为SK6812是4字节/LED，WS2812B是3字节/LED
+        let byte_offset =
+            Self::calculate_byte_offset_for_led_position(start_led_offset, all_strips)?;
+
         sender
             .send_complete_led_data(byte_offset as u16, hardware_data, "AmbientLight")
             .await?;
@@ -689,19 +840,6 @@ impl LedColorsPublisher {
             log::error!("Failed to get display info in get_colors_configs: {e}");
             anyhow::anyhow!("Failed to get display info: {}", e)
         })?;
-
-        // Log display detection order for debugging
-        log::info!("🖥️ get_colors_configs - Detected displays in order:");
-        for (i, display) in displays.iter().enumerate() {
-            log::info!(
-                "  Display {}: ID={}, X={}, Y={}, Primary={}",
-                i,
-                display.id,
-                display.x,
-                display.y,
-                display.is_primary
-            );
-        }
 
         // Create a mutable copy of configs with proper display IDs
         let mut updated_configs = configs.clone();
@@ -852,18 +990,26 @@ impl LedColorsPublisher {
             return Ok(());
         }
 
-        // 设置LED数据发送模式为环境光
+        // 检查当前模式，只有在非颜色校准模式下才设置为环境光
         let sender = LedDataSender::global().await;
-        sender.set_mode(DataSendMode::AmbientLight).await;
-        log::info!("✅ 恢复LED数据发送模式为: AmbientLight");
+        let current_mode = sender.get_mode().await;
+        if current_mode != DataSendMode::ColorCalibration {
+            sender.set_mode(DataSendMode::AmbientLight).await;
+            log::info!("✅ 设置LED数据发送模式为: AmbientLight");
+        } else {
+            log::info!("🎨 保持颜色校准模式，跳过模式切换");
+        }
 
-        // 重新启动氛围光处理任务
+        // 重新启动氛围光处理任务 - 使用ConfigManagerV2保持一致性
         log::info!("🔄 重新启动氛围光处理任务...");
-        let config_manager = ConfigManager::global().await;
-        let current_configs = config_manager.configs().await;
-        if !current_configs.strips.is_empty() {
+        let config_manager_v2 = crate::ambient_light::ConfigManagerV2::global().await;
+        let v2_config = config_manager_v2.get_config().await;
+
+        if !v2_config.strips.is_empty() {
             log::info!("📋 重新处理LED配置以恢复氛围光处理...");
-            self.handle_config_change(current_configs).await;
+            let display_registry = config_manager_v2.get_display_registry();
+            self.handle_config_change_v2(v2_config, display_registry)
+                .await;
         } else {
             log::warn!("⚠️ 当前LED配置为空，无法重新启动氛围光处理");
         }
@@ -998,13 +1144,16 @@ impl LedColorsPublisher {
         sender.set_mode(restore_mode).await;
         log::info!("✅ 恢复LED数据发送模式为: {restore_mode:?}");
 
-        // 🔧 重新启动氛围光处理任务
+        // 🔧 重新启动氛围光处理任务 - 使用ConfigManagerV2保持一致性
         log::info!("🔄 重新启动氛围光处理任务...");
-        let config_manager = ConfigManager::global().await;
-        let current_configs = config_manager.configs().await;
-        if !current_configs.strips.is_empty() {
+        let config_manager_v2 = crate::ambient_light::ConfigManagerV2::global().await;
+        let v2_config = config_manager_v2.get_config().await;
+
+        if !v2_config.strips.is_empty() {
             log::info!("📋 重新处理LED配置以恢复氛围光处理...");
-            self.handle_config_change(current_configs).await;
+            let display_registry = config_manager_v2.get_display_registry();
+            self.handle_config_change_v2(v2_config, display_registry)
+                .await;
         } else {
             log::warn!("⚠️ 当前LED配置为空，无法重新启动氛围光处理");
         }
@@ -1051,8 +1200,6 @@ impl LedColorsPublisher {
         let inner_tasks_version = self.inner_tasks_version.clone();
 
         tokio::spawn(async move {
-            log::info!("🚀 启动单屏配置模式30Hz发布任务 (版本: {current_version})");
-
             let mut interval = tokio::time::interval(Duration::from_millis(33)); // 30Hz
 
             loop {
@@ -1061,9 +1208,6 @@ impl LedColorsPublisher {
                 // 检查任务版本是否已更改
                 let version = *inner_tasks_version.read().await;
                 if version != current_version {
-                    log::info!(
-                        "🛑 单屏配置模式任务版本已更改，停止任务 ({version} != {current_version})"
-                    );
                     break;
                 }
 
@@ -1073,10 +1217,15 @@ impl LedColorsPublisher {
                     .await
                 {
                     log::error!("❌ 生成和发布定位色数据失败: {e}");
+
+                    // 🔧 如果是模式冲突错误，立即停止任务
+                    let error_msg = e.to_string();
+                    if error_msg.contains("Cannot send") && error_msg.contains("mode") {
+                        log::warn!("🛑 检测到模式冲突，停止单屏配置任务: {e}");
+                        break;
+                    }
                 }
             }
-
-            log::info!("✅ 单屏配置模式30Hz发布任务结束");
         });
     }
 
@@ -1090,8 +1239,21 @@ impl LedColorsPublisher {
         let edge_colors = self.generate_edge_colors_from_constants(border_colors);
 
         // 2. 读取完整的LED灯带配置以计算正确的全局偏移量
-        let config_manager = crate::ambient_light::ConfigManager::global().await;
-        let all_configs = config_manager.configs().await;
+        // 使用V2配置管理器并转换为V1格式
+        let config_manager_v2 = crate::ambient_light::ConfigManagerV2::global().await;
+        let v2_config = config_manager_v2.get_config().await;
+
+        // 使用适配器转换V2配置为V1格式
+        let adapter =
+            crate::ambient_light::PublisherAdapter::new(config_manager_v2.get_display_registry());
+        let all_configs = match adapter.convert_v2_to_v1_config(&v2_config).await {
+            Ok(v1_config) => v1_config,
+            Err(e) => {
+                log::error!("❌ 转换V2配置到V1格式失败: {}", e);
+                // 如果转换失败，使用传入的config_group作为备选
+                config_group.clone()
+            }
+        };
 
         // 3. 检查是否有活跃灯带需要呼吸效果
         let active_strip = {
@@ -1109,7 +1271,7 @@ impl LedColorsPublisher {
 
         // 5. 发布RGB预览数据到前端
         let websocket_publisher = crate::websocket_events::WebSocketEventPublisher::global().await;
-        // 移除旧的 LedColorsChanged 事件，使用排序颜色事件
+        // 移除旧的 LedColorsChanged 事件，使用按物理顺序排列的颜色事件
         websocket_publisher
             .publish_led_sorted_colors_changed(&rgb_preview_buffer, 0)
             .await;
@@ -1451,10 +1613,6 @@ impl LedColorsPublisher {
                 s.len * bytes_per_led
             })
             .sum();
-
-        log::info!(
-            "🎨 生成完整LED数据流(带呼吸效果): 总LED数={total_leds}, 总字节数={total_bytes}"
-        );
 
         // 获取当前显示器的灯带ID集合
         let current_display_strips: std::collections::HashSet<usize> =

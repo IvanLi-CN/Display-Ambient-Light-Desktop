@@ -35,10 +35,52 @@ export function StatusBar(props: StatusBarProps) {
   const [lastMessageTime, setLastMessageTime] = createSignal<Date | null>(null);
   const [ledPreviewEnabled, setLedPreviewEnabled] = createSignal(false);
 
+  // 频率显示动画相关
+  const [displayedFrequency, setDisplayedFrequency] = createSignal(0);
+  const [targetFrequency, setTargetFrequency] = createSignal(0);
+  let animationId: number | null = null;
+
+  // 平滑动画函数（缓入缓出）
+  const animateFrequencyChange = (newTarget: number) => {
+    if (animationId) cancelAnimationFrame(animationId);
+
+    const startValue = displayedFrequency();
+    const startTime = Date.now();
+    const duration = 500; // 500ms动画，与后端更新频率同步
+
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+
+      // 缓入缓出函数 (ease-in-out)
+      const easeInOut = progress < 0.5
+        ? 2 * progress * progress
+        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+      const currentValue = startValue + (newTarget - startValue) * easeInOut;
+      setDisplayedFrequency(parseFloat(currentValue.toFixed(1)));
+
+      if (progress < 1) {
+        animationId = requestAnimationFrame(animate);
+      }
+    };
+
+    animate();
+  };
+
+  // 更新频率显示（带动画）
+  const updateFrequencyDisplay = (newFrequency: number) => {
+    if (newFrequency !== targetFrequency()) {
+      setTargetFrequency(newFrequency);
+      animateFrequencyChange(newFrequency);
+    }
+  };
+
   // WebSocket连接状态监听
   let unsubscribeStatus: (() => void) | null = null;
   let unsubscribeConnection: (() => void) | null = null;
   let unsubscribeLedPreview: (() => void) | null = null;
+  let unsubscribeSortedColors: (() => void) | null = null;
 
   onMount(async () => {
     try {
@@ -49,22 +91,24 @@ export function StatusBar(props: StatusBarProps) {
       // 初始化时主动获取一次状态
       try {
         console.log('🔄 Fetching initial LED status...');
-        const initialMode = await adaptiveApi.getDataSendMode();
+        const [initialMode, ledStatus] = await Promise.all([
+          adaptiveApi.getDataSendMode(),
+          adaptiveApi.getLedStatus()
+        ]);
         console.log('📊 Initial LED mode:', initialMode);
+        console.log('📊 Initial LED status:', ledStatus);
 
-        // 创建一个模拟的WebSocket事件来初始化状态
-        const mockEvent = {
-          status: {
-            mode: initialMode,
-            frequency: initialMode === 'AmbientLight' ? 30 : (initialMode === 'None' ? 0 : 1),
-            data_length: 0,
-            total_led_count: 0,
-            test_mode_active: initialMode === 'TestEffect',
-            timestamp: new Date().toISOString()
-          }
+        // 使用真实的LED状态数据（频率初始为0，等待实时计算）
+        const statusEvent = {
+          data_send_mode: initialMode,
+          frequency: 0,
+          data_length: ledStatus.current_colors_bytes || 0,
+          total_led_count: Math.floor((ledStatus.current_colors_bytes || 0) / 3), // 假设RGB，每个LED 3字节
+          test_mode_active: initialMode === 'TestEffect',
+          timestamp: new Date().toISOString()
         };
 
-        const statusBarData = convertToStatusBarData(mockEvent.status, true, t);
+        const statusBarData = convertToStatusBarData(statusEvent, true, t);
         console.log('📊 Initial status bar data:', statusBarData);
         setStatusData(statusBarData);
         setConnected(true);
@@ -73,7 +117,7 @@ export function StatusBar(props: StatusBarProps) {
         console.error('❌ Failed to fetch initial status:', error);
       }
 
-      // 监听LED状态变化事件
+      // 监听LED状态变化事件（用于频率/模式/连接）
       unsubscribeStatus = await adaptiveApi.onEvent<any>(
         'LedStatusChanged',
         (statusData) => {
@@ -81,10 +125,17 @@ export function StatusBar(props: StatusBarProps) {
           if (statusData && typeof statusData === 'object') {
             try {
               const statusBarData = convertToStatusBarData(statusData, connected(), t);
-              console.log(`📊 [${new Date().toISOString()}] Status bar received mode: ${statusBarData.raw_mode}, test_mode_active: ${statusBarData.test_mode_active}`);
-              setStatusData(statusBarData);
+
+              // 使用后端计算的频率，并应用平滑动画
+              const backendFrequency = statusData.frequency || 0;
+              updateFrequencyDisplay(backendFrequency);
+
+              // 更新状态数据（使用显示中的频率值以保持动画连续性）
+              const updated: StatusBarData = { ...statusBarData, frequency: displayedFrequency() };
+              setStatusData(updated);
               setLastMessageTime(new Date());
-              // 移除频繁的状态更新日志
+
+              console.log(`📊 Received frequency update: ${backendFrequency}Hz`);
             } catch (error) {
               console.error('Error converting status data:', error);
               if (import.meta.env.DEV) {
@@ -104,13 +155,22 @@ export function StatusBar(props: StatusBarProps) {
           console.log('🔌 Status bar connection status changed:', isConnected);
           setConnected(isConnected);
 
+          // 断开连接时重置频率显示
+          if (!isConnected) {
+            setDisplayedFrequency(0);
+            setTargetFrequency(0);
+          }
+
           // 更新现有状态数据的连接状态
           const current = statusData();
           if (current) {
-            setStatusData({ ...current, connected: isConnected });
+            setStatusData({ ...current, connected: isConnected, frequency: isConnected ? current.frequency : 0 });
           }
         }
       );
+
+      // 注意：不再监听 LedSortedColorsChanged 用于频率计算
+      // 频率现在由后端通过 LedStatusChanged 事件提供
 
       // 监听LED预览状态变化事件
       unsubscribeLedPreview = await adaptiveApi.onEvent<LedPreviewStateChangedEvent>(
@@ -161,6 +221,9 @@ export function StatusBar(props: StatusBarProps) {
     if (unsubscribeConnection) {
       unsubscribeConnection();
     }
+    if (unsubscribeSortedColors) {
+      unsubscribeSortedColors();
+    }
     if (unsubscribeLedPreview) {
       unsubscribeLedPreview();
     }
@@ -171,6 +234,12 @@ export function StatusBar(props: StatusBarProps) {
     if (!connected()) return '#ef4444'; // 红色 - 未连接
     if (!statusData()) return '#f59e0b'; // 黄色 - 连接但无数据
     return '#10b981'; // 绿色 - 正常
+  };
+
+  // 检查是否有有效的上次更新时间
+  const hasValidLastMessageTime = () => {
+    const d = lastMessageTime();
+    return d instanceof Date && !isNaN(d.getTime());
   };
 
   // 获取连接状态文本
@@ -210,13 +279,15 @@ export function StatusBar(props: StatusBarProps) {
 
 
               {/* 频率 */}
-              <Show when={data().frequency > 0}>
-                <span class="text-base-content/80 flex-shrink-0">{data().frequency}Hz</span>
+              <Show when={displayedFrequency() > 0}>
+                <span class="text-base-content/80 flex-shrink-0 font-mono">{displayedFrequency().toFixed(1)}Hz</span>
               </Show>
 
-              {/* LED数量 */}
+              {/* LED数量 + 时间（无时间则仅显示无数据） */}
               <span class="text-base-content/60 text-xs flex-shrink-0">
-                {data().total_led_count} LEDs
+                {hasValidLastMessageTime()
+                  ? `${data().total_led_count} LEDs, ${lastMessageTime()!.toLocaleTimeString('zh-CN', { hour12: false })}`
+                  : t('common.noData')}
               </span>
             </>
           )}
@@ -305,23 +376,22 @@ export function StatusBar(props: StatusBarProps) {
 
 
               {/* 频率 */}
-              <Show when={data().frequency > 0}>
-                <span class="text-sm text-base-content/80 flex-shrink-0">
-                  {data().frequency}Hz
+              <Show when={displayedFrequency() > 0}>
+                <span class="text-sm text-base-content/80 flex-shrink-0 font-mono">
+                  {displayedFrequency().toFixed(1)}Hz
                 </span>
               </Show>
 
-              {/* LED数量 */}
-              <span class="text-sm text-base-content/80 flex-shrink-0">
-                {data().total_led_count} LEDs
-              </span>
-
-              {/* 数据大小（仅在有数据时显示） */}
-              <Show when={data().data_length > 0}>
-                <span class="text-xs text-base-content/60 flex-shrink-0">
-                  {formatDataSize(data().data_length)}
+              {/* LED数量 + 时间（无时间则仅显示无数据） */}
+              <div class="ml-2 text-xs text-base-content/60 flex-shrink-0">
+                <span>
+                  {hasValidLastMessageTime()
+                    ? `${data().total_led_count} LEDs, ${lastMessageTime()!.toLocaleTimeString('zh-CN', { hour12: false })}`
+                    : t('common.noData')}
                 </span>
-              </Show>
+              </div>
+
+
 
               {/* LED预览切换按钮 */}
               <div class="ml-auto">
@@ -339,9 +409,7 @@ export function StatusBar(props: StatusBarProps) {
       </div>
 
       {/* LED预览 */}
-      <Show when={ledPreviewEnabled()}>
-        <LedPreview maxLeds={200} />
-      </Show>
+      <LedPreview maxLeds={200} enabled={ledPreviewEnabled()} />
     </div>
   );
 

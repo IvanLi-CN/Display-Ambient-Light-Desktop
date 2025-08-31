@@ -849,24 +849,52 @@ fn get_sample_points_for_config(
             config.len,
             SINGLE_AXIS_POINTS,
         ),
-        crate::ambient_light::Border::Bottom => Screenshot::get_one_edge_sample_points(
-            height - height / 20,
-            width,
-            config.len,
-            SINGLE_AXIS_POINTS,
-        ),
-        crate::ambient_light::Border::Left => Screenshot::get_one_edge_sample_points(
-            width / 20,
-            height,
-            config.len,
-            SINGLE_AXIS_POINTS,
-        ),
-        crate::ambient_light::Border::Right => Screenshot::get_one_edge_sample_points(
-            width - width / 20,
-            height,
-            config.len,
-            SINGLE_AXIS_POINTS,
-        ),
+        crate::ambient_light::Border::Bottom => {
+            let points = Screenshot::get_one_edge_sample_points(
+                height / 20,
+                width,
+                config.len,
+                SINGLE_AXIS_POINTS,
+            );
+            points
+                .into_iter()
+                .map(|groups| -> Vec<Point> {
+                    groups
+                        .into_iter()
+                        .map(|(x, y)| (x, height - 1 - y))
+                        .collect()
+                })
+                .collect()
+        }
+        crate::ambient_light::Border::Left => {
+            let points = Screenshot::get_one_edge_sample_points(
+                width / 20,
+                height,
+                config.len,
+                SINGLE_AXIS_POINTS,
+            );
+            points
+                .into_iter()
+                .map(|groups| -> Vec<Point> { groups.into_iter().map(|(x, y)| (y, x)).collect() })
+                .collect()
+        }
+        crate::ambient_light::Border::Right => {
+            let points = Screenshot::get_one_edge_sample_points(
+                width / 20,
+                height,
+                config.len,
+                SINGLE_AXIS_POINTS,
+            );
+            points
+                .into_iter()
+                .map(|groups| -> Vec<Point> {
+                    groups
+                        .into_iter()
+                        .map(|(x, y)| (width - 1 - y, x))
+                        .collect()
+                })
+                .collect()
+        }
     }
 }
 

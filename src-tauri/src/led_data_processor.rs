@@ -2,7 +2,8 @@ use anyhow::Result;
 use log::{debug, warn};
 
 use crate::{
-    ambient_light::{Border, ColorCalibration, LedStripConfig, LedType},
+    ambient_light::{Border, ColorCalibration, LedStripConfig, LedStripConfigV2, LedType},
+    display::DisplayRegistry,
     led_color::LedColor,
     led_data_sender::DataSendMode,
     websocket_events::WebSocketEventPublisher,
@@ -32,16 +33,9 @@ impl LedDataProcessor {
         led_colors: Vec<Vec<LedColor>>,
         strips: &[LedStripConfig],
         color_calibration: Option<&ColorCalibration>,
-        mode: DataSendMode,
+        _mode: DataSendMode,
         start_led_offset: usize,
     ) -> Result<Vec<u8>> {
-        log::info!(
-            "🔧 LedDataProcessor::process_and_publish - strips: {}, mode: {:?}, offset: {}",
-            strips.len(),
-            mode,
-            start_led_offset
-        );
-
         // 1. 获取颜色校准配置
         let calibration = match color_calibration {
             Some(cal) => *cal,
@@ -50,31 +44,85 @@ impl LedDataProcessor {
 
         // 2. 转换为预览数据（一维RGB字节数组，无校准）
         let preview_rgb_bytes = Self::colors_2d_to_rgb_bytes(&led_colors);
-        log::info!(
-            "📊 Generated preview data: {} bytes",
-            preview_rgb_bytes.len()
-        );
 
         // 3. 发布预览数据（避免不必要的clone）
         let websocket_publisher = WebSocketEventPublisher::global().await;
-        // 移除旧的 LedColorsChanged 事件，使用按灯带分组的事件替代
+        // 移除旧的 LedColorsChanged 事件，使用按物理顺序排列的颜色事件和按灯带分组的事件替代
         websocket_publisher
             .publish_led_sorted_colors_changed(&preview_rgb_bytes, start_led_offset)
             .await;
 
-        // 3.1. 按灯带分组发布（替代旧的 LedColorsChanged 事件）
-        Self::publish_led_strip_colors(&led_colors, strips, &websocket_publisher).await;
+        // 记录数据发送事件到频率计算器
+        let status_manager = crate::led_status_manager::LedStatusManager::global().await;
+        if let Err(e) = status_manager.record_data_send_event().await {
+            log::warn!("Failed to record data send event: {e}");
+        }
 
-        log::info!("✅ LED preview data published successfully");
+        // 3.1. 按灯带分组发布（替代旧的 LedColorsChanged 事件）
+        Self::publish_led_strip_colors(&led_colors, strips, websocket_publisher).await;
 
         // 4. 硬件编码（应用颜色校准）
         let hardware_data =
             Self::encode_for_hardware(led_colors, strips, &calibration, start_led_offset)?;
 
-        log::info!(
-            "🔧 Hardware encoding completed: {} bytes",
-            hardware_data.len()
-        );
+        Ok(hardware_data)
+    }
+
+    /// V2配置版本：处理二维RGB颜色数据，发布预览，硬件编码
+    ///
+    /// # 参数
+    /// * `led_colors` - 二维颜色数组，外层按strips排序，内层为每个LED的颜色
+    /// * `strips` - V2 LED配置数组（必填）
+    /// * `display_registry` - 显示器注册表，用于ID转换
+    /// * `color_calibration` - 颜色校准配置（None时使用当前配置）
+    /// * `mode` - 当前数据发送模式
+    /// * `start_led_offset` - LED偏移量（必填）
+    ///
+    /// # 返回值
+    /// 返回硬件编码后的数据，可直接发送给LED硬件
+    pub async fn process_and_publish_v2(
+        led_colors: Vec<Vec<LedColor>>,
+        strips: &[LedStripConfigV2],
+        display_registry: &DisplayRegistry,
+        color_calibration: Option<&ColorCalibration>,
+        _mode: DataSendMode,
+        start_led_offset: usize,
+    ) -> Result<Vec<u8>> {
+        // 1. 获取颜色校准配置
+        let calibration = match color_calibration {
+            Some(cal) => *cal,
+            None => Self::get_current_color_calibration().await?,
+        };
+
+        // 2. 转换为预览数据（一维RGB字节数组，无校准）
+        let preview_rgb_bytes = Self::colors_2d_to_rgb_bytes(&led_colors);
+
+        // 3. 发布预览数据（避免不必要的clone）
+        let websocket_publisher = WebSocketEventPublisher::global().await;
+        // 移除旧的 LedColorsChanged 事件，使用按物理顺序排列的颜色事件和按灯带分组的事件替代
+        websocket_publisher
+            .publish_led_sorted_colors_changed(&preview_rgb_bytes, start_led_offset)
+            .await;
+
+        // 记录数据发送事件到频率计算器
+        let status_manager = crate::led_status_manager::LedStatusManager::global().await;
+        if let Err(e) = status_manager.record_data_send_event().await {
+            log::warn!("Failed to record data send event: {e}");
+        }
+
+        // 3.1. 按灯带分组发布（替代旧的 LedColorsChanged 事件）- V2版本
+        Self::publish_led_strip_colors_v2(
+            &led_colors,
+            strips,
+            display_registry,
+            websocket_publisher,
+        )
+        .await;
+
+        // 4. 硬件编码（应用颜色校准）- V2版本
+        let hardware_data =
+            Self::encode_for_hardware_v2(led_colors, strips, &calibration, start_led_offset)?;
+
         Ok(hardware_data)
     }
 
@@ -107,10 +155,17 @@ impl LedDataProcessor {
 
         // 2. 发布预览数据
         let websocket_publisher = WebSocketEventPublisher::global().await;
-        // 移除旧的 LedColorsChanged 事件，测试模式使用排序颜色事件
+        // 移除旧的 LedColorsChanged 事件，测试模式使用按物理顺序排列的颜色事件
         websocket_publisher
             .publish_led_sorted_colors_changed(&preview_rgb_bytes, 0) // 测试模式偏移量为0
             .await;
+
+        // 记录数据发送事件到频率计算器
+        let status_manager = crate::led_status_manager::LedStatusManager::global().await;
+        if let Err(e) = status_manager.record_data_send_event().await {
+            log::warn!("Failed to record data send event: {e}");
+        }
+
         debug!("✅ Test LED preview data published successfully");
 
         // 3. 测试模式编码（无校准）
@@ -352,6 +407,107 @@ impl LedDataProcessor {
         Ok(buffer)
     }
 
+    /// V2版本：硬件编码（支持V2配置格式）
+    ///
+    /// 将二维颜色数组按V2 strips配置编码为硬件数据，应用颜色校准
+    ///
+    /// # 参数
+    /// * `led_colors` - 二维颜色数组，外层按strips排序
+    /// * `strips` - V2 LED配置数组
+    /// * `color_calibration` - 颜色校准配置
+    /// * `start_led_offset` - LED偏移量
+    ///
+    /// # 返回值
+    /// 返回硬件编码后的数据（GRB/GRBW格式）
+    fn encode_for_hardware_v2(
+        led_colors: Vec<Vec<LedColor>>,
+        strips: &[LedStripConfigV2],
+        color_calibration: &ColorCalibration,
+        start_led_offset: usize,
+    ) -> Result<Vec<u8>> {
+        debug!(
+            "🔧 Encoding for hardware (V2): {} strips, offset: {}",
+            strips.len(),
+            start_led_offset
+        );
+
+        // 计算总LED数量和每个LED的字节数
+        let total_leds: usize = strips.iter().map(|s| s.len).sum();
+        let mut complete_led_data = Vec::new();
+
+        // 按strips顺序处理每个灯带
+        for (strip_index, strip) in strips.iter().enumerate() {
+            let strip_colors = &led_colors[strip_index];
+
+            debug!(
+                "🔧 Processing V2 strip {}: len={}, led_type={:?}, display_internal_id={}",
+                strip.index, strip.len, strip.led_type, strip.display_internal_id
+            );
+
+            // 处理每个LED
+            for i in 0..strip.len {
+                if i < strip_colors.len() {
+                    let color = &strip_colors[i];
+                    let rgb = color.get_rgb();
+
+                    // 应用颜色校准
+                    let calibrated_r = (rgb[0] as f32 * color_calibration.r) as u8;
+                    let calibrated_g = (rgb[1] as f32 * color_calibration.g) as u8;
+                    let calibrated_b = (rgb[2] as f32 * color_calibration.b) as u8;
+
+                    match strip.led_type {
+                        LedType::WS2812B => {
+                            // GRB格式
+                            complete_led_data.extend_from_slice(&[
+                                calibrated_g, // G (Green)
+                                calibrated_r, // R (Red)
+                                calibrated_b, // B (Blue)
+                            ]);
+                        }
+                        LedType::SK6812 => {
+                            // GRBW格式，W通道单独校准
+                            let w_channel = Self::calculate_white_channel(
+                                calibrated_r,
+                                calibrated_g,
+                                calibrated_b,
+                            );
+                            let calibrated_w = (w_channel as f32 * color_calibration.w) as u8;
+                            complete_led_data.extend_from_slice(&[
+                                calibrated_g, // G (Green)
+                                calibrated_r, // R (Red)
+                                calibrated_b, // B (Blue)
+                                calibrated_w, // W (White)
+                            ]);
+                        }
+                    }
+                } else {
+                    warn!(
+                        "LED索引 {} 超出V2灯带颜色数组范围 ({})",
+                        i,
+                        strip_colors.len()
+                    );
+                    // 填充黑色
+                    match strip.led_type {
+                        LedType::WS2812B => {
+                            complete_led_data.extend_from_slice(&[0, 0, 0]);
+                        }
+                        LedType::SK6812 => {
+                            complete_led_data.extend_from_slice(&[0, 0, 0, 0]);
+                        }
+                    }
+                }
+            }
+        }
+
+        debug!(
+            "✅ V2硬件编码完成: {} LEDs -> {} bytes",
+            total_leds,
+            complete_led_data.len()
+        );
+
+        Ok(complete_led_data)
+    }
+
     /// 计算SK6812的白色通道值
     ///
     /// 基于RGB值计算合适的白色通道值
@@ -395,6 +551,52 @@ impl LedDataProcessor {
                     strip.index,
                     &rgb_bytes,
                 )
+                .await;
+        }
+    }
+
+    /// V2版本：按灯带分组发布LED颜色数据
+    ///
+    /// 为每个V2灯带单独发布颜色数据，解决多显示器LED预览闪烁问题
+    async fn publish_led_strip_colors_v2(
+        led_colors: &[Vec<LedColor>],
+        strips: &[LedStripConfigV2],
+        display_registry: &DisplayRegistry,
+        websocket_publisher: &WebSocketEventPublisher,
+    ) {
+        for (strip, colors) in strips.iter().zip(led_colors.iter()) {
+            let rgb_bytes: Vec<u8> = colors.iter().flat_map(|color| color.get_rgb()).collect();
+
+            let border_str = match strip.border {
+                Border::Top => "Top",
+                Border::Bottom => "Bottom",
+                Border::Left => "Left",
+                Border::Right => "Right",
+            };
+
+            // 通过DisplayRegistry将internal_id转换为system_id
+            let display_id = match display_registry
+                .get_display_id_by_internal_id(&strip.display_internal_id)
+                .await
+            {
+                Ok(id) => {
+                    debug!(
+                        "✅ V2发布：映射显示器内部ID {} -> 系统ID {}",
+                        strip.display_internal_id, id
+                    );
+                    id
+                }
+                Err(e) => {
+                    warn!(
+                        "⚠️ V2发布：无法获取显示器 {} 的系统ID: {}，使用默认值0",
+                        strip.display_internal_id, e
+                    );
+                    0
+                }
+            };
+
+            websocket_publisher
+                .publish_led_strip_colors_changed(display_id, border_str, strip.index, &rgb_bytes)
                 .await;
         }
     }

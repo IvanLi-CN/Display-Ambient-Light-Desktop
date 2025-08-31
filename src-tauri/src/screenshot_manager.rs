@@ -12,7 +12,57 @@ use tokio::time::sleep;
 
 use crate::{ambient_light::SamplePointMapper, screenshot::Screenshot};
 
+/// 检查屏幕录制权限
+fn check_screen_recording_permission() -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        use core_graphics::display::CGDisplay;
+
+        // 尝试获取主显示器的截图来测试权限
+        let main_display = CGDisplay::main();
+        let bounds = main_display.bounds();
+
+        // 如果能成功创建截图，说明有权限
+        let test_screenshot = CGDisplay::screenshot(
+            bounds,
+            kCGWindowListOptionOnScreenOnly,
+            kCGNullWindowID,
+            kCGWindowImageDefault,
+        );
+
+        test_screenshot.is_some()
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        // 非macOS系统默认认为有权限
+        true
+    }
+}
+
+/// 请求屏幕录制权限（引导用户到系统设置）
+fn request_screen_recording_permission() {
+    #[cfg(target_os = "macos")]
+    {
+        log::warn!("🔒 屏幕录制权限缺失！");
+        log::warn!("📋 请按照以下步骤授予权限：");
+        log::warn!("1. 打开 系统偏好设置 > 安全性与隐私 > 隐私");
+        log::warn!("2. 在左侧列表中选择 '屏幕录制'");
+        log::warn!("3. 点击锁图标并输入密码");
+        log::warn!("4. 勾选 'Ambient Light Control' 应用");
+        log::warn!("5. 重启应用以使权限生效");
+
+        // 尝试打开系统偏好设置到隐私页面
+        if let Err(e) = std::process::Command::new("open")
+            .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")
+            .spawn()
+        {
+            log::warn!("无法自动打开系统偏好设置: {}", e);
+        }
+    }
+}
+
 pub struct ScreenshotManager {
+    #[allow(clippy::type_complexity)]
     pub channels: Arc<RwLock<HashMap<u32, Arc<RwLock<watch::Sender<Screenshot>>>>>>,
     merged_screenshot_tx: Arc<RwLock<broadcast::Sender<Screenshot>>>,
 }
@@ -35,6 +85,7 @@ impl ScreenshotManager {
 
     pub async fn start(&self) -> anyhow::Result<()> {
         log::info!("🔍 Attempting to detect displays...");
+
         let displays = match display_info::DisplayInfo::all() {
             Ok(displays) => {
                 log::info!("✅ Successfully detected {} displays", displays.len());
@@ -96,14 +147,24 @@ impl ScreenshotManager {
         tokio::spawn(async move {
             // Implement screen capture using screen-capture-kit
             loop {
-                // Check if ambient light is enabled before capturing screenshots
-                let ambient_light_enabled = {
+                // Check if ambient light is enabled and not in color calibration mode
+                let should_capture = {
                     let state_manager =
                         crate::ambient_light_state::AmbientLightStateManager::global().await;
-                    state_manager.is_enabled().await
+                    let ambient_light_enabled = state_manager.is_enabled().await;
+
+                    // Also check LED data send mode - don't capture during color calibration
+                    let led_sender = crate::led_data_sender::LedDataSender::global().await;
+                    let current_mode = led_sender.get_mode().await;
+                    let is_color_calibration = matches!(
+                        current_mode,
+                        crate::led_data_sender::DataSendMode::ColorCalibration
+                    );
+
+                    ambient_light_enabled && !is_color_calibration
                 };
 
-                if ambient_light_enabled {
+                if should_capture {
                     match Self::capture_display_screenshot(display_id, scale_factor).await {
                         Ok(screenshot) => {
                             let tx_for_send = tx.read().await;
@@ -144,13 +205,14 @@ impl ScreenshotManager {
                         }
                     }
                 } else {
-                    // If ambient light is disabled, sleep longer to reduce CPU usage
+                    // If ambient light is disabled or in color calibration mode, sleep longer to reduce CPU usage
                     sleep(Duration::from_millis(1000)).await;
                 }
 
-                // Sleep for a frame duration (5 FPS for much better CPU performance when enabled)
-                if ambient_light_enabled {
-                    sleep(Duration::from_millis(200)).await;
+                // Sleep for a frame duration when enabled
+                // Adjusted from 200ms (5 FPS) -> 33ms (~30 FPS) for smoother preview
+                if should_capture {
+                    sleep(Duration::from_millis(33)).await;
                 }
                 yield_now().await;
             }

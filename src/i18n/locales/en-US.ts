@@ -40,6 +40,7 @@ export const enUS: TranslationDict = {
     back: 'Back',
     clear: 'Clear',
     confirmUnsavedChanges: 'There are unsaved changes, are you sure you want to leave?',
+    noData: 'No data',
   },
   
   info: {
@@ -128,16 +129,10 @@ export const enUS: TranslationDict = {
     loadConfig: 'Load Configuration',
     stripSorting: 'LED Strip Sorting',
     realtimePreview: 'Real-time Preview',
-    sortingTip: 'Tip: Drag LED strip segments to adjust order, double-click to reverse direction',
+    sortingTip: 'Tip: LED strip real-time preview',
     displayConfiguration: 'Display Configuration',
     visualEditor: 'Visual Editor',
-    displayTip: 'Tip: Hover over displays for detailed information, use control panel below to adjust LED count',
-    ledCountControl: 'LED Count Control',
-    realtimeAdjustment: 'Real-time Adjustment',
-    decreaseLedCount: 'Decrease LED Count',
-    increaseLedCount: 'Increase LED Count',
-    display: 'Display',
-    controlTip: 'Tip: Click +/- buttons or input values directly to adjust LED count (Range: 0-1000)',
+    displayTip: 'Tip: Hover over displays for detailed information',
     // New config panel translations
     driver: 'Driver',
     sequence: 'Sequence',
@@ -259,7 +254,7 @@ export const enUS: TranslationDict = {
     // LED test form labels
     ledCount: 'LED Count',
     ledType: 'LED Type',
-    ledOffset: 'LED Offset',
+    ledOffset: 'Byte Offset',
     animationSpeed: 'Animation Speed (ms)',
     startTestButton: 'Start Test',
     // Hardware selection
