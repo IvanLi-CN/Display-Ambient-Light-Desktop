@@ -1,4 +1,4 @@
-import { Routes, Route, useLocation, useNavigate, A, Navigate } from '@solidjs/router';
+import { Route, useLocation, useNavigate, A, Navigate } from '@solidjs/router';
 import { LedStripConfiguration } from './components/led-strip-configuration/led-strip-configuration';
 import { SingleDisplayConfig } from './components/led-strip-configuration/single-display-config';
 import { WhiteBalance } from './components/white-balance/white-balance';
@@ -17,7 +17,7 @@ import { initializeThemeEffects } from './stores/theme.store';
 // Import user preferences store to ensure it's initialized
 import { userPreferencesStore } from './stores/user-preferences.store';
 
-function App() {
+function App(props: { children?: any }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [previousPath, setPreviousPath] = createSignal<string>('');
@@ -212,15 +212,8 @@ function App() {
 
       {/* Main Content - fills remaining height */}
       <main class="flex-1 container mx-auto px-2 sm:px-4 py-4 max-w-full overflow-x-auto min-h-0">
-        <Routes>
-          <Route path="/" element={<Navigate href="/info" />} />
-          <Route path="/info" component={InfoIndex} />
-          <Route path="/led-strips-configuration" component={LedStripConfiguration} />
-          <Route path="/led-strips-configuration/display/:displayId" component={SingleDisplayConfig} />
-          <Route path="/color-calibration" component={WhiteBalance} />
-          <Route path="/led-strip-test" element={<LedStripTest />} />
-          <Route path="/settings" component={Settings} />
-        </Routes>
+        {/* Routes are now handled by the Router component in index.tsx */}
+        {props.children}
       </main>
 
       {/* Status Bar - fixed at bottom */}

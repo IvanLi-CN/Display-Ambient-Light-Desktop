@@ -7,14 +7,14 @@ pre-commit:
     # Frontend linting and formatting
     frontend-lint:
       glob: "*.{ts,tsx,js,jsx}"
-      run: bun exec tsc --noEmit
+      run: bun run lint
       stage_fixed: true
 
-    # Frontend build check - catch ESM and other build issues early (temporarily disabled)
-    # frontend-build:
-    #   glob: "*.{ts,tsx,js,jsx,json,mjs,cjs}"
-    #   run: bun run build
-    #   stage_fixed: false
+    # Frontend build check - catch ESM and other build issues early
+    frontend-build:
+      glob: "*.{ts,tsx,js,jsx,json,mjs,cjs}"
+      run: bun run build
+      stage_fixed: false
 
     # Rust formatting check
     rust-fmt:
