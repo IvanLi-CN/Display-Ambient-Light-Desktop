@@ -132,20 +132,7 @@ export const DisplayView: Component<DisplayViewProps> = (props) => {
           colors={displayLedColors().get('Bottom')}
         />
 
-        {/* LED数量显示在右边 */}
-        <div class="row-start-2 col-start-4 flex flex-col justify-center items-start pl-2 text-xs text-base-content/60 space-y-1">
-          {ledStripConfigs().map((config) => (
-            <div class="flex items-center gap-1">
-              <div class={`w-2 h-2 rounded-sm ${
-                config.border === 'Top' ? 'bg-blue-400' :
-                config.border === 'Right' ? 'bg-red-400' :
-                config.border === 'Bottom' ? 'bg-orange-400' :
-                'bg-green-400'
-              }`} />
-              <span>{config.len}</span>
-            </div>
-          ))}
-        </div>
+
       </section>
     </>
   );
