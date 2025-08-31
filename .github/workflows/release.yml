@@ -190,16 +190,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          version: 10
+          bun-version: latest
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'pnpm'
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -218,7 +217,7 @@ jobs:
           workspaces: './src-tauri -> target'
 
       - name: Install frontend dependencies
-        run: pnpm install
+        run: bun install
 
       - name: Update version in configuration files
         shell: bash
@@ -237,7 +236,7 @@ jobs:
           echo "Updated version to: $VERSION"
 
       - name: Build frontend
-        run: pnpm build
+        run: bun run build
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0.5.22
