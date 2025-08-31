@@ -10,7 +10,7 @@ use tokio::{
 };
 
 use crate::{
-    ambient_light::{config, ConfigManager},
+    ambient_light::config,
     led_color::LedColor,
     led_data_sender::{DataSendMode, LedDataSender},
     led_status_manager::LedStatusManager,

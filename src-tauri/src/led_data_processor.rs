@@ -33,7 +33,7 @@ impl LedDataProcessor {
         led_colors: Vec<Vec<LedColor>>,
         strips: &[LedStripConfig],
         color_calibration: Option<&ColorCalibration>,
-        mode: DataSendMode,
+        _mode: DataSendMode,
         start_led_offset: usize,
     ) -> Result<Vec<u8>> {
         // 1. 获取颜色校准配置
@@ -51,6 +51,12 @@ impl LedDataProcessor {
         websocket_publisher
             .publish_led_sorted_colors_changed(&preview_rgb_bytes, start_led_offset)
             .await;
+
+        // 记录数据发送事件到频率计算器
+        let status_manager = crate::led_status_manager::LedStatusManager::global().await;
+        if let Err(e) = status_manager.record_data_send_event().await {
+            log::warn!("Failed to record data send event: {e}");
+        }
 
         // 3.1. 按灯带分组发布（替代旧的 LedColorsChanged 事件）
         Self::publish_led_strip_colors(&led_colors, strips, websocket_publisher).await;
@@ -79,7 +85,7 @@ impl LedDataProcessor {
         strips: &[LedStripConfigV2],
         display_registry: &DisplayRegistry,
         color_calibration: Option<&ColorCalibration>,
-        mode: DataSendMode,
+        _mode: DataSendMode,
         start_led_offset: usize,
     ) -> Result<Vec<u8>> {
         // 1. 获取颜色校准配置
@@ -97,6 +103,12 @@ impl LedDataProcessor {
         websocket_publisher
             .publish_led_sorted_colors_changed(&preview_rgb_bytes, start_led_offset)
             .await;
+
+        // 记录数据发送事件到频率计算器
+        let status_manager = crate::led_status_manager::LedStatusManager::global().await;
+        if let Err(e) = status_manager.record_data_send_event().await {
+            log::warn!("Failed to record data send event: {e}");
+        }
 
         // 3.1. 按灯带分组发布（替代旧的 LedColorsChanged 事件）- V2版本
         Self::publish_led_strip_colors_v2(
@@ -147,6 +159,13 @@ impl LedDataProcessor {
         websocket_publisher
             .publish_led_sorted_colors_changed(&preview_rgb_bytes, 0) // 测试模式偏移量为0
             .await;
+
+        // 记录数据发送事件到频率计算器
+        let status_manager = crate::led_status_manager::LedStatusManager::global().await;
+        if let Err(e) = status_manager.record_data_send_event().await {
+            log::warn!("Failed to record data send event: {e}");
+        }
+
         debug!("✅ Test LED preview data published successfully");
 
         // 3. 测试模式编码（无校准）

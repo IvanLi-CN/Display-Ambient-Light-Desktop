@@ -5,6 +5,7 @@ mod ambient_light;
 mod ambient_light_state;
 mod auto_start;
 mod display;
+mod frequency_calculator;
 mod http_server;
 mod language_manager;
 mod led_color;

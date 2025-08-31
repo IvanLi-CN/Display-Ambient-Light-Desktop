@@ -5,6 +5,7 @@ use tokio::sync::{watch, OnceCell, RwLock};
 
 use crate::{
     ambient_light::{BorderColors, LedStripConfig},
+    frequency_calculator::FrequencyCalculator,
     led_data_sender::DataSendMode,
     websocket_events::WebSocketEventPublisher,
 };
@@ -71,6 +72,8 @@ pub struct LedStatusManager {
     status_change_tx: watch::Sender<LedStatusStats>,
     /// 状态变更通知接收器
     status_change_rx: Arc<RwLock<watch::Receiver<LedStatusStats>>>,
+    /// 频率计算器
+    frequency_calculator: Arc<RwLock<FrequencyCalculator>>,
 }
 
 impl LedStatusManager {
@@ -92,6 +95,7 @@ impl LedStatusManager {
                     single_display_config_data: Arc::new(RwLock::new(None)),
                     status_change_tx,
                     status_change_rx: Arc::new(RwLock::new(status_change_rx)),
+                    frequency_calculator: Arc::new(RwLock::new(FrequencyCalculator::new())),
                 }
             })
             .await
@@ -235,10 +239,55 @@ impl LedStatusManager {
             status.last_updated = chrono::Utc::now();
         }
 
+        // 记录到频率计算器
+        self.record_data_send_event().await?;
+
         self.notify_status_changed().await?;
         debug!(
             "LED send stats updated: {packets_sent} packets, {bytes_sent} bytes, success: {success}"
         );
+        Ok(())
+    }
+
+    /// 记录数据发送事件到频率计算器
+    pub async fn record_data_send_event(&self) -> anyhow::Result<()> {
+        {
+            let mut freq_calc = self.frequency_calculator.write().await;
+            freq_calc.add_event();
+
+            // 添加调试日志
+            let debug_info = freq_calc.get_debug_info();
+            log::debug!("📊 {}", debug_info);
+        }
+
+        // 检查是否需要发送频率更新
+        if self.should_send_frequency_update().await {
+            self.notify_status_changed().await?;
+        }
+
+        Ok(())
+    }
+
+    /// 检查是否需要发送频率更新
+    async fn should_send_frequency_update(&self) -> bool {
+        let freq_calc = self.frequency_calculator.read().await;
+        freq_calc.should_send_update()
+    }
+
+    /// 获取当前计算的频率
+    pub async fn get_current_frequency(&self) -> f64 {
+        let freq_calc = self.frequency_calculator.read().await;
+        freq_calc.calculate_frequency()
+    }
+
+    /// 重置频率计算器（用于模式切换）
+    pub async fn reset_frequency_calculator(&self) -> anyhow::Result<()> {
+        {
+            let mut freq_calc = self.frequency_calculator.write().await;
+            freq_calc.reset();
+        }
+
+        debug!("Frequency calculator reset");
         Ok(())
     }
 
@@ -256,9 +305,20 @@ impl LedStatusManager {
             warn!("Failed to send status change notification: {e}");
         }
 
-        // 通过WebSocket广播状态变更
+        // 获取实际计算的频率
+        let calculated_frequency = self.get_current_frequency().await;
+
+        // 标记频率更新已发送
+        {
+            let mut freq_calc = self.frequency_calculator.write().await;
+            freq_calc.mark_update_sent();
+        }
+
+        // 通过WebSocket广播状态变更（使用实际频率）
         let websocket_publisher = WebSocketEventPublisher::global().await;
-        websocket_publisher.publish_led_status_changed().await;
+        websocket_publisher
+            .publish_led_status_changed_with_calculated_frequency(calculated_frequency)
+            .await;
 
         // 移除频繁的状态变更通知日志
 

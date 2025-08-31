@@ -182,6 +182,12 @@ impl LedDataSender {
 
         // 通过状态管理器更新状态
         let status_manager = LedStatusManager::global().await;
+
+        // 重置频率计算器（模式切换时）
+        if let Err(e) = status_manager.reset_frequency_calculator().await {
+            warn!("Failed to reset frequency calculator: {e}");
+        }
+
         if let Err(e) = status_manager.set_data_send_mode(mode).await {
             warn!("Failed to update LED status manager: {e}");
         }

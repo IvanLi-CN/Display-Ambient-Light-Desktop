@@ -77,3 +77,18 @@
 .ambient-control-toggle .toggle {
   margin-left: auto !important;
 }
+
+/* Frequency display styles */
+.frequency-display {
+  font-family: 'Monaco', 'Menlo', 'Consolas', 'SF Mono', monospace !important;
+  font-variant-numeric: tabular-nums;
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  min-width: 3.5rem;
+  text-align: right;
+}
+
+/* Ensure monospace font for frequency values */
+.font-mono {
+  font-family: 'Monaco', 'Menlo', 'Consolas', 'SF Mono', monospace !important;
+  font-variant-numeric: tabular-nums;
+}

@@ -98,7 +98,6 @@ impl WebSocketEventPublisher {
                     log::info!(
                         "✅ LED颜色变化事件（按物理顺序排列）已发送给 {subscriber_count} 个订阅者"
                     );
-                } else {
                 }
             }
             Err(e) => {
@@ -225,6 +224,62 @@ impl WebSocketEventPublisher {
             .await
         {
             Ok(_) => {}
+            Err(e) => {
+                log::warn!("发送LED状态变化事件失败: {e}");
+            }
+        }
+    }
+
+    /// 发布LED状态变化事件（使用计算的频率）
+    pub async fn publish_led_status_changed_with_calculated_frequency(
+        &self,
+        calculated_frequency: f64,
+    ) {
+        // 获取当前LED状态
+        let sender = crate::led_data_sender::LedDataSender::global().await;
+        let config_manager = crate::ambient_light::ConfigManagerV2::global().await;
+        let mode = sender.get_mode().await;
+
+        // 获取LED配置以计算总数量和数据长度
+        let configs = config_manager.get_config().await;
+        let total_led_count: u32 = configs.strips.iter().map(|strip| strip.len as u32).sum();
+
+        // 计算数据长度（每个LED 3字节 RGB 或 4字节 RGBW）
+        let data_length: u32 = configs
+            .strips
+            .iter()
+            .map(|strip| {
+                match strip.led_type {
+                    crate::ambient_light::LedType::WS2812B => strip.len as u32 * 3, // RGB
+                    crate::ambient_light::LedType::SK6812 => strip.len as u32 * 4,  // RGBW
+                }
+            })
+            .sum();
+
+        // 创建状态对象（使用实际计算的频率）
+        let status = serde_json::json!({
+            "mode": mode,
+            "frequency": calculated_frequency,
+            "data_length": data_length,
+            "total_led_count": total_led_count,
+            "test_mode_active": mode == DataSendMode::TestEffect,
+            "timestamp": chrono::Utc::now().to_rfc3339()
+        });
+
+        let message = WsMessage::LedStatusChanged { data: status };
+        match self
+            .ws_manager
+            .send_to_subscribers("LedStatusChanged", message)
+            .await
+        {
+            Ok(subscriber_count) => {
+                if subscriber_count > 0 {
+                    log::debug!(
+                        "✅ LED状态变化事件已发送给 {subscriber_count} 个订阅者，频率: {}Hz",
+                        calculated_frequency
+                    );
+                }
+            }
             Err(e) => {
                 log::warn!("发送LED状态变化事件失败: {e}");
             }

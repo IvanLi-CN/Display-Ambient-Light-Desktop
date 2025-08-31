@@ -35,58 +35,45 @@ export function StatusBar(props: StatusBarProps) {
   const [lastMessageTime, setLastMessageTime] = createSignal<Date | null>(null);
   const [ledPreviewEnabled, setLedPreviewEnabled] = createSignal(false);
 
-  // 频率统计（滑动窗口 + EMA 平滑 + 空闲超时）
-  const frequencyWindowSize = 20;
-  const idleTimeoutMs = 3000; // 空闲超时：3s
-  const emaAlpha = 0.2; // EMA 平滑因子
-  const minWindowDurationMs = 500; // 计算窗口至少覆盖500ms以避免噪声
-  const timestampHistory: number[] = [];
-  let emaFrequency = 0; // 指数滑动平均频率
-  let lastReceiveMs = 0;
-  let idleResetTimer: ReturnType<typeof setTimeout> | null = null;
+  // 频率显示动画相关
+  const [displayedFrequency, setDisplayedFrequency] = createSignal(0);
+  const [targetFrequency, setTargetFrequency] = createSignal(0);
+  let animationId: number | null = null;
 
-  const computeWindowFrequencyHz = () => {
-    if (timestampHistory.length < 2) return 0;
-    const first = timestampHistory[0];
-    const last = timestampHistory[timestampHistory.length - 1];
-    const durationMs = last - first;
-    if (durationMs <= 0 || durationMs < minWindowDurationMs) return 0;
-    const intervals = timestampHistory.length - 1;
-    const hz = (intervals * 1000) / durationMs;
-    return Math.round(hz * 10) / 10; // 保留1位小数
-  };
+  // 平滑动画函数（缓入缓出）
+  const animateFrequencyChange = (newTarget: number) => {
+    if (animationId) cancelAnimationFrame(animationId);
 
-  const applyEma = (value: number) => {
-    if (emaFrequency === 0) {
-      emaFrequency = value; // 初次赋值
-    } else {
-      emaFrequency = Math.round((emaAlpha * value + (1 - emaAlpha) * emaFrequency) * 10) / 10;
-    }
-    return emaFrequency;
-  };
+    const startValue = displayedFrequency();
+    const startTime = Date.now();
+    const duration = 500; // 500ms动画，与后端更新频率同步
 
-  const resetFrequencyStats = () => {
-    timestampHistory.length = 0;
-    emaFrequency = 0;
-    lastReceiveMs = 0;
-    if (idleResetTimer) {
-      clearTimeout(idleResetTimer);
-      idleResetTimer = null;
-    }
-    // 立即更新 UI 的频率为 0
-    const current = statusData();
-    if (current) setStatusData({ ...current, frequency: 0 });
-  };
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
 
-  const scheduleIdleReset = () => {
-    if (idleResetTimer) clearTimeout(idleResetTimer);
-    idleResetTimer = setTimeout(() => {
-      // 如果超过 idleTimeoutMs 未收到新消息，则重置频率
-      const now = Date.now();
-      if (lastReceiveMs && now - lastReceiveMs >= idleTimeoutMs) {
-        resetFrequencyStats();
+      // 缓入缓出函数 (ease-in-out)
+      const easeInOut = progress < 0.5
+        ? 2 * progress * progress
+        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+      const currentValue = startValue + (newTarget - startValue) * easeInOut;
+      setDisplayedFrequency(parseFloat(currentValue.toFixed(1)));
+
+      if (progress < 1) {
+        animationId = requestAnimationFrame(animate);
       }
-    }, idleTimeoutMs + 50);
+    };
+
+    animate();
+  };
+
+  // 更新频率显示（带动画）
+  const updateFrequencyDisplay = (newFrequency: number) => {
+    if (newFrequency !== targetFrequency()) {
+      setTargetFrequency(newFrequency);
+      animateFrequencyChange(newFrequency);
+    }
   };
 
   // WebSocket连接状态监听
@@ -137,31 +124,18 @@ export function StatusBar(props: StatusBarProps) {
           // api-adapter.ts 已经提取了 message.data，所以这里直接使用 statusData
           if (statusData && typeof statusData === 'object') {
             try {
-              // 如果模式为 None，重置频率并直接更新 UI
-              const mode = (statusData.data_send_mode || statusData.mode) as DataSendMode | undefined;
-              if (mode === 'None') {
-                resetFrequencyStats();
-              }
-
-              // 更新本地频率统计
-              const now = Date.now();
-              lastReceiveMs = now;
-              timestampHistory.push(now);
-              if (timestampHistory.length > frequencyWindowSize) {
-                timestampHistory.shift();
-              }
-
-              // 计算窗口频率并应用 EMA 平滑
-              const windowHz = computeWindowFrequencyHz();
-              const realtimeHz = applyEma(windowHz);
-              scheduleIdleReset();
-
               const statusBarData = convertToStatusBarData(statusData, connected(), t);
-              const updated: StatusBarData = { ...statusBarData, frequency: realtimeHz };
-              // 移除频繁的状态日志
+
+              // 使用后端计算的频率，并应用平滑动画
+              const backendFrequency = statusData.frequency || 0;
+              updateFrequencyDisplay(backendFrequency);
+
+              // 更新状态数据（使用显示中的频率值以保持动画连续性）
+              const updated: StatusBarData = { ...statusBarData, frequency: displayedFrequency() };
               setStatusData(updated);
               setLastMessageTime(new Date());
-              // 移除频繁的状态更新日志
+
+              console.log(`📊 Received frequency update: ${backendFrequency}Hz`);
             } catch (error) {
               console.error('Error converting status data:', error);
               if (import.meta.env.DEV) {
@@ -181,9 +155,10 @@ export function StatusBar(props: StatusBarProps) {
           console.log('🔌 Status bar connection status changed:', isConnected);
           setConnected(isConnected);
 
-          // 断开连接时重置频率统计
+          // 断开连接时重置频率显示
           if (!isConnected) {
-            resetFrequencyStats();
+            setDisplayedFrequency(0);
+            setTargetFrequency(0);
           }
 
           // 更新现有状态数据的连接状态
@@ -194,28 +169,8 @@ export function StatusBar(props: StatusBarProps) {
         }
       );
 
-      // 监听 LED 排序颜色变化事件（也可触发频率统计，避免仅依赖 LedStatusChanged 的发送频率）
-      try {
-        unsubscribeSortedColors = await adaptiveApi.onEvent<any>(
-          'LedSortedColorsChanged',
-          () => {
-            const now = Date.now();
-            lastReceiveMs = now;
-            timestampHistory.push(now);
-            if (timestampHistory.length > frequencyWindowSize) timestampHistory.shift();
-            const windowHz = computeWindowFrequencyHz();
-            const realtimeHz = applyEma(windowHz);
-            scheduleIdleReset();
-
-            const current = statusData();
-            if (current) {
-              setStatusData({ ...current, frequency: realtimeHz });
-            }
-          }
-        );
-      } catch (error) {
-        console.error('❌ Failed to listen LedSortedColorsChanged for frequency:', error);
-      }
+      // 注意：不再监听 LedSortedColorsChanged 用于频率计算
+      // 频率现在由后端通过 LedStatusChanged 事件提供
 
       // 监听LED预览状态变化事件
       unsubscribeLedPreview = await adaptiveApi.onEvent<LedPreviewStateChangedEvent>(
@@ -324,8 +279,8 @@ export function StatusBar(props: StatusBarProps) {
 
 
               {/* 频率 */}
-              <Show when={data().frequency > 0}>
-                <span class="text-base-content/80 flex-shrink-0">{data().frequency}Hz</span>
+              <Show when={displayedFrequency() > 0}>
+                <span class="text-base-content/80 flex-shrink-0 font-mono">{displayedFrequency().toFixed(1)}Hz</span>
               </Show>
 
               {/* LED数量 + 时间（无时间则仅显示无数据） */}
@@ -421,9 +376,9 @@ export function StatusBar(props: StatusBarProps) {
 
 
               {/* 频率 */}
-              <Show when={data().frequency > 0}>
-                <span class="text-sm text-base-content/80 flex-shrink-0">
-                  {data().frequency}Hz
+              <Show when={displayedFrequency() > 0}>
+                <span class="text-sm text-base-content/80 flex-shrink-0 font-mono">
+                  {displayedFrequency().toFixed(1)}Hz
                 </span>
               </Show>
 
