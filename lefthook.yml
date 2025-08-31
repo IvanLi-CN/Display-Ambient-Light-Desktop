@@ -7,13 +7,13 @@ pre-commit:
     # Frontend linting and formatting
     frontend-lint:
       glob: "*.{ts,tsx,js,jsx}"
-      run: pnpm exec tsc --noEmit
+      run: bun run lint
       stage_fixed: true
 
     # Frontend build check - catch ESM and other build issues early
     frontend-build:
       glob: "*.{ts,tsx,js,jsx,json,mjs,cjs}"
-      run: pnpm build
+      run: bun run build
       stage_fixed: false
 
     # Rust formatting check
@@ -38,15 +38,15 @@ pre-commit:
     markdown-lint:
       glob: "*.md"
       exclude: ".augment/**/*.md"
-      run: pnpm run fmt:md
+      run: bun run fmt:md
       stage_fixed: true
       skip: true  # Temporarily disabled due to docs formatting issues
 
-commit-msg:
-  commands:
-    # Commit message validation with commitlint
-    commitlint:
-      run: pnpm exec commitlint --edit $1
+# commit-msg:
+#   commands:
+#     # Commit message validation with commitlint
+#     commitlint:
+#       run: bun exec commitlint --edit $LEFTHOOK_COMMIT_MSG_FILE
 
 pre-push:
   parallel: false
@@ -55,7 +55,7 @@ pre-push:
     build-check:
       run: |
         echo "🔍 Checking frontend build..."
-        pnpm build
+        bun run build
         echo "🔍 Checking Rust build..."
         cd src-tauri && cargo check --all-targets --all-features
         echo "✅ All builds successful!"

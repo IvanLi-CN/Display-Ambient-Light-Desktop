@@ -53,7 +53,7 @@ A desktop application built with Tauri 2.0 for ambient light control, supporting
    source ~/.cargo/env
    ```
 
-2. **Install Node.js and pnpm**
+2. **Install Node.js and Bun**
 
    ```bash
    # Install Node.js 22 LTS (recommended using nvm)
@@ -61,8 +61,8 @@ A desktop application built with Tauri 2.0 for ambient light control, supporting
    nvm install 22
    nvm use 22
 
-   # Install pnpm 10+
-   npm install -g pnpm@latest
+   # Install Bun
+   curl -fsSL https://bun.sh/install | bash
    ```
 
 3. **Install Tauri CLI**
@@ -83,20 +83,20 @@ A desktop application built with Tauri 2.0 for ambient light control, supporting
 2. **Install dependencies**
 
    ```bash
-   pnpm install
+   bun install
    ```
 
 3. **Start development server**
 
    ```bash
-   pnpm tauri dev
+   bun tauri dev
    ```
 
 ### Production Build
 
 ```bash
 # Build the application
-pnpm tauri build
+bun tauri build
 
 # Build artifacts are located in src-tauri/target/release/bundle/
 ```
