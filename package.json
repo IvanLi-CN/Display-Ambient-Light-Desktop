@@ -1,5 +1,5 @@
 {
-  "name": "display-ambient-light",
+  "name": "ambient-light-control",
   "version": "2.0.0-alpha",
   "description": "A desktop application for controlling ambient lighting based on screen content, supporting WS2812B and SK6812 LED strips with real-time color synchronization.",
   "author": "Ivan Li",
