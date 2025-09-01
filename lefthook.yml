@@ -42,11 +42,11 @@ pre-commit:
       stage_fixed: true
       skip: true  # Temporarily disabled due to docs formatting issues
 
-# commit-msg:
-#   commands:
-#     # Commit message validation with commitlint
-#     commitlint:
-#       run: bun exec commitlint --edit $LEFTHOOK_COMMIT_MSG_FILE
+commit-msg:
+  commands:
+    # Commit message validation with commitlint
+    commitlint:
+      run: bunx commitlint --edit {0}
 
 pre-push:
   parallel: false
