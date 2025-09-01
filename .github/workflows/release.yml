@@ -91,16 +91,18 @@ jobs:
         id: increment-version
         if: github.event.inputs.version_mode == 'patch' || github.event.inputs.version_mode == 'minor' || github.event.inputs.version_mode == 'major'
         run: |
-          # Get the latest tag
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          echo "Latest tag: $LATEST_TAG"
+          # Get the latest semantic version tag (v*.*.* format only)
+          LATEST_SEMVER_TAG=$(git tag -l "v*.*.*" | sort -V | tail -1)
 
-          # Remove 'v' prefix and extract version components
-          CURRENT_VERSION="${LATEST_TAG#v}"
-
-          # Handle case where no previous tags exist
-          if [[ "$CURRENT_VERSION" == "v0.0.0" ]]; then
-            CURRENT_VERSION="0.0.0"
+          if [[ -z "$LATEST_SEMVER_TAG" ]]; then
+            # If no semantic version tags found, use package.json version as base
+            CURRENT_VERSION=$(node -p "require('./package.json').version")
+            echo "No semantic version tags found, using package.json version: $CURRENT_VERSION"
+          else
+            # Use the latest semantic version tag
+            CURRENT_VERSION="${LATEST_SEMVER_TAG#v}"
+            echo "Found latest semantic version tag: $LATEST_SEMVER_TAG"
+            echo "Current version: $CURRENT_VERSION"
           fi
 
           # Extract major.minor.patch (ignore prerelease/build metadata)
