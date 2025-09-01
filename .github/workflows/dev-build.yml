@@ -81,7 +81,7 @@ jobs:
         shell: bash
         run: |
           # Update package.json version
-          npm version ${{ steps.version.outputs.version }} --no-git-tag-version
+          sed -i '' "s/\"version\": \".*\"/\"version\": \"${{ steps.version.outputs.version }}\"/" package.json
 
           # Update Cargo.toml version (macOS)
           sed -i '' 's/^version = ".*"/version = "${{ steps.version.outputs.version }}"/' src-tauri/Cargo.toml

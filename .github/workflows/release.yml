@@ -53,7 +53,7 @@ jobs:
 
       - name: Determine version using semantic-version action
         id: version
-        if: github.event.inputs.version_mode != 'manual' && github.event.inputs.version_mode != 'semantic-auto'
+        if: github.event.inputs.version_mode == 'semantic-auto'
         uses: paulhatch/semantic-version@v5.4.0
         with:
           tag_prefix: "v"
@@ -225,7 +225,7 @@ jobs:
           VERSION="${{ needs.determine-version.outputs.version }}"
 
           # Update package.json version
-          npm version "$VERSION" --no-git-tag-version
+          sed -i '' "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" package.json
 
           # Update Cargo.toml version (macOS)
           sed -i '' "s/^version = \".*\"/version = \"$VERSION\"/" src-tauri/Cargo.toml
