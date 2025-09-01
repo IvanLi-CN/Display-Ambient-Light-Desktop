@@ -309,6 +309,14 @@ export class ApiAdapter {
     );
   }
 
+  public async setAmbientLightState(enabled: boolean): Promise<void> {
+    return this.call(
+      'set_ambient_light_enabled',
+      () => DeviceApiService.setAmbientLightState(enabled),
+      { enabled }
+    );
+  }
+
   // ===== 应用信息相关API =====
 
   public async getAppVersion(): Promise<any> {
@@ -620,6 +628,7 @@ export const adaptiveApi = {
   // 设备API
   getBoards: () => apiAdapter.getBoards(),
   getAmbientLightState: () => apiAdapter.getAmbientLightState(),
+  setAmbientLightState: (enabled: boolean) => apiAdapter.setAmbientLightState(enabled),
   
   // 应用信息API
   getAppVersion: () => apiAdapter.getAppVersion(),

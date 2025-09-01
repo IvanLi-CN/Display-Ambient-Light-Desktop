@@ -1,7 +1,6 @@
 import { createSignal, createEffect, onMount, onCleanup } from 'solid-js';
-import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
 import { useLanguage } from '../../i18n/index';
+import { adaptiveApi } from '../../services/api-adapter';
 
 interface AmbientLightState {
   enabled: boolean;
@@ -16,7 +15,7 @@ export const AmbientLightControl = () => {
   // Load ambient light state on mount
   onMount(async () => {
     try {
-      const state = await invoke<AmbientLightState>('get_ambient_light_state');
+      const state = await adaptiveApi.getAmbientLightState();
       setAmbientLightEnabled(state.enabled);
     } catch (error) {
       console.error('Failed to load ambient light state:', error);
@@ -25,14 +24,14 @@ export const AmbientLightControl = () => {
 
   // Listen for ambient light state changes from tray menu
   createEffect(() => {
-    const unlisten = listen<AmbientLightState>('ambient_light_state_changed', (event) => {
+    const unlisten = adaptiveApi.onEvent<AmbientLightState>('AmbientLightStateChanged', (data) => {
       if (import.meta.env.DEV) {
-        console.log('Ambient light state changed from tray:', event.payload);
+        console.log('Ambient light state changed from tray:', data);
       }
-      setAmbientLightEnabled(event.payload.enabled);
+      setAmbientLightEnabled(data.enabled);
 
       // Show notification message
-      showMessage('success', event.payload.enabled ? t('ambientLight.statusEnabled') : t('ambientLight.statusDisabled'));
+      showMessage('success', data.enabled ? t('ambientLight.statusEnabled') : t('ambientLight.statusDisabled'));
     });
 
     onCleanup(() => {
@@ -45,12 +44,10 @@ export const AmbientLightControl = () => {
     setLoading(true);
     try {
       const newState = !ambientLightEnabled();
-      await invoke('set_ambient_light_enabled', { enabled: newState });
+      await adaptiveApi.setAmbientLightState(newState);
       setAmbientLightEnabled(newState);
 
-      // Update tray menu to reflect new state
-      await invoke('update_tray_menu');
-
+      // Tray menu will be updated automatically by the backend
       showMessage('success', newState ? t('ambientLight.statusEnabled') : t('ambientLight.statusDisabled'));
     } catch (error) {
       console.error('Failed to toggle ambient light:', error);

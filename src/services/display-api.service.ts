@@ -138,6 +138,14 @@ export class DeviceApiService {
   static async getAmbientLightState(): Promise<any> {
     return api.get('/api/v1/device/ambient-light-state');
   }
+
+  /**
+   * 设置环境光状态
+   * 替代: invoke('set_ambient_light_enabled', { enabled })
+   */
+  static async setAmbientLightState(enabled: boolean): Promise<void> {
+    return api.put('/api/v1/device/ambient-light-state', { enabled });
+  }
 }
 
 /**
