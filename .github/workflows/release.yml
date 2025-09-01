@@ -40,8 +40,8 @@ jobs:
   determine-version:
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.version.outputs.version }}
-      version_tag: ${{ steps.version.outputs.version_tag }}
+      version: ${{ steps.final-version.outputs.version }}
+      version_tag: ${{ steps.final-version.outputs.version_tag }}
       is_prerelease: ${{ steps.check-prerelease.outputs.is_prerelease }}
       should_release: ${{ steps.check-release.outputs.should_release }}
 
