@@ -96,6 +96,7 @@ jobs:
         uses: tauri-apps/tauri-action@v0.5.22
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_SIGNING_IDENTITY: "-"
         with:
           args: ${{ matrix.args }}
           includeDebug: false

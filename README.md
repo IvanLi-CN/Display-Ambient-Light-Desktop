@@ -42,7 +42,39 @@ A desktop application built with Tauri 2.0 for ambient light control, supporting
 - **Graphics**: Hardware-accelerated graphics card
 - **Network**: For device discovery and communication
 
-## 🚀 Quick Start
+## 📦 Installation
+
+### Download Pre-built Binaries
+
+1. Go to the [Releases page](https://github.com/IvanLi-CN/Display-Ambient-Light-Desktop/releases)
+2. Download the latest `.dmg` file for macOS
+
+### macOS Installation Notes
+
+⚠️ **Important**: This application uses ad-hoc code signing and will show a security warning on first launch.
+
+**First-time installation:**
+
+1. Download and open the `.dmg` file
+2. Drag the app to your Applications folder
+3. **Do NOT double-click to open** - this will show an error
+4. Instead, **right-click** on the app and select **"Open"**
+5. Click **"Open"** in the security dialog that appears
+6. The app will now launch normally
+
+**Subsequent launches:**
+
+- You can now double-click the app normally
+- No more security warnings will appear
+
+**Alternative method** (if the above doesn't work):
+
+```bash
+# Remove quarantine attribute (run in Terminal)
+xattr -d com.apple.quarantine /Applications/Ambient\ Light\ Control.app
+```
+
+## 🚀 Development Setup
 
 ### Prerequisites
 

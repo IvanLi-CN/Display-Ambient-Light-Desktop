@@ -40,7 +40,8 @@
     ],
     "targets": "all",
     "macOS": {
-      "minimumSystemVersion": "13"
+      "minimumSystemVersion": "13",
+      "signingIdentity": "-"
     }
   },
   "plugins": {
