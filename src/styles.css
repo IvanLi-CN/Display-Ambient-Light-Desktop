@@ -67,6 +67,15 @@
   flex-shrink: 0 !important;
 }
 
+/* Custom symmetric grid for color calibration */
+.color-test-grid {
+  display: grid;
+  grid-template-columns: 76px 1fr 1fr 1fr 1fr 1fr 1fr 76px;
+  grid-template-rows: 76px 1fr 1fr 1fr 1fr 1fr 1fr 76px;
+  height: 100%;
+  width: 100%;
+}
+
 /* Specific styles for ambient light control */
 .ambient-control-toggle {
   display: flex !important;

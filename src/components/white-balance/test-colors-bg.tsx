@@ -59,7 +59,7 @@ export const TestColorsBg: Component = () => {
   return (
     <>
       <section
-        class="grid grid-cols-[8] grid-rows-[8] h-full w-full"
+        class="color-test-grid"
         classList={{
           hidden: singleColor() !== null,
         }}
@@ -94,7 +94,7 @@ export const TestColorsBg: Component = () => {
         <ColorItem color="#ffff00" position={[8, 7]} onClick={handleColorClick} />
       </section>
       <section
-        class="grid grid-cols-[8] grid-rows-[8] h-full w-full"
+        class="color-test-grid"
         classList={{
           hidden: singleColor() === null,
         }}
@@ -107,8 +107,8 @@ export const TestColorsBg: Component = () => {
         />
         <ColorItem
           color={singleColor()!}
-          position={[8, 2]}
-          size={[1, 7]}
+          position={[8, 1]}
+          size={[1, 8]}
           onClick={handleClearColor}
         />
         <ColorItem
@@ -120,7 +120,7 @@ export const TestColorsBg: Component = () => {
         <ColorItem
           color={singleColor()!}
           position={[1, 8]}
-          size={[7, 1]}
+          size={[8, 1]}
           onClick={handleClearColor}
         />
       </section>
