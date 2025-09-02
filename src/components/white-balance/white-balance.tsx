@@ -10,6 +10,7 @@ import transparentBg from '../../assets/transparent-grid-background.svg?url';
 import { useLanguage } from '../../i18n/index';
 import { adaptiveApi } from '../../services/api-adapter';
 import { colorCalibrationService } from '../../services/color-calibration.service';
+import { fullscreenManager } from '../../utils/fullscreen.utils';
 
 const Value: Component<{ value: number }> = (props) => {
   return (
@@ -28,11 +29,16 @@ export const WhiteBalance = () => {
 
   // 初始化全屏状态检测
   createEffect(() => {
-    const checkInitialFullscreenStatus = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
+    // 设置初始状态
+    setIsFullscreen(fullscreenManager.getCurrentState());
 
-    checkInitialFullscreenStatus();
+    // 监听全屏状态变化
+    const removeListener = fullscreenManager.addStateListener((state) => {
+      setIsFullscreen(state);
+    });
+
+    // 清理监听器
+    onCleanup(removeListener);
   });
 
   // 组件卸载时禁用颜色校准模式
@@ -100,7 +106,7 @@ export const WhiteBalance = () => {
     }
   });
 
-  // 监听ESC键和窗口全屏状态变化
+  // 监听ESC键退出全屏
   createEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isFullscreen()) {
@@ -108,25 +114,10 @@ export const WhiteBalance = () => {
       }
     };
 
-    const checkFullscreenStatus = () => {
-      const currentFullscreen = !!document.fullscreenElement;
-      if (currentFullscreen !== isFullscreen()) {
-        setIsFullscreen(currentFullscreen);
-        // 退出全屏时重置面板位置
-        if (!currentFullscreen) {
-          setPanelPosition({ x: 0, y: 0 });
-        }
-      }
-    };
-
-    // 定期检查全屏状态
-    const intervalId = setInterval(checkFullscreenStatus, 100);
-
     document.addEventListener('keydown', handleKeyDown);
 
     onCleanup(() => {
       document.removeEventListener('keydown', handleKeyDown);
-      clearInterval(intervalId);
     });
   });
 
@@ -173,19 +164,19 @@ export const WhiteBalance = () => {
 
   const toggleFullscreen = async () => {
     try {
-      if (!document.fullscreenElement) {
-        // 进入全屏
-        await document.documentElement.requestFullscreen();
-        setIsFullscreen(true);
+      const result = await fullscreenManager.toggleFullscreen();
+
+      if (result.error) {
+        console.warn('全屏操作失败:', result.error);
       } else {
-        // 退出全屏
-        await document.exitFullscreen();
-        setIsFullscreen(false);
+        console.log(`🖥️ 全屏状态切换: ${result.isFullscreen}`);
+
         // 退出全屏时重置面板位置
-        setPanelPosition({ x: 0, y: 0 });
+        if (!result.isFullscreen) {
+          setPanelPosition({ x: 0, y: 0 });
+        }
       }
     } catch (error) {
-      // Silently handle fullscreen error
       console.warn('全屏操作失败:', error);
     }
   };
