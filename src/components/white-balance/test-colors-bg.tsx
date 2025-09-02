@@ -1,4 +1,4 @@
-import { Component, createSignal } from 'solid-js';
+import { Component, createSignal, Show } from 'solid-js';
 import { colorCalibrationService } from '../../services/color-calibration.service';
 
 const ColorItem: Component<{
@@ -93,37 +93,36 @@ export const TestColorsBg: Component = () => {
         <ColorItem color="#00ff00" position={[8, 6]} onClick={handleColorClick} />
         <ColorItem color="#ffff00" position={[8, 7]} onClick={handleColorClick} />
       </section>
-      <section
-        class="color-test-grid"
-        classList={{
-          hidden: singleColor() === null,
-        }}
-      >
-        <ColorItem
-          color={singleColor()!}
-          position={[1, 1]}
-          size={[1, 7]}
-          onClick={handleClearColor}
-        />
-        <ColorItem
-          color={singleColor()!}
-          position={[8, 1]}
-          size={[1, 8]}
-          onClick={handleClearColor}
-        />
-        <ColorItem
-          color={singleColor()!}
-          position={[2, 1]}
-          size={[7, 1]}
-          onClick={handleClearColor}
-        />
-        <ColorItem
-          color={singleColor()!}
-          position={[1, 8]}
-          size={[8, 1]}
-          onClick={handleClearColor}
-        />
-      </section>
+      <Show when={singleColor()}>
+        {(color) => (
+          <section class="color-test-grid">
+            <ColorItem
+              color={color()}
+              position={[1, 1]}
+              size={[1, 7]}
+              onClick={handleClearColor}
+            />
+            <ColorItem
+              color={color()}
+              position={[8, 1]}
+              size={[1, 8]}
+              onClick={handleClearColor}
+            />
+            <ColorItem
+              color={color()}
+              position={[2, 1]}
+              size={[7, 1]}
+              onClick={handleClearColor}
+            />
+            <ColorItem
+              color={color()}
+              position={[1, 8]}
+              size={[8, 1]}
+              onClick={handleClearColor}
+            />
+          </section>
+        )}
+      </Show>
     </>
   );
 };

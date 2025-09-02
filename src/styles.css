@@ -76,6 +76,11 @@
   width: 100%;
 }
 
+/* Ensure hidden class works with color-test-grid */
+.color-test-grid.hidden {
+  display: none !important;
+}
+
 /* Specific styles for ambient light control */
 .ambient-control-toggle {
   display: flex !important;
