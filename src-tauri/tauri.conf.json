@@ -27,11 +27,7 @@
         "width": 1400,
         "height": 1000
       }
-    ],
-    "trayIcon": {
-      "iconPath": "icons/32x32.png",
-      "iconAsTemplate": false
-    }
+    ]
   },
   "bundle": {
     "active": true,
