@@ -12,7 +12,7 @@
 ## Build, Test, and Development Commands
 
 - Setup: `bun install` (Node ≥ 22, Bun ≥ 1).
-- Frontend dev (Vite): `bun run dev` → <http://localhost:5173>
+- Frontend dev (Vite): `bun run dev` → <http://localhost:24100>
 - Desktop dev (Tauri): `bunx tauri dev`
 - Browser split dev (FE+BE): `bun run dev:browser`
 - Frontend build/preview: `bun run build`, `bun run serve`

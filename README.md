@@ -124,6 +124,14 @@ xattr -d com.apple.quarantine /Applications/Ambient\ Light\ Control.app
    bun tauri dev
    ```
 
+   - Frontend-only development (Vite):
+
+     ```bash
+     bun run dev
+     ```
+
+     Server: <http://localhost:24100> (`strictPort=true`)
+
 ### Production Build
 
 ```bash
