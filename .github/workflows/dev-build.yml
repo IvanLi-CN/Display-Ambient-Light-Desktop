@@ -12,6 +12,10 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
 
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   build:
     outputs:
@@ -52,10 +56,14 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Cache Bun packages
+        uses: actions/cache@v4
         with:
-          node-version: '22'
+          path: |
+            ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -63,19 +71,16 @@ jobs:
           targets: ${{ matrix.target }}
           components: rustfmt, clippy
 
-      - name: Install additional Rust targets for macOS universal build
-        shell: bash
-        run: |
-          rustup target add aarch64-apple-darwin
-          rustup target add x86_64-apple-darwin
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
           workspaces: './src-tauri -> target'
+          save-if: 'always'
+          cache-all-crates: true
 
       - name: Install frontend dependencies
-        run: bun install
+        run: bun install --no-progress
 
       - name: Update version in configuration files
         shell: bash
