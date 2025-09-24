@@ -121,12 +121,14 @@ impl LedColorsPublisher {
                     .cloned()
                     .collect();
 
-                let colors_by_strips = screenshot
+                let mut colors_by_strips = screenshot
                     .get_colors_by_led_configs(&current_display_strips)
                     .await;
 
+                Self::apply_reversal_to_colors(&current_display_strips, &mut colors_by_strips);
+
                 // 将二维颜色数组展平为一维数组，保持与旧API的兼容性
-                let colors: Vec<LedColor> = colors_by_strips.into_iter().flatten().collect();
+                let colors: Vec<LedColor> = colors_by_strips.iter().flatten().copied().collect();
 
                 let colors_copy = colors.clone();
 
@@ -186,6 +188,20 @@ impl LedColorsPublisher {
                 };
             }
         });
+    }
+
+    fn apply_reversal_to_colors(strips: &[LedStripConfig], colors_by_strips: &mut [Vec<LedColor>]) {
+        if strips.len() != colors_by_strips.len() {
+            log::warn!(
+                "apply_reversal_to_colors: strip count {} mismatches color groups {}",
+                strips.len(),
+                colors_by_strips.len()
+            );
+        }
+
+        for (strip, colors) in strips.iter().zip(colors_by_strips.iter_mut()) {
+            strip.apply_reversal(colors);
+        }
     }
 
     fn start_all_colors_worker(
@@ -1896,6 +1912,45 @@ mod tests {
             led_offset += strip_len;
         }
         Ok(())
+    }
+
+    #[test]
+    fn apply_reversal_to_colors_reorders_each_strip() {
+        let strips = vec![
+            LedStripConfig {
+                index: 0,
+                border: Border::Top,
+                display_id: 1,
+                len: 2,
+                led_type: LedType::WS2812B,
+                reversed: false,
+            },
+            LedStripConfig {
+                index: 1,
+                border: Border::Bottom,
+                display_id: 1,
+                len: 3,
+                led_type: LedType::WS2812B,
+                reversed: true,
+            },
+        ];
+
+        let mut colors_by_strips = vec![
+            vec![LedColor::new(1, 0, 0), LedColor::new(2, 0, 0)],
+            vec![
+                LedColor::new(3, 0, 0),
+                LedColor::new(4, 0, 0),
+                LedColor::new(5, 0, 0),
+            ],
+        ];
+
+        super::LedColorsPublisher::apply_reversal_to_colors(&strips, &mut colors_by_strips);
+
+        let first_strip: Vec<u8> = colors_by_strips[0].iter().map(|c| c.get_rgb()[0]).collect();
+        assert_eq!(first_strip, vec![1, 2]);
+
+        let second_strip: Vec<u8> = colors_by_strips[1].iter().map(|c| c.get_rgb()[0]).collect();
+        assert_eq!(second_strip, vec![5, 4, 3]);
     }
 
     #[tokio::test]

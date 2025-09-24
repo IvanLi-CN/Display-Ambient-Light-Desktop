@@ -114,7 +114,23 @@ pub async fn get_display_colors(
         // 如果提供了LED配置，使用它；否则使用默认配置
         let colors = if let Some(led_configs_str) = query.led_configs {
             match serde_json::from_str::<Vec<LedStripConfig>>(&led_configs_str) {
-                Ok(led_configs) => screenshot.get_colors_by_led_configs(&led_configs).await,
+                Ok(led_configs) => {
+                    let mut colors = screenshot.get_colors_by_led_configs(&led_configs).await;
+
+                    if colors.len() != led_configs.len() {
+                        log::warn!(
+                            "display colors request: strip count {} mismatches sampled groups {}",
+                            led_configs.len(),
+                            colors.len()
+                        );
+                    }
+
+                    for (strip, color_group) in led_configs.iter().zip(colors.iter_mut()) {
+                        strip.apply_reversal(color_group);
+                    }
+
+                    colors
+                }
                 Err(e) => {
                     log::error!("Failed to parse LED configs: {e}");
                     return Err(StatusCode::BAD_REQUEST);

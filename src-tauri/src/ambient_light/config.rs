@@ -2,7 +2,7 @@ use std::env::current_dir;
 
 use serde::{Deserialize, Serialize};
 
-use crate::screenshot::LedSamplePoints;
+use crate::{led_color::LedColor, screenshot::LedSamplePoints};
 
 const CONFIG_FILE_NAME: &str = "cc.ivanli.ambient_light/led_strip_config.toml";
 
@@ -62,6 +62,13 @@ impl LedStripConfig {
             len: 0, // Default to 0 length
             led_type: LedType::WS2812B,
             reversed: false,
+        }
+    }
+
+    /// 依据 `reversed` 设置调整灯带颜色顺序，使索引0始终代表物理起点
+    pub fn apply_reversal(&self, colors: &mut Vec<LedColor>) {
+        if self.reversed {
+            colors.reverse();
         }
     }
 }
@@ -221,6 +228,53 @@ pub struct SamplePointConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn apply_reversal_reverses_when_enabled() {
+        let strip = LedStripConfig {
+            index: 0,
+            border: Border::Top,
+            display_id: 1,
+            len: 4,
+            led_type: LedType::WS2812B,
+            reversed: true,
+        };
+
+        let mut colors = vec![
+            LedColor::new(1, 0, 0),
+            LedColor::new(2, 0, 0),
+            LedColor::new(3, 0, 0),
+            LedColor::new(4, 0, 0),
+        ];
+
+        strip.apply_reversal(&mut colors);
+
+        let ordered: Vec<[u8; 3]> = colors.iter().map(|c| c.get_rgb()).collect();
+        assert_eq!(ordered, vec![[4, 0, 0], [3, 0, 0], [2, 0, 0], [1, 0, 0]]);
+    }
+
+    #[test]
+    fn apply_reversal_keeps_order_when_disabled() {
+        let strip = LedStripConfig {
+            index: 0,
+            border: Border::Top,
+            display_id: 1,
+            len: 3,
+            led_type: LedType::WS2812B,
+            reversed: false,
+        };
+
+        let mut colors = vec![
+            LedColor::new(10, 0, 0),
+            LedColor::new(11, 0, 0),
+            LedColor::new(12, 0, 0),
+        ];
+
+        strip.apply_reversal(&mut colors);
+
+        let ordered: Vec<[u8; 3]> = colors.iter().map(|c| c.get_rgb()).collect();
+        assert_eq!(ordered, vec![[10, 0, 0], [11, 0, 0], [12, 0, 0]]);
+    }
 
     #[test]
     fn test_parse_led_strip_config_group_from_toml() {
