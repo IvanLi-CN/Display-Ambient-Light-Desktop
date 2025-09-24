@@ -80,10 +80,11 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: RustSec advisory audit
-        uses: rustsec/audit-check@v1
+        uses: actions-rust-lang/audit@v1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --manifest-path src-tauri/Cargo.toml
+          # Use src-tauri workspace
+          workingDirectory: src-tauri
+          denyWarnings: false
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
