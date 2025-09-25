@@ -17,7 +17,7 @@ export interface LedPreviewProps {
 }
 
 export function LedPreview(props: LedPreviewProps) {
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const [sortedColors, setSortedColors] = createSignal<Uint8ClampedArray>(new Uint8ClampedArray(0));
   const [connected, setConnected] = createSignal(false);
   const [lastUpdateTime, setLastUpdateTime] = createSignal<Date | null>(null);
@@ -348,8 +348,8 @@ export function LedPreview(props: LedPreviewProps) {
 
   // 格式化时间（只显示时分秒）
   const formatTimeOnly = (date: Date | null) => {
-    if (!date) return '无数据';
-    return date.toLocaleString('zh-CN', {
+    if (!date) return t('common.noData');
+    return date.toLocaleString(locale(), {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
@@ -371,7 +371,7 @@ export function LedPreview(props: LedPreviewProps) {
         when={displayInfo().colors.length > 0}
         fallback={
           <div class="flex items-center justify-center h-16 text-base-content/60 text-xs bg-base-100 border border-base-300 rounded">
-            <div class="opacity-70">等待状态数据...</div>
+            <div class="opacity-70">{t('ledStatus.waitingForData')}</div>
           </div>
         }
       >

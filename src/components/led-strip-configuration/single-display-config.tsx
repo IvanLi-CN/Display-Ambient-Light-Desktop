@@ -302,6 +302,7 @@ const LedBorderAddButton: Component<{
   strips: LedStripConfig[];
   onCreateStrip: (border: 'Top' | 'Bottom' | 'Left' | 'Right') => Promise<void>;
 }> = (props) => {
+  const { t } = useLanguage();
   // 获取该边框的LED灯带数量
   const stripCount = createMemo(() => {
     // 安全检查：确保 strips 存在且是数组
@@ -388,16 +389,17 @@ const LedBorderAddButton: Component<{
 
   const getButtonText = () => {
     if (props.border === 'Left' || props.border === 'Right') {
-      return '+';  // 纵向只显示加号
+      return '+'; // 纵向只显示加号
     }
-    return stripCount() > 0 ? '+ 添加更多' : '+ 添加LED灯带';
+    const label = stripCount() > 0 ? t('singleDisplayConfig.addMoreStrip') : t('singleDisplayConfig.addStrip');
+    return `+ ${label}`;
   };
 
   return (
     <div
       style={getAddButtonStyle()}
       onClick={async () => await props.onCreateStrip(props.border)}
-      title={`点击添加${props.border}边LED灯带`}
+      title={t('singleDisplayConfig.addStripTooltip')}
       class="hover:bg-blue-200 hover:border-blue-400"
     >
       {getButtonText()}
@@ -961,10 +963,16 @@ export function SingleDisplayConfig() {
 
     console.log(`📊 总计: ${cumulativeLedOffset} 个LED`);
 
-    alert(`调试信息已输出到控制台。当前有 ${currentStrips.length} 个灯带配置，总计 ${cumulativeLedOffset} 个LED。`);
+    const debugMessage = [
+      t('singleDisplayConfig.debugInfoAlertIntro'),
+      `${t('singleDisplayConfig.debugInfoAlertStripCountPrefix')} ${currentStrips.length}`,
+      `${t('singleDisplayConfig.debugInfoAlertLedCountPrefix')} ${cumulativeLedOffset}`
+    ].join('\n');
+    alert(debugMessage);
     } catch (error) {
       console.error('❌ 调试函数执行失败:', error);
-      alert('❌ 调试函数执行失败: ' + (error instanceof Error ? error.message : String(error)));
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      alert(`${t('singleDisplayConfig.debugInfoAlertError')} ${errorMessage}`);
     }
   };
 
@@ -1045,9 +1053,9 @@ export function SingleDisplayConfig() {
           <button
             class="btn btn-outline btn-info"
             on:click={debugCurrentConfig}
-            title="在控制台显示调试信息"
+            title={t('singleDisplayConfig.debugInfoTooltip')}
           >
-            调试信息
+            {t('singleDisplayConfig.debugInfo')}
           </button>
           <button
             class="btn btn-outline btn-error"
@@ -1092,8 +1100,8 @@ export function SingleDisplayConfig() {
                   {/* 显示器信息 */}
                   <div class="absolute inset-0 flex items-center justify-center">
                     <div class="text-center">
-                      <div class="font-semibold">Display {displayId()}</div>
-                      <div class="text-sm text-base-content/60">LED Configuration</div>
+                      <div class="font-semibold">{t('singleDisplayConfig.displayLabel')} {displayId()}</div>
+                      <div class="text-sm text-base-content/60">{t('singleDisplayConfig.ledConfiguration')}</div>
                     </div>
                   </div>
                 </div>
@@ -1142,8 +1150,8 @@ export function SingleDisplayConfig() {
               <div class="card bg-base-100 shadow-lg">
                 <div class="card-body text-center text-base-content/60">
                   <p>{t('singleDisplayConfig.selectOrCreateStrip')}</p>
-                  <p class="text-xs mt-2">当前选中: {selectedStrip() ? selectedStrip()!.id : '无'}</p>
-                  <p class="text-xs">总灯带数: {ledStrips().length}</p>
+                  <p class="text-xs mt-2">{t('singleDisplayConfig.currentSelection')} {selectedStrip() ? selectedStrip()!.id : t('singleDisplayConfig.none')}</p>
+                  <p class="text-xs">{t('singleDisplayConfig.totalStripCount')} {ledStrips().length}</p>
                 </div>
               </div>
             }

@@ -5,11 +5,12 @@
 
 import { onMount, onCleanup, createSignal } from 'solid-js';
 import { adaptiveApi } from '../services/api-adapter';
+import { useLanguage } from '../i18n/index';
 
 // WebSocket连接状态
 export interface WebSocketStatus {
   connected: boolean;
-  lastMessage?: string;
+  lastMessageKey?: string;
   messageCount: number;
 }
 
@@ -38,6 +39,7 @@ interface WebSocketListenerProps {
  * WebSocket监听器组件
  */
 export const WebSocketListener = (props: WebSocketListenerProps) => {
+  const { t } = useLanguage();
   const [status, setStatus] = createSignal<WebSocketStatus>({
     connected: false,
     messageCount: 0
@@ -47,7 +49,11 @@ export const WebSocketListener = (props: WebSocketListenerProps) => {
 
   // 更新连接状态
   const updateConnectionStatus = (connected: boolean) => {
-    setStatus(prev => ({ ...prev, connected }));
+    setStatus((prev) => ({
+      ...prev,
+      connected,
+      ...(connected ? {} : { lastMessageKey: undefined })
+    }));
     props.handlers?.onConnectionStatusChanged?.(connected);
   };
 
@@ -61,9 +67,9 @@ export const WebSocketListener = (props: WebSocketListenerProps) => {
       if (props.handlers?.onLedColorsChanged) {
         const unlisten = await adaptiveApi.onEvent('LedColorsChanged', (data) => {
           // 移除频繁的颜色变化日志
-          setStatus(prev => ({
+          setStatus((prev) => ({
             ...prev,
-            lastMessage: 'LED颜色更新',
+            lastMessageKey: 'websocket.events.ledColorsChanged',
             messageCount: prev.messageCount + 1
           }));
           props.handlers?.onLedColorsChanged?.(data);
@@ -75,9 +81,9 @@ export const WebSocketListener = (props: WebSocketListenerProps) => {
       if (props.handlers?.onLedSortedColorsChanged) {
         const unlisten = await adaptiveApi.onEvent('LedSortedColorsChanged', (data) => {
           // 移除重复日志，只更新状态
-          setStatus(prev => ({
+          setStatus((prev) => ({
             ...prev,
-            lastMessage: 'LED颜色更新（按物理顺序排列）',
+            lastMessageKey: 'websocket.events.ledSortedColorsChanged',
             messageCount: prev.messageCount + 1
           }));
           props.handlers?.onLedSortedColorsChanged?.(data);
@@ -89,9 +95,9 @@ export const WebSocketListener = (props: WebSocketListenerProps) => {
       if (props.handlers?.onLedStripColorsChanged) {
         const unlisten = await adaptiveApi.onEvent('LedStripColorsChanged', (data) => {
           // 移除频繁的颜色变化日志
-          setStatus(prev => ({
+          setStatus((prev) => ({
             ...prev,
-            lastMessage: 'LED灯带颜色更新',
+            lastMessageKey: 'websocket.events.ledStripColorsChanged',
             messageCount: prev.messageCount + 1
           }));
           props.handlers?.onLedStripColorsChanged?.(data);
@@ -103,10 +109,10 @@ export const WebSocketListener = (props: WebSocketListenerProps) => {
       if (props.handlers?.onConfigChanged) {
         const unlisten = await adaptiveApi.onEvent('ConfigChanged', (data) => {
           console.log('⚙️ 配置变化:', data);
-          setStatus(prev => ({ 
-            ...prev, 
-            lastMessage: '配置更新',
-            messageCount: prev.messageCount + 1 
+          setStatus((prev) => ({
+            ...prev,
+            lastMessageKey: 'websocket.events.configChanged',
+            messageCount: prev.messageCount + 1
           }));
           props.handlers?.onConfigChanged?.(data);
         });
@@ -119,9 +125,9 @@ export const WebSocketListener = (props: WebSocketListenerProps) => {
           if (import.meta.env.DEV) {
             console.log('环境光状态变化:', data);
           }
-          setStatus(prev => ({
+          setStatus((prev) => ({
             ...prev,
-            lastMessage: '环境光状态更新',
+            lastMessageKey: 'websocket.events.ambientLightStateChanged',
             messageCount: prev.messageCount + 1
           }));
           props.handlers?.onAmbientLightStateChanged?.(data);
@@ -132,9 +138,9 @@ export const WebSocketListener = (props: WebSocketListenerProps) => {
       // 设备列表变化事件
       if (props.handlers?.onBoardsChanged) {
         const unlisten = await adaptiveApi.onEvent('BoardsChanged', (data) => {
-          setStatus(prev => ({
+          setStatus((prev) => ({
             ...prev,
-            lastMessage: '设备列表更新',
+            lastMessageKey: 'websocket.events.boardsChanged',
             messageCount: prev.messageCount + 1
           }));
           props.handlers?.onBoardsChanged?.(data);
@@ -145,9 +151,9 @@ export const WebSocketListener = (props: WebSocketListenerProps) => {
       // 显示器状态变化事件
       if (props.handlers?.onDisplaysChanged) {
         const unlisten = await adaptiveApi.onEvent('DisplaysChanged', (data) => {
-          setStatus(prev => ({
+          setStatus((prev) => ({
             ...prev,
-            lastMessage: '显示器状态更新',
+            lastMessageKey: 'websocket.events.displaysChanged',
             messageCount: prev.messageCount + 1
           }));
           props.handlers?.onDisplaysChanged?.(data);
@@ -161,9 +167,9 @@ export const WebSocketListener = (props: WebSocketListenerProps) => {
           if (import.meta.env.DEV) {
             console.log('导航事件:', data);
           }
-          setStatus(prev => ({
+          setStatus((prev) => ({
             ...prev,
-            lastMessage: '导航更新',
+            lastMessageKey: 'websocket.events.navigate',
             messageCount: prev.messageCount + 1
           }));
           props.handlers?.onNavigate?.(data);
@@ -224,15 +230,15 @@ export const WebSocketListener = (props: WebSocketListenerProps) => {
       <div class={`status-indicator ${status().connected ? 'connected' : 'disconnected'}`}>
         <span class="status-dot"></span>
         <span class="status-text">
-          {status().connected ? '已连接' : '未连接'}
+          {status().connected ? t('websocket.connected') : t('websocket.disconnected')}
         </span>
       </div>
       
       {status().connected && (
         <div class="status-details">
-          <span class="message-count">消息: {status().messageCount}</span>
-          {status().lastMessage && (
-            <span class="last-message">最新: {status().lastMessage}</span>
+          <span class="message-count">{t('websocket.messages')}: {status().messageCount}</span>
+          {status().lastMessageKey && (
+            <span class="last-message">{t('websocket.lastMessage')}: {t(status().lastMessageKey!)}</span>
           )}
         </div>
       )}
@@ -242,7 +248,7 @@ export const WebSocketListener = (props: WebSocketListenerProps) => {
           onClick={status().connected ? disconnect : connect}
           class={`btn btn-sm ${status().connected ? 'btn-warning' : 'btn-primary'}`}
         >
-          {status().connected ? '断开' : '连接'}
+          {status().connected ? t('websocket.disconnect') : t('websocket.connect')}
         </button>
       </div>
 

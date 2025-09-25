@@ -16,6 +16,8 @@ export interface TranslationDict {
   common: {
     version: string;
     primary: string;
+    yes: string;
+    no: string;
     save: string;
     cancel: string;
     reset: string;
@@ -104,6 +106,9 @@ export interface TranslationDict {
     // Display info panel specific
     id: string;
     scale: string;
+    ddcUnsupported: string;
+    primaryDisplayName: string;
+    displayLabel: string;
   };
   
   // LED Strip Configuration
@@ -180,6 +185,19 @@ export interface TranslationDict {
     saveFailed: string;
     saving: string;
     saveConfig: string;
+    debugInfo: string;
+    debugInfoTooltip: string;
+    debugInfoAlertIntro: string;
+    debugInfoAlertStripCountPrefix: string;
+    debugInfoAlertLedCountPrefix: string;
+    debugInfoAlertError: string;
+    currentSelection: string;
+    none: string;
+    totalStripCount: string;
+    addMoreStrip: string;
+    addStrip: string;
+    addStripTooltip: string;
+    displayLabel: string;
   };
   
   // Color Calibration
@@ -272,6 +290,8 @@ export interface TranslationDict {
     connected: string;
     connecting: string;
     disconnected: string;
+    configDataTest: string;
+    sendConfigData: string;
   };
   
   // Error messages
@@ -382,6 +402,25 @@ export interface TranslationDict {
       StripConfig: string;
       TestEffect: string;
       ColorCalibration: string;
+    };
+  };
+
+  websocket: {
+    connected: string;
+    disconnected: string;
+    messages: string;
+    lastMessage: string;
+    connect: string;
+    disconnect: string;
+    events: {
+      ledColorsChanged: string;
+      ledSortedColorsChanged: string;
+      ledStripColorsChanged: string;
+      configChanged: string;
+      ambientLightStateChanged: string;
+      boardsChanged: string;
+      displaysChanged: string;
+      navigate: string;
     };
   };
 }

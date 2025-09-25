@@ -14,6 +14,8 @@ export const zhCN: TranslationDict = {
   common: {
     version: '版本',
     primary: '主要',
+    yes: '是',
+    no: '否',
     save: '保存',
     cancel: '取消',
     reset: '重置',
@@ -100,6 +102,9 @@ export const zhCN: TranslationDict = {
     // Display info panel specific
     id: 'ID',
     scale: '缩放',
+    ddcUnsupported: '不支持DDC控制',
+    primaryDisplayName: '主显示器',
+    displayLabel: '显示器',
   },
   
   ledConfig: {
@@ -176,6 +181,19 @@ export const zhCN: TranslationDict = {
     saveFailed: '保存失败',
     saving: '保存中...',
     saveConfig: '保存配置',
+    debugInfo: '调试信息',
+    debugInfoTooltip: '在控制台输出详细的灯带配置信息',
+    debugInfoAlertIntro: '调试信息已输出到控制台。',
+    debugInfoAlertStripCountPrefix: '当前灯带数量：',
+    debugInfoAlertLedCountPrefix: 'LED总数：',
+    debugInfoAlertError: '调试函数执行失败：',
+    currentSelection: '当前选中：',
+    none: '无',
+    totalStripCount: '总灯带数：',
+    addMoreStrip: '添加更多',
+    addStrip: '添加LED灯带',
+    addStripTooltip: '点击添加LED灯带',
+    displayLabel: '显示器',
   },
   
   colorCalibration: {
@@ -266,6 +284,8 @@ export const zhCN: TranslationDict = {
     connected: '已连接',
     connecting: '连接中',
     disconnected: '已断开',
+    configDataTest: 'LED配置数据测试',
+    sendConfigData: '🔧 测试LED配置数据发送',
   },
   
   errors: {
@@ -373,6 +393,25 @@ export const zhCN: TranslationDict = {
       StripConfig: '配置模式',
       TestEffect: '测试模式',
       ColorCalibration: '颜色校准',
+    },
+  },
+
+  websocket: {
+    connected: '已连接',
+    disconnected: '未连接',
+    messages: '消息',
+    lastMessage: '最新',
+    connect: '连接',
+    disconnect: '断开',
+    events: {
+      ledColorsChanged: 'LED颜色更新',
+      ledSortedColorsChanged: 'LED颜色（按物理顺序）更新',
+      ledStripColorsChanged: 'LED灯带颜色更新',
+      configChanged: '配置更新',
+      ambientLightStateChanged: '氛围灯状态更新',
+      boardsChanged: '设备列表更新',
+      displaysChanged: '显示器状态更新',
+      navigate: '导航事件',
     },
   },
 };
