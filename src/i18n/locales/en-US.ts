@@ -14,6 +14,8 @@ export const enUS: TranslationDict = {
   common: {
     version: 'Version',
     primary: 'Primary',
+    yes: 'Yes',
+    no: 'No',
     save: 'Save',
     cancel: 'Cancel',
     reset: 'Reset',
@@ -100,6 +102,9 @@ export const enUS: TranslationDict = {
     // Display info panel specific
     id: 'ID',
     scale: 'Scale',
+    ddcUnsupported: 'DDC control not supported',
+    primaryDisplayName: 'Primary Display',
+    displayLabel: 'Display',
   },
   
   ledConfig: {
@@ -174,8 +179,21 @@ export const enUS: TranslationDict = {
     // Save status
     configSaved: 'Configuration saved',
     saveFailed: 'Save failed',
-    saving: 'Saving...',
-    saveConfig: 'Save Configuration',
+   saving: 'Saving...',
+   saveConfig: 'Save Configuration',
+    debugInfo: 'Debug Info',
+    debugInfoTooltip: 'Print detailed LED strip configuration to console',
+    debugInfoAlertIntro: 'Debug information has been printed to the console.',
+    debugInfoAlertStripCountPrefix: 'Configured strips:',
+    debugInfoAlertLedCountPrefix: 'Total LEDs:',
+    debugInfoAlertError: 'Failed to run debug helper:',
+    currentSelection: 'Current selection:',
+    none: 'None',
+    totalStripCount: 'Total strips:',
+    addMoreStrip: 'Add More',
+    addStrip: 'Add LED Strip',
+    addStripTooltip: 'Click to add an LED strip',
+    displayLabel: 'Display',
   },
   
   colorCalibration: {
@@ -266,6 +284,8 @@ export const enUS: TranslationDict = {
     connected: 'Connected',
     connecting: 'Connecting',
     disconnected: 'Disconnected',
+    configDataTest: 'LED Configuration Data Test',
+    sendConfigData: '🔧 Send LED configuration data',
   },
   
   errors: {
@@ -373,6 +393,25 @@ export const enUS: TranslationDict = {
       StripConfig: 'Configuration',
       TestEffect: 'Test Mode',
       ColorCalibration: 'Color Calibration',
+    },
+  },
+
+  websocket: {
+    connected: 'Connected',
+    disconnected: 'Disconnected',
+    messages: 'Messages',
+    lastMessage: 'Last',
+    connect: 'Connect',
+    disconnect: 'Disconnect',
+    events: {
+      ledColorsChanged: 'LED colors updated',
+      ledSortedColorsChanged: 'LED colors (sorted) updated',
+      ledStripColorsChanged: 'LED strip colors updated',
+      configChanged: 'Configuration updated',
+      ambientLightStateChanged: 'Ambient light status updated',
+      boardsChanged: 'Device list updated',
+      displaysChanged: 'Display status updated',
+      navigate: 'Navigation event',
     },
   },
 };

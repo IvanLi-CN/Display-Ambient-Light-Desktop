@@ -636,14 +636,14 @@ export const LedStripTest = () => {
           </div>
 
           {/* LED配置数据测试按钮 */}
-          <div class="divider">LED配置数据测试</div>
+          <div class="divider">{t('ledTest.configDataTest')}</div>
           <div class="flex gap-4">
             <button
               class="btn btn-secondary"
               onClick={testLedConfigData}
               disabled={!selectedBoard()}
             >
-              🔧 测试LED配置数据发送
+              {t('ledTest.sendConfigData')}
             </button>
           </div>
 

@@ -12,7 +12,7 @@ const logger = debug('app:components:info:info-index');
 export const InfoIndex: Component = () => {
   const [displayStates, setDisplayStates] = createSignal<DisplayState[]>([]);
   const [displayConfigs, setDisplayConfigs] = createSignal<any[]>([]);
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
 
   createEffect(() => {
     // 获取DDC显示器状态
@@ -49,6 +49,38 @@ export const InfoIndex: Component = () => {
     },
   };
 
+  const getDisplayName = (config: any, index: number) => {
+    const rawName = typeof config?.name === 'string' ? config.name.trim() : '';
+
+    if (rawName) {
+      if (locale() === 'en-US') {
+        if (config?.is_primary && rawName.includes('主显示器')) {
+          return t('displays.primaryDisplayName');
+        }
+
+        const match = rawName.match(/显示器\s*(\d+)/);
+        if (match) {
+          return `${t('displays.displayLabel')} ${match[1]}`;
+        }
+      }
+
+      if (locale() === 'zh-CN') {
+        const displayMatch = rawName.match(/Display\s*(\d+)/i);
+        if (displayMatch) {
+          return `${t('displays.displayLabel')} ${displayMatch[1]}`;
+        }
+      }
+
+      return rawName;
+    }
+
+    if (config?.is_primary) {
+      return t('displays.primaryDisplayName');
+    }
+
+    return `${t('displays.displayLabel')} ${index + 1}`;
+  };
+
   return (
     <div class="space-y-8">
       <WebSocketListener handlers={webSocketHandlers} />
@@ -72,32 +104,33 @@ export const InfoIndex: Component = () => {
             {(config, index) => {
               // 尝试找到对应的DDC状态
               const ddcState = displayStates().find((state, stateIndex) => stateIndex === index());
+              const displayName = getDisplayName(config, index());
 
               return (
                 <div class="relative">
                   {ddcState ? (
-                    <DisplayStateCard state={ddcState} />
+                    <DisplayStateCard state={ddcState} title={displayName} />
                   ) : (
                     <div class="card bg-base-100 shadow-xl">
                       <div class="card-body">
-                        <h2 class="card-title text-base-content">{config.name}</h2>
+                        <h2 class="card-title text-base-content">{displayName}</h2>
                         <div class="space-y-2">
                           <div class="flex justify-between items-center py-1">
-                            <dt class="text-sm font-medium text-base-content/70">分辨率</dt>
+                            <dt class="text-sm font-medium text-base-content/70">{t('displays.resolution')}</dt>
                             <dd class="text-sm font-mono text-base-content">{config.width}x{config.height}</dd>
                           </div>
                           <div class="flex justify-between items-center py-1">
-                            <dt class="text-sm font-medium text-base-content/70">缩放比例</dt>
+                            <dt class="text-sm font-medium text-base-content/70">{t('displays.scaleFactor')}</dt>
                             <dd class="text-sm font-mono text-base-content">{config.scale_factor}</dd>
                           </div>
                           <div class="flex justify-between items-center py-1">
-                            <dt class="text-sm font-medium text-base-content/70">主显示器</dt>
-                            <dd class="text-sm font-mono text-base-content">{config.is_primary ? '是' : '否'}</dd>
+                            <dt class="text-sm font-medium text-base-content/70">{t('displays.isPrimary')}</dt>
+                            <dd class="text-sm font-mono text-base-content">{config.is_primary ? t('common.yes') : t('common.no')}</dd>
                           </div>
                           <div class="flex justify-between items-center py-1">
-                            <dt class="text-sm font-medium text-base-content/70">状态</dt>
+                            <dt class="text-sm font-medium text-base-content/70">{t('info.status')}</dt>
                             <dd class="text-sm font-mono text-base-content">
-                              <span class="badge badge-warning">不支持DDC控制</span>
+                              <span class="badge badge-warning">{t('displays.ddcUnsupported')}</span>
                             </dd>
                           </div>
                         </div>
