@@ -26,6 +26,9 @@ jobs:
         with:
           bun-version: latest
 
+      - name: Check release workflow concurrency contract
+        run: bun scripts/test-release-workflow-concurrency.mjs
+
       - name: Cache Bun packages
         uses: actions/cache@v4
         with:
