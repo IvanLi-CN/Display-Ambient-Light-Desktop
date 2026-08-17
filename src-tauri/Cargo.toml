@@ -43,7 +43,7 @@ futures = "0.3.28"
 ddc-hi = "0.4.1"
 coreaudio-rs = "0.11.2"
 screen-capture-kit = "0.3.1"
-image = { version = "0.24", features = ["jpeg"] }
+image = { version = "0.24", default-features = false, features = ["jpeg", "png"] }
 tokio-tungstenite = "0.20"
 futures-util = "0.3"
 sha1 = "0.10"
@@ -68,3 +68,6 @@ hostname = "0.3"
 # this feature is used for production builds or when `devPath` points to the filesystem
 # DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
+
+[patch.crates-io]
+ddc-hi = { path = "vendor/ddc-hi" }

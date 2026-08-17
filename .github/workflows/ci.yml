@@ -50,6 +50,9 @@ jobs:
           cache-all-crates: true
           save-if: 'always'
 
+      - name: Check Rust dependency security contract
+        run: bun scripts/test-rust-dependency-security-contract.mjs
+
       - name: Install frontend dependencies
         run: bun install --no-progress
 
